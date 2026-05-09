@@ -116,6 +116,9 @@ physics:
   humidity:
     outdoor_mean: 55.0                        # %RH baseline outdoor (Valencia Csa)
     occupancy_gain_per_person: 0.08           # %RH/persona (vapor exhalado)
+    # L-PV-09 (PATCH 003): cooling deshumidifica. tau y cooling_dehum_delta antes hardcoded.
+    tau_minutes: 180                          # tau de respuesta (~3h, legacy hardcoded)
+    cooling_dehum_delta: 8.0                  # %RH menos en target cuando HVAC en cool
   noise:
     base_unoccupied: 33.0                     # dB(A) ambiente
     base_occupied: 55.0                       # dB(A) base con ocupación

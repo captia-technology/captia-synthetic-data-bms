@@ -1,0 +1,107 @@
+# 003-humidity-dehumidification.patch
+
+**Title**: Humidity dehumidification cuando HVAC está en cooling (L-PV-09).
+
+**Status**: Applied.
+
+**Applied on**: 2026-05-10.
+
+**Linked finding**: `docs/audit/PHYSICAL_REALISM_REPORT.md` F-1 (humidity siempre drift hacia outdoor + occ).
+
+**Linked open question**: `docs/specs/digital-twin-bms-physics-validation/02-physics-questions.md` L-PV-09.
+
+**Linked rule**: `docs/specs/digital-twin-bms-physics-validation/04-physical-plausibility-rules.md` R-RH-02 (cooling debería deshumidificar).
+
+## Problema
+
+`vendor/.../physics/indoor.py:simulate_humidity` ignoraba el modo HVAC. La
+humedad siempre derivaba a `outdoor_mean + occ_gain * occupancy`. En la
+realidad, una unidad AC en cooling tiene una batería fría que condensa el
+vapor de agua: `∂RH/∂t < 0` durante el cooling. R-RH-02 documentaba este
+comportamiento como esperado FAIL hasta que se modelara.
+
+Sin esta corrección, datasets generados para entrenamiento ML tienen una
+ventana RH desconectada del modo HVAC, sesgando cualquier modelo que
+intente correlacionar IAQ con uso de climatización.
+
+## Cambio
+
+`simulate_humidity` añade dos parámetros opcionales `hvac_enable` y
+`hvac_mode`:
+
+- Si ambos son `None` (default), comportamiento legacy preservado.
+- Si están presentes y `enable == 1 AND mode == "cool"`, el target RH del
+  paso se reduce en `cfg_h.get("cooling_dehum_delta", 8.0)` % RH.
+
+Adicionalmente, dos constantes que estaban hardcoded ahora son configurables:
+
+- `tau_minutes` (default `180`) — antes `alpha = dt / 180.0` literal.
+- `cooling_dehum_delta` (default `8.0` % RH) — la corrección dehumid de cooling.
+
+`plugin.py` pasa `enable` y `mode` ya calculados localmente al llamar
+`simulate_humidity`, sin trabajo extra.
+
+`domain.yaml` añade los dos defaults bajo `physics.humidity` para que el
+override sea visible y editable sin tocar código.
+
+## Diff
+
+```diff
+--- a/src/synthetic_generator/domains/bms_classrooms/physics/indoor.py
++++ b/src/synthetic_generator/domains/bms_classrooms/physics/indoor.py
+@@ -102,8 +102,10 @@ def simulate_humidity(
+     index: pd.DatetimeIndex,
+     outdoor_temp: pd.Series,
+     occupancy: pd.Series,
+     cfg_h: Dict[str, Any],
+-    rng: np.random.Generator
++    rng: np.random.Generator,
++    hvac_enable: pd.Series | None = None,
++    hvac_mode: pd.Series | None = None,
+ ) -> pd.Series:
+@@ -123,15 +125,22 @@
+     outdoor_mean = float(cfg_h.get("outdoor_mean", 55))
+     occ_gain = float(cfg_h.get("occupancy_gain_per_person", 0.08))
++    tau_minutes = float(cfg_h.get("tau_minutes", 180))
++    cooling_dehum_delta = float(cfg_h.get("cooling_dehum_delta", 8.0))
+     dt_min = (index[1] - index[0]).total_seconds() / 60.0 if len(index) > 1 else 5.0
+-    alpha = dt_min / 180.0
++    alpha = dt_min / max(1.0, tau_minutes)
+     h = np.zeros(len(index), dtype=float)
+     h[0] = outdoor_mean + rng.normal(0, 4)
++    cool_mask = None
++    if hvac_enable is not None and hvac_mode is not None:
++        cool_mask = (hvac_enable.values == 1) & (hvac_mode.values == "cool")
+     for i in range(1, len(index)):
+         target = outdoor_mean + occ_gain * occupancy.iat[i]
++        if cool_mask is not None and cool_mask[i]:
++            target -= cooling_dehum_delta
+         h[i] = h[i - 1] + alpha * (target - h[i - 1]) + rng.normal(0, 0.2)
+     return pd.Series(np.clip(h, 10, 90), index=index, name="humidity")
+
+--- a/src/synthetic_generator/domains/bms_classrooms/plugin.py
++++ b/src/synthetic_generator/domains/bms_classrooms/plugin.py
+@@ -162,1 +162,5 @@
+-            hum = simulate_humidity(time_index, ctx.outdoor_temp, occ, cfg_h, aula_rng)
++            # L-PV-09 / PATCH 003: pasar hvac_enable + mode para que cooling deshumidifique.
++            hum = simulate_humidity(
++                time_index, ctx.outdoor_temp, occ, cfg_h, aula_rng,
++                hvac_enable=enable, hvac_mode=mode,
++            )
+```
+
+## Validación
+
+- `tests/integration/test_humidity_dehumidification_audit.py`:
+  1. Sin `hvac_enable`/`hvac_mode` (None) → comportamiento legacy preservado.
+  2. Con `mode="cool"` y `enable=1` → RH significativamente menor que con
+     `mode="heat"` o `enable=0`.
+  3. `tau_minutes` y `cooling_dehum_delta` realmente leídos desde cfg_h.
+
+## Reversibilidad
+
+Si causa problemas en consumidores externos:
+- En código: pasar siempre `hvac_enable=None, hvac_mode=None` al llamar
+  `simulate_humidity`.
+- En config: eliminar `cooling_dehum_delta` y `tau_minutes` de
+  `domain.yaml` — el default 0.0 / 180 se preserva.

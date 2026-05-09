@@ -159,7 +159,11 @@ class BMSClassroomsPlugin(DomainPlugin):
 
             # Indoor environment
             co2 = simulate_co2(time_index, occ, enable, cfg_co2, aula_rng)
-            hum = simulate_humidity(time_index, ctx.outdoor_temp, occ, cfg_h, aula_rng)
+            # L-PV-09 / PATCH 003: pasar hvac_enable + mode para que cooling deshumidifique.
+            hum = simulate_humidity(
+                time_index, ctx.outdoor_temp, occ, cfg_h, aula_rng,
+                hvac_enable=enable, hvac_mode=mode,
+            )
             noi = simulate_noise(time_index, occ, cfg_noise, aula_rng)
             illum = simulate_illuminance(time_index, ctx.daylight_lux, light, cfg_light, aula_rng)
             pir = derive_pir_presence(occ, aula_rng)

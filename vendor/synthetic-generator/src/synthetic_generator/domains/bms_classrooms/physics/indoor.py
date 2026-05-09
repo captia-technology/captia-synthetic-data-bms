@@ -104,11 +104,17 @@ def simulate_humidity(
     outdoor_temp: pd.Series,
     occupancy: pd.Series,
     cfg_h: Dict[str, Any],
-    rng: np.random.Generator
+    rng: np.random.Generator,
+    hvac_enable: pd.Series | None = None,
+    hvac_mode: pd.Series | None = None,
 ) -> pd.Series:
     """Simulate relative humidity dynamics.
 
-    Models humidity response to occupancy with first-order dynamics.
+    Models humidity response to occupancy with first-order dynamics. When
+    ``hvac_enable`` and ``hvac_mode`` are provided and the unit is in cooling
+    mode, the cold coil condenses water vapor and the target RH is pulled
+    down by ``cooling_dehum_delta`` (% RH). Defaults preserve legacy behavior
+    when the new params are ``None`` (L-PV-09 / PATCH 003).
 
     Args:
         index: Time index
@@ -116,21 +122,33 @@ def simulate_humidity(
         occupancy: Occupancy count series
         cfg_h: Humidity physics configuration
         rng: NumPy random generator
+        hvac_enable: Optional HVAC enable signal series (0/1). If ``None``,
+            no dehumidification is applied (legacy).
+        hvac_mode: Optional HVAC mode series ('off'/'heat'/'cool'/'auto'). If
+            ``None``, no dehumidification is applied (legacy).
 
     Returns:
         Series of relative humidity in %RH
     """
     outdoor_mean = float(cfg_h.get("outdoor_mean", 55))
     occ_gain = float(cfg_h.get("occupancy_gain_per_person", 0.08))
+    tau_minutes = float(cfg_h.get("tau_minutes", 180))
+    cooling_dehum_delta = float(cfg_h.get("cooling_dehum_delta", 8.0))
 
     dt_min = (index[1] - index[0]).total_seconds() / 60.0 if len(index) > 1 else 5.0
-    alpha = dt_min / 180.0
+    alpha = dt_min / max(1.0, tau_minutes)
 
     h = np.zeros(len(index), dtype=float)
     h[0] = outdoor_mean + rng.normal(0, 4)
 
+    cool_mask: np.ndarray | None = None
+    if hvac_enable is not None and hvac_mode is not None:
+        cool_mask = (hvac_enable.values == 1) & (hvac_mode.values == "cool")
+
     for i in range(1, len(index)):
         target = outdoor_mean + occ_gain * occupancy.iat[i]
+        if cool_mask is not None and cool_mask[i]:
+            target -= cooling_dehum_delta
         h[i] = h[i - 1] + alpha * (target - h[i - 1]) + rng.normal(0, 0.2)
 
     return pd.Series(np.clip(h, 10, 90), index=index, name="humidity")
