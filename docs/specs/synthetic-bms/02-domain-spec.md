@@ -88,9 +88,36 @@ captia/{captia_env}/{captia_tenant}/{site_id}/{asset_id}/event/{variable}
 Para cada variable se publica al bucket `captia_metadata` (retención infinita) un registro con:
 
 ```
-captia_metadata,domain_id=bms_classrooms,asset_id=AULA01,variable=co2
-  unit="ppm",rango_min=300,rango_max=5000,metric_kind="analog_gauge"
+captia_metadata,captia_env=dev,domain_id=bms_classrooms,site_id=ies_simarro,variable=co2
+  unit="ppm",metric_kind="analog_gauge",range_min=300,range_max=5000
 ```
+
+El catálogo es **a nivel de dominio** (no por `asset_id`): todas las aulas del
+mismo `domain_id` comparten el mismo perfil de variables. La carga la realiza
+`infra/influxdb/init/init_buckets_tasks.sh` durante `make demo`, leyendo
+`config/domains/<domain_id>/variables.yaml` y emitiendo line-protocol con
+`influx write`. Sin este registro, las tareas Flux de downsampling no
+escribirían a `telemetry_1m` (regla CENTINELA+ § 1.3).
+
+### Naming de variables — alias guion ↔ underscore
+
+`docs/CENTINELA_Guia_Alumnos_v4.md` mezcla los dos estilos: línea 59 usa
+`temperature_01`, `co2`, `t-voc`, `iaq-index`; línea 416-424 (mapping Caso A)
+usa `temperature-indoor`, `relative-humidity`. Para evitar quoting de Flux y
+mantener compatibilidad con el resto del schema (`captia_env`, `domain_id`,
+`asset_id` siempre con underscore), este repo normaliza **todo a
+underscore**. ETL externos (Caso A In-Gauge → CAPTIA) deben usar la tabla
+de equivalencias siguiente al ingestar:
+
+| Alias guía CENTINELA+ (con guion) | Variable canónica (con underscore, este repo) |
+|-----------------------------------|----------------------------------------------|
+| `temperature-indoor`              | `temperature_01`                             |
+| `relative-humidity`               | `relative_humidity_01`                       |
+| `t-voc`                           | `t_voc`                                      |
+| `iaq-index`                       | `iaq_index`                                  |
+| `avg-sound-level`                 | `avg_sound_level`                            |
+| `max-sound-level`                 | `max_sound_level`                            |
+| `people-count`                    | `people_count`                               |
 
 ## Reglas de generación
 
@@ -143,15 +170,30 @@ captia_metadata,domain_id=bms_classrooms,asset_id=AULA01,variable=co2
 
 ### Etiquetado de fallos
 
-Cada evento de fallo genera serie en bucket `state_events` (90 d retención) con:
+Conforme a `docs/CENTINELA_Guia_Alumnos_v4.md:464` (Caso C — *"las etiquetas de
+fallo no van en InfluxDB junto a la telemetría: van en lakeFS o en un
+measurement separado `captia_fault_labels`"*), las etiquetas se materializan
+en un measurement dedicado **`captia_fault_labels`** dentro del bucket
+`state_events` (90 d de retención).
+
+Schema:
 
 ```
-captia_point,captia_env=dev,domain_id=bms_classrooms,site_id=ies_simarro,asset_id=AULA03,variable=fault.valve_stuck
-  value=1.0  <- durante el episodio
-  value=0.0  <- al terminar
+captia_fault_labels,captia_env=dev,domain_id=bms_classrooms,site_id=ies_simarro,asset_id=AULA03,fault_type=valve_stuck
+  active=1.0i,severity=0.74    <- al iniciar el episodio (timestamp = start)
+  active=0.0i                  <- al terminar (timestamp = end)
 ```
 
-Esto permite training supervisado (Caso C) y queries Flux para clasificación.
+Tags: los 4 tags canónicos (`captia_env`, `domain_id`, `site_id`, `asset_id`)
+más `fault_type` (uno de los 4 tipos del catálogo).
+
+Fields: `active` (bool 0/1) marca el inicio/fin del episodio; `severity`
+(float ∈ [0.3, 1.0]) acompaña al evento de inicio.
+
+Esta separación mantiene `captia_point` libre de etiquetas no-canónicas y
+permite que un consumidor entrene clasificadores supervisados con un
+único `from(bucket:"state_events") |> filter(fn:(r) => r._measurement ==
+"captia_fault_labels")`.
 
 ## Acceptance criteria
 

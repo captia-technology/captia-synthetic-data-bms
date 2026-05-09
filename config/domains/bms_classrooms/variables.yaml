@@ -53,6 +53,11 @@ variables:
     metric_kind: counter
     rango_min: 0
     rango_max: 3000
+  - name: light_consumption
+    unit: "Wh"
+    metric_kind: counter
+    rango_min: 0
+    rango_max: 1500
 
   # HVAC
   - name: temperature_supply
@@ -71,6 +76,11 @@ variables:
     rango_min: 0
     rango_max: 1
   - name: ac_control
+    unit: "bool"
+    metric_kind: bool_state
+    rango_min: 0
+    rango_max: 1
+  - name: heat_state
     unit: "bool"
     metric_kind: bool_state
     rango_min: 0

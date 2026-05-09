@@ -1,7 +1,11 @@
 """Inyector de fallos HVAC para escenarios sintéticos BMS (Caso C).
 
-Genera eventos de fallo etiquetables con frecuencia configurable. Los eventos
-se materializan luego en el bucket `state_events` con `variable=fault.<tipo>`.
+Genera eventos de fallo etiquetables con frecuencia configurable. Conforme a
+``docs/CENTINELA_Guia_Alumnos_v4.md:464`` los eventos NO se mezclan con la
+telemetría canónica (`captia_point`). Se publican al bucket ``state_events``
+en un *measurement* dedicado ``captia_fault_labels`` con tags
+``captia_env``, ``domain_id``, ``site_id``, ``asset_id`` y ``fault_type``,
+y fields ``active`` (bool 0/1) + ``severity`` (float ∈ [0.3, 1.0]).
 
 Tipos soportados (ADR-010):
     - sensor_drift: deriva acumulativa en sensores de temperatura.

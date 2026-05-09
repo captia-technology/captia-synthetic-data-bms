@@ -1,6 +1,7 @@
 # =============================================================================
 # CAPTIA-SYNTHETIC-DATA-BMS — data plane init (one-shot)
-# Servicio: influx-init que crea 6 buckets y 5 tareas Flux.
+# Servicio: influx-init que crea 7 buckets, aplica las 5 tareas Flux y
+# puebla captia_metadata desde config/domains/<dominio>/variables.yaml.
 # =============================================================================
 
 name: captia-bms
@@ -16,10 +17,13 @@ services:
     volumes:
       - ../infra/influxdb/init:/scripts:ro
       - ../infra/influxdb/tasks:/tasks:ro
+      - ../config/domains:/domains:ro
     environment:
       - INFLUXDB_URL=${INFLUXDB_URL:-http://influxdb:8086}
       - INFLUXDB_TOKEN=${INFLUXDB_TOKEN:?required}
       - INFLUXDB_ORG=${INFLUXDB_ORG:-captia}
+      - CAPTIA_ENV=${CAPTIA_ENV:-dev}
+      - CAPTIA_SITE=${CAPTIA_SITE:-ies_simarro}
     entrypoint: ["/bin/sh", "/scripts/init_buckets_tasks.sh"]
 
 networks:

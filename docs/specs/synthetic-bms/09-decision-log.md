@@ -77,10 +77,35 @@
 ## ADR-010 — 4 tipos de fallos HVAC v1
 
 - **Contexto**: Caso C requiere etiquetas de fallo; sin docs de catalogación específica.
-- **Decisión**: 4 tipos: `sensor_drift`, `valve_stuck`, `fan_failure`, `refrigerant_low`. Probabilidades configurables vía `config/domains/bms_classrooms/faults.yaml`. Etiquetas en bucket `state_events` con `variable=fault.<tipo>`.
+- **Decisión**: 4 tipos: `sensor_drift`, `valve_stuck`, `fan_failure`, `refrigerant_low`. Probabilidades configurables vía `config/domains/bms_classrooms/faults.yaml`.
 - **Alternativas**: sin fallos (bloquea Caso C); fallos físicos completos LBNL FDD (over-engineering v1).
 - **Consecuencias**: hooks abiertos para añadir tipos.
 - **Estado**: Aceptada.
+
+## ADR-010-bis — Etiquetas de fallo en `captia_fault_labels` (no `state_events:variable=fault.*`)
+
+- **Contexto**: la decisión inicial (ADR-010 v1) materializaba los eventos
+  como series con `variable=fault.<tipo>` dentro del bucket `state_events`,
+  pero la guía CENTINELA+ es taxativa al respecto: *"las etiquetas de fallo
+  no van en InfluxDB junto a la telemetría canónica: van en lakeFS o en un
+  measurement separado `captia_fault_labels`"* (`docs/CENTINELA_Guia_Alumnos_v4.md:464`).
+  Mezclarlas con `captia_point` rompería:
+  - El contrato tácito *un measurement = un schema de tags*.
+  - Cualquier query agregada (ej. `mean(value)` sobre `captia_point` con
+    `variable` libre) que sumaría 0/1 lógicos a magnitudes físicas.
+  - La auditabilidad — un consumidor del Caso C no sabría distinguir un
+    "fallo" de una telemetría real con un nombre engañoso.
+- **Decisión**: las etiquetas se publican al bucket `state_events` (90 d
+  retención) en el measurement dedicado `captia_fault_labels` con:
+  - tags: `captia_env`, `domain_id`, `site_id`, `asset_id`, `fault_type`
+  - fields: `active` (0/1), `severity` (0.3–1.0).
+- **Consecuencias**:
+  - El dashboard `bms_faults_caseC.json` consulta `captia_fault_labels` (no
+    `variable =~ /^fault\\..*/`).
+  - Documentado en `02-domain-spec.md` (sección *Etiquetado de fallos*).
+  - El docstring de `extensions/bms_calibration/src/bms_calibration/faults.py`
+    reproduce el contrato.
+- **Estado**: Aceptada (sustituye la sub-decisión de ADR-010 sobre routing).
 
 ## ADR-011 — Grafana provisionado, sin UI custom
 

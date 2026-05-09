@@ -44,7 +44,7 @@
       "targets": [
         {
           "datasource": {"type": "influxdb", "uid": "influxdb"},
-          "query": "from(bucket: \"state_events\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"captia_point\" and r.variable =~ /^fault\\..*/ )\n  |> aggregateWindow(every: 1h, fn: count, createEmpty: false)",
+          "query": "from(bucket: \"state_events\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"captia_fault_labels\" and r._field == \"active\")\n  |> aggregateWindow(every: 1h, fn: count, createEmpty: false)",
           "refId": "A"
         }
       ]
@@ -57,7 +57,7 @@
       "targets": [
         {
           "datasource": {"type": "influxdb", "uid": "influxdb"},
-          "query": "from(bucket: \"state_events\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"captia_point\" and r.variable =~ /^fault\\..*/ and r._value == 1.0)\n  |> last()\n  |> group(columns: [\"asset_id\", \"variable\"])",
+          "query": "from(bucket: \"state_events\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"captia_fault_labels\" and r._field == \"active\" and r._value == 1.0)\n  |> last()\n  |> group(columns: [\"asset_id\", \"fault_type\"])",
           "refId": "A"
         }
       ]

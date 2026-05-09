@@ -31,7 +31,7 @@ if [ -z "${buckets}" ]; then
     exit 1
 fi
 
-required="telemetry telemetry_1m telemetry_15m telemetry_1h state_events captia_metadata"
+required="telemetry telemetry_1m telemetry_15m telemetry_1h state_events telemetry_events captia_metadata"
 missing=""
 for b in ${required}; do
     if ! echo "${buckets}" | grep -qx "${b}"; then
@@ -45,5 +45,18 @@ if [ -n "${missing}" ]; then
     exit 1
 fi
 
-echo "  - 6 buckets canónicos presentes (telemetry, _1m, _15m, _1h, state_events, captia_metadata)"
+echo "  - 7 buckets canónicos presentes (telemetry, _1m, _15m, _1h, state_events, telemetry_events, captia_metadata)"
+
+# Bonus: validar que captia_metadata está poblado (gap CENTINELA+ § 549).
+md_count=$(curl -fsS -X POST -H "Authorization: Token ${TOKEN}" \
+    -H "Content-Type: application/vnd.flux" \
+    "${URL}/api/v2/query?org=${ORG}" \
+    --data 'from(bucket:"captia_metadata") |> range(start:-1d) |> filter(fn:(r) => r._field=="metric_kind") |> group() |> count() |> rename(columns:{_value:"n"})' 2>/dev/null \
+    | tr -d '\r' \
+    | awk -F, 'NF>=6 && $6 ~ /^[0-9]+$/ {print $6; exit}')
+if [ -n "${md_count:-}" ] && [ "${md_count}" -ge 24 ]; then
+    echo "  - captia_metadata poblado (${md_count} variables)"
+else
+    echo "  - WARN: captia_metadata casi vacío (${md_count:-0} variables; esperadas ≥ 24)"
+fi
 echo "==> Smoke InfluxDB OK"

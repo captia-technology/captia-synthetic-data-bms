@@ -44,17 +44,55 @@ refresh_bucket_cache() {
     existing_buckets=$(influx bucket list --org-id "${ORG_ID}" 2>/dev/null | awk 'NR>1 {print $2}')
 }
 
+# Look up bucket metadata via REST (avoids 'influx bucket update' CLI quirks
+# in v2.7 where neither --org-id nor --name are valid identifiers).
+_bucket_lookup() {
+    name="$1"
+    curl -sS -H "Authorization: Token ${INFLUX_TOKEN}" \
+        "${INFLUX_HOST}/api/v2/buckets?org-id=${ORG_ID}&name=${name}" 2>/dev/null \
+        | tr -d ' \t\r\n'
+}
+
 create_bucket_if_missing() {
     name="$1"
     retention="$2"
+    target_seconds=$(_retention_to_seconds "${retention}")
     if echo "${existing_buckets}" | grep -qx "${name}"; then
-        echo "bucket exists: ${name}"
+        body=$(_bucket_lookup "${name}")
+        bucket_id=$(echo "${body}" \
+            | grep -o "\"id\":\"[^\"]*\",\"orgID\"[^}]*\"name\":\"${name}\"" \
+            | grep -o '"id":"[^"]*"' | head -n1 | sed 's/"id":"//; s/"$//')
+        actual_seconds=$(echo "${body}" \
+            | grep -o "\"name\":\"${name}\"[^}]*\"everySeconds\":[0-9]*" \
+            | grep -o '"everySeconds":[0-9]*' | head -n1 | sed 's/"everySeconds"://')
+        if [ "${actual_seconds:-0}" = "${target_seconds}" ]; then
+            echo "bucket exists: ${name} (retention OK: ${retention})"
+        elif [ -n "${bucket_id}" ]; then
+            echo "bucket exists: ${name} — updating retention ${actual_seconds:-?}s -> ${retention} (${target_seconds}s)"
+            influx bucket update --id "${bucket_id}" --retention "${retention}" \
+                || echo "  WARN: could not update retention for ${name}"
+        else
+            echo "bucket exists: ${name} — could not resolve id (skipping update)"
+        fi
     else
         echo "creating bucket: ${name} (${retention})"
         influx bucket create --org-id "${ORG_ID}" --name "${name}" --retention "${retention}"
         existing_buckets="${existing_buckets}
 ${name}"
     fi
+}
+
+# Convert a retention spec like '14d', '30d', '720h', '0' to seconds.
+_retention_to_seconds() {
+    spec="$1"
+    case "${spec}" in
+        0|0s|infinite) echo 0 ;;
+        *d) echo $(( ${spec%d} * 86400 )) ;;
+        *h) echo $(( ${spec%h} * 3600 )) ;;
+        *m) echo $(( ${spec%m} * 60 )) ;;
+        *s) echo "${spec%s}" ;;
+        *) echo "${spec}" ;;
+    esac
 }
 
 refresh_bucket_cache
@@ -70,6 +108,72 @@ create_bucket_if_missing "state_events" "90d"
 # Source of truth: docs/influxdb-simarro-buckets.pptx slide 8.
 create_bucket_if_missing "telemetry_events" "90d"
 create_bucket_if_missing "captia_metadata" "0"
+
+# =============================================================================
+# Populate captia_metadata bucket from config/domains/<domain>/variables.yaml
+# Closes the gap reported by CENTINELA+ guide (line 549, 268): the rollup
+# tasks only emit data for variables present in captia_metadata.
+# =============================================================================
+populate_metadata() {
+    domain_dir="$1"
+    [ -d "${domain_dir}" ] || return 0
+    domain_id=$(basename "${domain_dir}")
+    yaml_file="${domain_dir}/variables.yaml"
+    [ -f "${yaml_file}" ] || return 0
+    echo "populating captia_metadata from ${yaml_file} (domain=${domain_id})"
+    site_id="${CAPTIA_SITE:-ies_simarro}"
+    captia_env="${CAPTIA_ENV:-dev}"
+    ts_ns=$(date +%s)000000000
+
+    # Idempotencia: borrar todos los registros previos de este dominio antes
+    # de re-poblar. La API REST /api/v2/delete tiene quirks con el predicate
+    # sobre _measurement; el CLI 'influx delete' es más fiable.
+    influx delete \
+        --bucket captia_metadata --org-id "${ORG_ID}" \
+        --start 1970-01-01T00:00:00Z --stop 2099-12-31T23:59:59Z \
+        --predicate "_measurement=\"captia_metadata\" AND domain_id=\"${domain_id}\"" \
+        >/dev/null 2>&1 \
+        && echo "  - cleared existing records for domain=${domain_id}" \
+        || echo "  - (no previous records to clear for domain=${domain_id})"
+    # Tiny YAML parser (sh-only): emit one influx line-protocol per variable.
+    # Each variable becomes:
+    #   captia_metadata,captia_env=<env>,domain_id=<domain>,site_id=<site>,variable=<name>
+    #     unit="<unit>",metric_kind="<kind>",range_min=<n>,range_max=<n>
+    awk -v env="${captia_env}" -v domain="${domain_id}" -v site="${site_id}" -v ts="${ts_ns}" '
+        /^  - name:/ {
+            if (name != "") emit();
+            name = $3; gsub("\"|'\''", "", name);
+            unit=""; kind=""; rmin=""; rmax="";
+            next;
+        }
+        /^    unit:/         { sub(/^    unit:[[:space:]]*/, ""); gsub("\"|'\''", ""); unit=$0; next }
+        /^    metric_kind:/  { sub(/^    metric_kind:[[:space:]]*/, ""); kind=$0; next }
+        /^    rango_min:/    { sub(/^    rango_min:[[:space:]]*/, ""); rmin=$0; next }
+        /^    rango_max:/    { sub(/^    rango_max:[[:space:]]*/, ""); rmax=$0; next }
+        END { if (name != "") emit(); }
+        function emit() {
+            tags = "captia_env=" env ",domain_id=" domain ",site_id=" site ",variable=" name;
+            fields = "unit=\"" unit "\",metric_kind=\"" kind "\""
+            if (rmin != "") fields = fields ",range_min=" rmin
+            if (rmax != "") fields = fields ",range_max=" rmax
+            print "captia_metadata," tags " " fields " " ts
+        }
+    ' "${yaml_file}" > /tmp/metadata.lp
+    lines=$(wc -l < /tmp/metadata.lp || echo 0)
+    if [ "${lines}" -gt 0 ]; then
+        influx write --org-id "${ORG_ID}" --bucket captia_metadata \
+            --file /tmp/metadata.lp \
+            && echo "  - wrote ${lines} captia_metadata records"
+    else
+        echo "  - WARN: no variables parsed from ${yaml_file}"
+    fi
+}
+
+if [ -d /domains ]; then
+    for d in /domains/*/; do
+        [ -d "${d}" ] && populate_metadata "${d%/}"
+    done
+fi
 
 existing_tasks=$(influx task list --org-id "${ORG_ID}" 2>/dev/null | awk 'NR>1 {print $4}')
 for task_file in /tasks/*.flux; do
