@@ -1,0 +1,94 @@
+# 009-noise-ewma-smoothing.patch
+
+**Title**: EWMA en `simulate_noise` para suavizar transiciones occupancy (F-6).
+
+**Status**: Applied.
+
+**Applied on**: 2026-05-10.
+
+**Linked finding**: `docs/audit/PHYSICAL_REALISM_REPORT.md` F-6 (discontinuidad
+ruido `occ=0 → 1`, salto 33 → 55 dB en 1 sample).
+
+**Linked rule**: `docs/specs/digital-twin-bms-physics-validation/04-physical-plausibility-rules.md` R-N-01.
+
+## Problema
+
+`vendor/.../physics/indoor.py:simulate_noise` aplicaba la transición
+occupancy=0 → occupancy>0 como un salto instantáneo:
+
+```python
+n = where(occ > 0, 55 + 0.35*occ, 33) + N(0, 4)
+```
+
+En aulas reales, cuando entran 20 personas el ruido sube de ~33 dB a
+~55 dB pero no en 5 s — toma 5-10 min mientras la gente se sienta,
+abre mochilas, hace scroll, etc. El salto instantáneo deja huella en
+detectores de cambio de actividad y rompe modelos ML que esperan
+signal-to-noise ratio gradual.
+
+## Cambio
+
+`simulate_noise` lee una nueva clave opcional `tau_minutes` de
+`cfg_noise`. Cuando es > 0, aplica un filtro EWMA de primer orden sobre
+el target (que sigue siendo step) para producir un output suave:
+
+```python
+if tau_minutes > 0:
+    dt_min = (index[1] - index[0]).total_seconds() / 60.0
+    alpha = dt_min / max(1.0, tau_minutes)
+    smoothed[0] = target[0]
+    for i in range(1, len(target)):
+        smoothed[i] = smoothed[i-1] + alpha * (target[i] - smoothed[i-1])
+n = smoothed + N(0, std)
+```
+
+Si `tau_minutes` es 0 o no está, comportamiento legacy preservado.
+
+`domain.yaml` setea `tau_minutes: 3.0` (5-10 min de transición real).
+
+## Diff
+
+```diff
+--- a/src/synthetic_generator/domains/bms_classrooms/physics/indoor.py
++++ b/src/synthetic_generator/domains/bms_classrooms/physics/indoor.py
+@@ -158,15 +158,32 @@
+     base_u = float(cfg_noise.get("base_unoccupied", 33))
+     base_o = float(cfg_noise.get("base_occupied", 55))
+     std = float(cfg_noise.get("std", 4))
++    tau_minutes = float(cfg_noise.get("tau_minutes", 0))
+-    n = np.where(
+-        occupancy.values > 0,
+-        base_o + 0.35 * occupancy.values,
+-        base_u
+-    ) + rng.normal(0, std, size=len(index))
++    target = np.where(
++        occupancy.values > 0,
++        base_o + 0.35 * occupancy.values,
++        base_u,
++    ).astype(float)
++    if tau_minutes > 0 and len(index) > 1:
++        dt_min = (index[1] - index[0]).total_seconds() / 60.0
++        alpha = dt_min / max(1.0, tau_minutes)
++        smoothed = np.empty_like(target)
++        smoothed[0] = target[0]
++        for i in range(1, len(target)):
++            smoothed[i] = smoothed[i-1] + alpha * (target[i] - smoothed[i-1])
++    else:
++        smoothed = target  # legacy
++    n = smoothed + rng.normal(0, std, size=len(index))
+     return pd.Series(np.clip(n, 25, 90), index=index, name="noise")
+```
+
+## Validación
+
+- `tests/integration/test_noise_ewma_audit.py`:
+  1. Sin `tau_minutes` o = 0 → comportamiento legacy preservado.
+  2. Con `tau_minutes=3` y transición occ 0 → 20 → output suaviza
+     monótonamente (no hay saltos > 5 dB entre samples consecutivos
+     fuera del propio ruido `std`).
+  3. Asintota: tras `~5·tau` el output converge al target ± std.
+
+## Reversibilidad
+
+- Eliminar `tau_minutes` de `domain.yaml` o ponerlo a `0` →
+  comportamiento legacy idéntico.

@@ -218,3 +218,74 @@ def test_alias_sink_handles_sink_without_optional_methods() -> None:
     adapter.emit_batch([FakeDataPoint("AULA01", "power", 100.0)])
     adapter.close()  # no-op
     assert sink.emitted[0].variable == "power_01"
+
+
+# ─────────────────── H-10 (AUDIT_REPORT) — extra edge cases ───────────────────
+
+
+def test_alias_sink_passes_through_fault_variables() -> None:
+    """``fault.<tipo>`` debe ser passthrough (no aparece en alias map nunca).
+
+    Esto es crítico para L-PV-02: FaultEventEmitter emite con variable
+    ``fault.sensor_drift`` y AliasSinkAdapter no debe renombrar esos
+    DataPoints — Telegraf clone+dedup los enrutará a state_events tal cual.
+    """
+    sink = FakeSink()
+    adapter = AliasSinkAdapter(sink, {"temperature": "temperature_01"})
+
+    fault_types = ["sensor_drift", "valve_stuck", "fan_failure", "refrigerant_low"]
+    for ftype in fault_types:
+        adapter.emit(FakeDataPoint("AULA01", f"fault.{ftype}", 1.0))
+
+    emitted_vars = [p.variable for p in sink.emitted]
+    assert emitted_vars == [f"fault.{t}" for t in fault_types], (
+        f"Fault variables fueron renombradas (no deberían): {emitted_vars}"
+    )
+    assert adapter.passthrough_count == 4
+    assert adapter.renamed_count == 0
+
+
+def test_alias_sink_handles_yaml_without_asset_types(tmp_path: Path) -> None:
+    """YAML sin clave ``asset_types`` debe devolver mapping vacío sin crashear."""
+    yaml_file = tmp_path / "variables.yaml"
+    yaml_file.write_text(
+        """
+project:
+  description: "Some other yaml shape"
+""",
+        encoding="utf-8",
+    )
+    assert build_alias_map_from_yaml(yaml_file) == {}
+
+
+def test_alias_sink_metrics_aggregate_across_emit_and_batch() -> None:
+    """Mezcla de emit() + emit_batch() debe acumular renamed/passthrough."""
+    sink = FakeSink()
+    adapter = AliasSinkAdapter(sink, {"power": "power_01", "humidity": "relative-humidity"})
+
+    adapter.emit(FakeDataPoint("AULA01", "power", 100.0))         # renamed
+    adapter.emit(FakeDataPoint("AULA01", "co2", 600.0))            # passthrough
+    adapter.emit_batch([
+        FakeDataPoint("AULA01", "humidity", 55.0),                 # renamed
+        FakeDataPoint("AULA01", "fault.valve_stuck", 1.0),         # passthrough
+        FakeDataPoint("AULA02", "power", 250.0),                   # renamed
+    ])
+
+    assert adapter.renamed_count == 3
+    assert adapter.passthrough_count == 2
+    assert len(sink.emitted) == 5
+    assert {p.variable for p in sink.emitted} == {
+        "power_01", "co2", "relative-humidity", "fault.valve_stuck",
+    }
+
+
+def test_alias_sink_from_yaml_falls_back_when_file_missing(tmp_path: Path) -> None:
+    """Si el YAML no existe, ``from_yaml`` arranca con mapping vacío (sin crashear)."""
+    sink = FakeSink()
+    missing = tmp_path / "does_not_exist.yaml"
+    adapter = AliasSinkAdapter.from_yaml(sink, missing)
+    assert adapter.aliases == {}
+    # Y emit sigue funcionando como passthrough.
+    adapter.emit(FakeDataPoint("AULA01", "power", 100.0))
+    assert sink.emitted[0].variable == "power"
+    assert adapter.passthrough_count == 1

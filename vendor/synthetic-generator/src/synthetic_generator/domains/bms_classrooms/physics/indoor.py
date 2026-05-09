@@ -177,7 +177,10 @@ def simulate_noise(
 ) -> pd.Series:
     """Simulate noise levels.
 
-    Models ambient noise based on occupancy.
+    Models ambient noise based on occupancy. F-6 / PATCH 009: when
+    ``cfg_noise.tau_minutes > 0``, the level applies a first-order EWMA
+    smoothing to mimic the gradual ramp when people enter/leave (5-10 min
+    in real classrooms vs. instantaneous step on the legacy model).
 
     Args:
         index: Time index
@@ -191,13 +194,25 @@ def simulate_noise(
     base_u = float(cfg_noise.get("base_unoccupied", 33))
     base_o = float(cfg_noise.get("base_occupied", 55))
     std = float(cfg_noise.get("std", 4))
+    tau_minutes = float(cfg_noise.get("tau_minutes", 0))
 
-    n = np.where(
+    target = np.where(
         occupancy.values > 0,
         base_o + 0.35 * occupancy.values,
-        base_u
-    ) + rng.normal(0, std, size=len(index))
+        base_u,
+    ).astype(float)
 
+    if tau_minutes > 0 and len(index) > 1:
+        dt_min = (index[1] - index[0]).total_seconds() / 60.0
+        alpha = dt_min / max(1.0, tau_minutes)
+        smoothed = np.empty_like(target)
+        smoothed[0] = target[0]
+        for i in range(1, len(target)):
+            smoothed[i] = smoothed[i - 1] + alpha * (target[i] - smoothed[i - 1])
+    else:
+        smoothed = target  # legacy: salto instantáneo
+
+    n = smoothed + rng.normal(0, std, size=len(index))
     return pd.Series(np.clip(n, 25, 90), index=index, name="noise")
 
 

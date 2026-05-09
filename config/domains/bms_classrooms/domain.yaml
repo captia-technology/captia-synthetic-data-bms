@@ -138,6 +138,10 @@ physics:
     base_unoccupied: 33.0                     # dB(A) ambiente
     base_occupied: 55.0                       # dB(A) base con ocupación
     std: 4.0                                  # dB(A) ruido aleatorio
+    # F-6 (PATCH 009): EWMA suaviza el salto 33->55 dB cuando entran/salen
+    # personas (rampa real ~5-10 min vs salto instantáneo legacy).
+    # tau=3 min produce ramp visible pero rápido en escenarios live de 5 s.
+    tau_minutes: 3.0
   light:
     target_lux_on: 550                        # lux setpoint con luz artificial
     # F-9 (PHYSICAL_REALISM_REPORT): vendor default era 70, irreal con
