@@ -23,8 +23,8 @@ COPY examples/ examples/
 # Create output directory
 RUN mkdir -p outputs
 
-# Default: run scenario from GENERATOR_CONFIG env var
-ENV GENERATOR_CONFIG=/app/config/projects/manufacturing_e2e.yaml
+# Default: BMS classrooms scenario (this vendor build is BMS-only).
+ENV GENERATOR_CONFIG=/app/config/projects/bms_e2e.yaml
 ENV LOG_LEVEL=INFO
 ENV HEALTH_PORT=8000
 
@@ -32,4 +32,4 @@ ENV HEALTH_PORT=8000
 EXPOSE 8000
 
 ENTRYPOINT ["python", "-m", "synthetic_generator"]
-CMD ["run", "--config", "/app/config/projects/manufacturing_e2e.yaml", "--loglevel", "INFO"]
+CMD ["run", "--config", "/app/config/projects/bms_e2e.yaml", "--loglevel", "INFO"]

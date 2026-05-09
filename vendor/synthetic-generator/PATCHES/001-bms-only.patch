@@ -1,0 +1,57 @@
+# 001-bms-only.patch
+
+**Title**: Slim vendor build to BMS classrooms only.
+
+**Status**: Applied.
+
+**Applied on**: 2026-05-09 (snapshot commit `2a793a551967dde4d35c94d2b636f07130dcd72f`).
+
+**Linked ADR**: `docs/specs/synthetic-bms/09-decision-log.md` ADR-016.
+
+## Rationale
+
+`CAPTIA-SYNTHETIC-DATA-BMS` only targets the *Building Management System*
+(IES Simarro classrooms) domain. The other two domains shipped by the
+upstream engine (`industrial_refrigeration`, `discrete_manufacturing`) are
+out of scope:
+
+- They double the surface area for security, tests and CI.
+- They expose the names of unrelated CAPTIA partners through configs and
+  fixtures, which is unnecessary in a public BMS-only repository.
+
+## Changes
+
+- **Removed**:
+  - `src/synthetic_generator/domains/industrial_refrigeration/`
+  - `src/synthetic_generator/domains/discrete_manufacturing/`
+  - `config/domains/industrial_refrigeration/`
+  - `config/domains/discrete_manufacturing/`
+  - `config/projects/frio_e2e.yaml`
+  - `config/projects/manufacturing_e2e.yaml`
+  - `examples/refrigeration-baseline.yaml`
+  - `examples/manufacturing-baseline.yaml`
+- **Edited**:
+  - `src/synthetic_generator/domains/__init__.py` — docstring updated.
+  - `src/synthetic_generator/domains/registry.py` — `auto_discover_domains()`
+    only loads `bms_classrooms`.
+  - `Dockerfile` — default `GENERATOR_CONFIG` now points to
+    `/app/config/projects/bms_e2e.yaml`.
+  - `README.md` — rewritten as BMS-only quickstart.
+  - `tests/integration/test_snapshot_regression.py` — removed snapshots
+    for the deleted domains.
+  - `tests/unit/test_ilp_format.py` — replaced
+    `discrete_manufacturing` fixtures with `bms_classrooms` ones.
+
+## How to re-apply (manual)
+
+After re-vendoring with `scripts/update_vendor.sh` against the internal
+upstream:
+
+1. Delete the four domain folders and four configs/examples listed above.
+2. Edit `domains/__init__.py` and `domains/registry.py` to remove the
+   non-BMS imports.
+3. Update `Dockerfile` default scenario.
+4. Re-write `README.md` from this BMS-only template.
+5. Adjust the two test files (`test_snapshot_regression.py`,
+   `test_ilp_format.py`).
+6. Run `uv run pytest -m unit -q` and verify it passes.

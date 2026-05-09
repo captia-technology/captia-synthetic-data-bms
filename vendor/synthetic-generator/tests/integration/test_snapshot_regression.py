@@ -122,26 +122,5 @@ class TestSnapshotRegression:
         )
         _compare_rows(generated, expected, "bms_classrooms")
 
-    def test_industrial_refrigeration_snapshot(self):
-        """Industrial Refrigeration output matches grasso_frio_seed42_1day.csv."""
-        expected = _load_fixture_rows("grasso_frio_seed42_1day.csv")
-        generated = _generate_domain_rows(
-            domain_id="industrial_refrigeration",
-            project_cfg={"namespace": "captia", "site_id": "grasso_frio"},
-            domain_cfg={},
-        )
-        _compare_rows(generated, expected, "industrial_refrigeration")
-
-    def test_discrete_manufacturing_snapshot(self):
-        """Discrete Manufacturing output matches faraone_seed42_1day.csv."""
-        expected = _load_fixture_rows("faraone_seed42_1day.csv")
-        generated = _generate_domain_rows(
-            domain_id="discrete_manufacturing",
-            project_cfg={
-                "namespace": "captia",
-                "site_id": "PLANT_001",
-                "simulation": {"n_machines": 3, "seed": SEED},
-            },
-            domain_cfg={},
-        )
-        _compare_rows(generated, expected, "discrete_manufacturing")
+    # CAPTIA-SYNTHETIC-DATA-BMS: industrial_refrigeration & discrete_manufacturing
+    # snapshots removed (vendor slimmed to BMS only). See PATCHES/001-bms-only.patch.

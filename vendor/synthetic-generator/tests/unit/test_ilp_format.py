@@ -131,10 +131,10 @@ class TestTopicStructure:
     def test_captia_topic_carries_all_required_tags(self):
         """Captia topic encodes domain_id, site_id, asset_id, variable for regex extraction."""
         point = _make_point(
-            domain_id="discrete_manufacturing",
-            site_id="plant_faraone",
-            asset_id="M01",
-            variable="power_kw",
+            domain_id="bms_classrooms",
+            site_id="ies_simarro",
+            asset_id="AULA01",
+            variable="co2",
         )
         sink = MQTTSinkAdapter(MQTTSinkConfig(captia_env="dev"))
         topic = sink._build_topic(point)
@@ -144,19 +144,19 @@ class TestTopicStructure:
         assert len(segments) == 7
         assert segments[0] == "captia"
         assert segments[1] == "dev"  # captia_env
-        assert segments[2] == "discrete_manufacturing"  # -> domain_id
-        assert segments[3] == "plant_faraone"  # -> site_id
-        assert segments[4] == "M01"  # -> asset_id
+        assert segments[2] == "bms_classrooms"  # -> domain_id
+        assert segments[3] == "ies_simarro"  # -> site_id
+        assert segments[4] == "AULA01"  # -> asset_id
         assert segments[5] == "telemetry"  # stream
-        assert segments[6] == "power_kw"  # -> variable
+        assert segments[6] == "co2"  # -> variable
 
     def test_synthetic_is_just_another_tenant(self):
         """domain_id for synthetic data is a normal value, not a special route."""
-        point = _make_point(domain_id="discrete_manufacturing", site_id="plant_faraone")
+        point = _make_point(domain_id="bms_classrooms", site_id="ies_simarro")
         sink = MQTTSinkAdapter(MQTTSinkConfig(captia_env="dev"))
         topic = sink._build_topic(point)
         # The topic has the same structure as a real device
-        assert topic.startswith("captia/dev/discrete_manufacturing/")
+        assert topic.startswith("captia/dev/bms_classrooms/")
 
     def test_topic_with_version_segment(self):
         """When captia_version is set, it appears after the prefix."""

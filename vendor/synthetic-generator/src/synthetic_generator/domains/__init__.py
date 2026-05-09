@@ -1,15 +1,12 @@
-"""Domain plugin framework for multi-domain synthetic data generation.
+"""Domain plugin framework for synthetic data generation.
 
-This module provides the plugin architecture for domain-specific
-data generation:
-- Base plugin interface (DomainPlugin)
-- Plugin registry with auto-discovery
-- Domain-specific implementations (bms_classrooms, industrial_refrigeration)
+This vendor build (CAPTIA-SYNTHETIC-DATA-BMS) only ships the
+`bms_classrooms` domain. See `vendor/synthetic-generator/PATCHES/`.
 
 Usage:
     from synthetic_generator.domains import get_domain, list_domains
 
-    # List available domains
+    # List available domains (currently: bms_classrooms)
     domains = list_domains()
 
     # Get a domain plugin

@@ -1,18 +1,19 @@
-# Synthetic Data Generator
+# Synthetic Data Generator (vendored, BMS-only)
 
-Modular, multi-domain synthetic data generator for CAPTIA-connect. Generates deterministic time-series data using hexagonal architecture with pluggable domain and sink adapters.
+> Vendored snapshot for **CAPTIA-SYNTHETIC-DATA-BMS**. This build only ships the
+> `bms_classrooms` domain. See `PATCHES/001-bms-only.patch` and `VENDOR.md`.
+
+Hexagonal architecture (`core` / `ports` / `domains` / `sinks`) for deterministic
+time-series data generation. Read-only from the parent repo: extensions go in
+`extensions/bms_calibration/` and `modules/bms-data-generator/`.
 
 ## Quickstart
 
 ```bash
-# Install
-cd tools/synthetic-generator
+# From the parent workspace root
 uv sync
 
-# Run tests
-uv run python -m pytest tests/ -v
-
-# List available domains
+# List domains (only bms_classrooms in this build)
 uv run python -c "
 from synthetic_generator.domains.registry import auto_discover_domains, list_domain_info
 auto_discover_domains()
@@ -23,10 +24,12 @@ for info in list_domain_info():
 
 ## Usage
 
-### File Sink (CSV/JSONL)
+### File sink (CSV / JSONL)
 
 ```python
-from synthetic_generator.core.config import *
+from synthetic_generator.core.config import (
+    DomainReference, ProjectConfig, ScenarioConfig, SimulationConfig, SinkConfig, SinkType,
+)
 from synthetic_generator.core.runner import ScenarioRunner
 from synthetic_generator.core.validator import ContractValidator
 from synthetic_generator.domains.registry import auto_discover_domains, get_domain
@@ -36,7 +39,7 @@ auto_discover_domains()
 domain = get_domain("bms_classrooms")
 
 config = ScenarioConfig(
-    project=ProjectConfig(namespace="captia", site_id="school1"),
+    project=ProjectConfig(namespace="captia", site_id="ies_simarro"),
     simulation=SimulationConfig(start="2026-01-01", end="2026-01-07", freq="5min", seed=42),
     domain=DomainReference(id="bms_classrooms"),
     sinks=[SinkConfig(type=SinkType.FILE, config={"path": "outputs/data.jsonl", "format": "jsonl"})],
@@ -46,36 +49,25 @@ runner = ScenarioRunner(config, domain, sink, validator=ContractValidator())
 results = runner.run()
 ```
 
-### MQTT Sink
+### MQTT sink
 
 ```python
 from synthetic_generator.sinks.mqtt import MQTTSinkAdapter, MQTTSinkConfig
 
-sink = MQTTSinkAdapter(MQTTSinkConfig(
-    broker_url="tcp://localhost:1883",
-    topic_base="captia",
-))
-# Use with ScenarioRunner as above
+sink = MQTTSinkAdapter(MQTTSinkConfig(broker_url="tcp://localhost:1883", captia_env="dev"))
+# Wire into ScenarioRunner as above.
 ```
 
-### Docker Compose
-
-```bash
-docker compose -f compose/base.yaml -f compose/synthetic-multi.yaml --profile synthetic_all up -d
-```
-
-## Domains
+## Domain (BMS classrooms)
 
 | Domain | Assets | Variables | Description |
 |--------|--------|-----------|-------------|
-| `bms_classrooms` | 70 aulas | 21/aula | BMS: temperature, CO2, humidity, HVAC, energy |
-| `industrial_refrigeration` | ~20 | 30+ | Cold storage: chambers, compressors, condensers |
-| `discrete_manufacturing` | 8-13 | 22+ | Factory: machines, production, condition monitoring |
+| `bms_classrooms` | 1–70 aulas | 16–21 / aula | Temperature, RH, CO2, IAQ, sound, lux, occupancy, HVAC, energy |
 
 ## Architecture
 
 ```
-core/           Business logic (zero external deps)
+core/           Business logic (no external deps)
   runner.py       ScenarioRunner (backfill + live)
   config.py       Pydantic v2 ScenarioConfig
   validator.py    ContractValidator (pre-emission)
@@ -85,29 +77,26 @@ core/           Business logic (zero external deps)
 ports/          Protocol interfaces
   domain.py       DomainAdapterPort
   sink.py         SinkAdapterPort
-domains/        3 domain adapters + physics engines
+domains/        bms_classrooms (only domain in this vendor build)
 sinks/          5 sink adapters (MQTT, File, Stdout, Composite, Null)
 ```
 
 ## Testing
 
+Run from the parent workspace root:
+
 ```bash
-uv run python -m pytest tests/ -v           # All 125 tests
-uv run python -m pytest tests/ -m unit       # Unit only
-uv run python -m pytest tests/ -m snapshot   # Determinism
-uv run python -m pytest tests/ -m performance # Throughput
+uv run pytest -m unit          # Vendor unit tests
+uv run pytest -m snapshot      # Determinism (seed=42)
 ```
 
 ## Troubleshooting
 
-**Import errors**: Run `uv pip install -e ".[dev]"` if `uv sync` doesn't install all deps.
-
-**MQTT connection**: Ensure broker is running at `tcp://localhost:1883`. For Docker: `docker run -d -p 1883:1883 eclipse-mosquitto:2.0.18 mosquitto -c /dev/null -p 1883`
-
-**Determinism issues**: Always use `np.random.default_rng(seed)` (not `np.random.seed()`). Check that FakeClock is used in tests.
+- **Import errors**: re-run `uv sync` from the parent root.
+- **MQTT connection**: broker must be reachable at `tcp://localhost:1883` (or whatever `BMS_MQTT_HOST` resolves to).
+- **Determinism**: always use `np.random.default_rng(seed)` (NOT `np.random.seed()`).
 
 ## References
 
-- [Specs](../../docs/specs/)
-- [Module Docs](../../docs/02-modules/synthetic-generator.md)
-- [Verification](../../docs/verification/)
+- Parent specs: `docs/specs/synthetic-bms/`.
+- Vendor governance: `vendor/synthetic-generator/VENDOR.md`.

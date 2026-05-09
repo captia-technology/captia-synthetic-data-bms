@@ -146,22 +146,12 @@ def auto_discover_domains():
 
     Imports known domain modules to trigger registration.
     Call this at application startup.
+
+    NOTE (CAPTIA-SYNTHETIC-DATA-BMS): This vendor build only ships the
+    `bms_classrooms` domain. See PATCHES/001-bms-only.patch.
     """
-    # Import domain modules to trigger @register_domain decorators
     try:
-        from ..domains import bms_classrooms
+        from ..domains import bms_classrooms  # noqa: F401
         LOG.debug("Loaded bms_classrooms domain")
     except ImportError as e:
         LOG.debug(f"Could not load bms_classrooms domain: {e}")
-
-    try:
-        from ..domains import industrial_refrigeration
-        LOG.debug("Loaded industrial_refrigeration domain")
-    except ImportError as e:
-        LOG.debug(f"Could not load industrial_refrigeration domain: {e}")
-
-    try:
-        from ..domains import discrete_manufacturing
-        LOG.debug("Loaded discrete_manufacturing domain")
-    except ImportError as e:
-        LOG.debug(f"Could not load discrete_manufacturing domain: {e}")
