@@ -1,146 +1,228 @@
 # =============================================================================
-# BMS Classrooms — Catálogo de variables (poblado en captia_metadata)
-# metric_kind dirige el downsampling (analog_gauge / counter / bool_state /
-# bool_presence / setpoint_step). Ver docs/specs/synthetic-bms/02-domain-spec.md.
+# BMS Classrooms — Variable Catalog (override LOCAL alineado con producción)
 # =============================================================================
+# Override de vendor/synthetic-generator/config/domains/bms_classrooms/variables.yaml
+# resuelto por inventory.py:117-124 (walking up file system).
+#
+# Mantiene `name:` con nombres VENDOR (lo que el physics produce: temperature,
+# humidity, ...) y añade `production_name:` con el nombre canónico de
+# simarro-prod (docs/influxdb-simarro-buckets.pptx slide 14, Sep 2026).
+#
+# Usado por:
+#   - vendor BMSDomainPlugin → inventory (lee `name`, ignora `production_name`).
+#   - extensions/bms_signal_alias/AliasSinkAdapter → renombra DataPoints
+#     `name` → `production_name` antes de emit a MQTT/file (T-PV-21).
+#   - infra/influxdb/init/init_buckets_tasks.sh::populate_metadata → escribe
+#     entries en captia_point_meta (bucket captia_metadata) usando
+#     production_name si existe, sino name (T-PV-23).
+#
+# Source of truth para mapping:
+#   docs/specs/digital-twin-bms-physics-validation/11-production-signal-mapping.md
+#
+# metric_kind values (drives downsampling y storage_mode):
+#   analog_gauge    → continuous, mean/min/max
+#   bool_presence   → continuous, duty/count_rise/last
+#   bool_state      → on_change, last/count_rise
+#   setpoint_step   → on_change, last
+#   counter         → continuous, sum (delta vía nonNegative)
+#   skip            → continuous, no rollup
 
-variables:
-  # ENVIRONMENTAL
-  - name: temperature_01
-    unit: "°C"
-    metric_kind: analog_gauge
-    rango_min: 16
-    rango_max: 32
-  - name: relative_humidity_01
-    unit: "%RH"
-    metric_kind: analog_gauge
-    rango_min: 20
-    rango_max: 80
-  - name: co2
-    unit: "ppm"
-    metric_kind: analog_gauge
-    rango_min: 300
-    rango_max: 5000
-  - name: t_voc
-    unit: "ppb"
-    metric_kind: analog_gauge
-    rango_min: 0
-    rango_max: 3000
-  - name: iaq_index
-    unit: "index"
-    metric_kind: analog_gauge
-    rango_min: 0
-    rango_max: 500
-  - name: avg_sound_level
-    unit: "dB"
-    metric_kind: analog_gauge
-    rango_min: 30
-    rango_max: 90
-  - name: max_sound_level
-    unit: "dB"
-    metric_kind: analog_gauge
-    rango_min: 30
-    rango_max: 110
-  - name: luminosity
-    unit: "lux"
-    metric_kind: analog_gauge
-    rango_min: 0
-    rango_max: 2000
+asset_types:
+  classroom:
+    variables:
+      # ── Sensors: Environmental ──────────────────────────────────
+      - name: temperature
+        production_name: temperature_01
+        data_type: float
+        unit: "°C"
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: ENVIRONMENTAL
+        range: [10.0, 35.0]
 
-  # ENERGY
-  - name: power_01
-    unit: "W"
-    metric_kind: counter
-    rango_min: 0
-    rango_max: 3000
-  - name: light_consumption
-    unit: "Wh"
-    metric_kind: counter
-    rango_min: 0
-    rango_max: 1500
+      - name: humidity
+        production_name: relative-humidity
+        data_type: float
+        unit: "%RH"
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: ENVIRONMENTAL
+        range: [10.0, 90.0]
 
-  # HVAC
-  - name: temperature_supply
-    unit: "°C"
-    metric_kind: analog_gauge
-    rango_min: 8
-    rango_max: 30
-  - name: temperature_return
-    unit: "°C"
-    metric_kind: analog_gauge
-    rango_min: 8
-    rango_max: 32
-  - name: ac_state
-    unit: "bool"
-    metric_kind: bool_state
-    rango_min: 0
-    rango_max: 1
-  - name: ac_control
-    unit: "bool"
-    metric_kind: bool_state
-    rango_min: 0
-    rango_max: 1
-  - name: heat_state
-    unit: "bool"
-    metric_kind: bool_state
-    rango_min: 0
-    rango_max: 1
-  - name: fan_speed_01_state
-    unit: "bool"
-    metric_kind: bool_state
-    rango_min: 0
-    rango_max: 1
-  - name: fan_speed_02_state
-    unit: "bool"
-    metric_kind: bool_state
-    rango_min: 0
-    rango_max: 1
-  - name: fan_speed_03_state
-    unit: "bool"
-    metric_kind: bool_state
-    rango_min: 0
-    rango_max: 1
-  - name: light_01_state
-    unit: "bool"
-    metric_kind: bool_state
-    rango_min: 0
-    rango_max: 1
-  - name: light_02_state
-    unit: "bool"
-    metric_kind: bool_state
-    rango_min: 0
-    rango_max: 1
-  - name: valve_control
-    unit: "bool"
-    metric_kind: bool_state
-    rango_min: 0
-    rango_max: 1
-  - name: valve_state
-    unit: "bool"
-    metric_kind: bool_state
-    rango_min: 0
-    rango_max: 1
+      - name: co2
+        production_name: co2
+        data_type: float
+        unit: ppm
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: ENVIRONMENTAL
+        range: [400.0, 2200.0]
 
-  # OCCUPANCY
-  - name: occupancy
-    unit: "bool"
-    metric_kind: bool_presence
-    rango_min: 0
-    rango_max: 1
-  - name: people_count
-    unit: "count"
-    metric_kind: analog_gauge
-    rango_min: 0
-    rango_max: 50
+      - name: iaq_index
+        production_name: iaq-index
+        data_type: float
+        unit: index
+        point_type: calculated
+        metric_kind: analog_gauge
+        category: ENVIRONMENTAL
+        range: [0.0, 500.0]
 
-  # EXTERNAL (compartidas, asset_id genérico "OUTDOOR" o por sitio)
-  - name: temperature_outdoor
-    unit: "°C"
-    metric_kind: analog_gauge
-    rango_min: -5
-    rango_max: 45
-  - name: solar_irradiance
-    unit: "W/m²"
-    metric_kind: analog_gauge
-    rango_min: 0
-    rango_max: 1100
+      - name: noise
+        production_name: avg-sound-level
+        data_type: float
+        unit: "dB(A)"
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: ENVIRONMENTAL
+        range: [25.0, 90.0]
+
+      - name: illuminance
+        production_name: luminosity
+        data_type: float
+        unit: lux
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: ENVIRONMENTAL
+        range: [0.0, 2500.0]
+
+      # ── Sensors: Occupancy ──────────────────────────────────────
+      - name: occupancy
+        production_name: people-count
+        data_type: integer
+        unit: persons
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: OCCUPANCY
+        range: [0.0, 100.0]
+
+      - name: presence_pir
+        production_name: occupancy
+        data_type: boolean
+        unit: bool
+        point_type: sensor
+        metric_kind: bool_presence
+        category: OCCUPANCY
+
+      # ── Sensors: External ───────────────────────────────────────
+      - name: outdoor_temp
+        production_name: temperature-outdoor
+        data_type: float
+        unit: "°C"
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: EXTERNAL
+        range: [-10.0, 45.0]
+
+      - name: daylight_lux
+        production_name: daylight-lux
+        data_type: float
+        unit: lux
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: EXTERNAL
+        range: [0.0, 1000.0]
+
+      # ── Actuators: HVAC (on_change via metric_kind) ─────────────
+      - name: thermostat_setpoint
+        production_name: temperature_01_sp
+        data_type: float
+        unit: "°C"
+        point_type: setpoint
+        metric_kind: setpoint_step
+        storage_mode: on_change
+        category: HVAC
+        range: [14.0, 30.0]
+
+      - name: hvac_mode
+        production_name: ac_control
+        data_type: enum
+        unit: enum
+        point_type: actuator
+        metric_kind: setpoint_step
+        storage_mode: on_change
+        category: HVAC
+        enum_values: [off, heat, cool, auto]
+
+      - name: hvac_enable
+        production_name: ac_state
+        data_type: boolean
+        unit: bool
+        point_type: actuator
+        metric_kind: bool_state
+        storage_mode: on_change
+        category: HVAC
+
+      - name: heating_valve_pos
+        production_name: valve_control
+        data_type: float
+        unit: "%"
+        point_type: actuator
+        metric_kind: analog_gauge
+        category: HVAC
+        range: [0.0, 100.0]
+
+      # ── Actuators: Control (on_change relays) ───────────────────
+      - name: scene_mode
+        production_name: scene_mode
+        data_type: enum
+        unit: enum
+        point_type: actuator
+        metric_kind: setpoint_step
+        storage_mode: on_change
+        category: CONTROL
+        enum_values: [out_of_hours, class, manual]
+
+      - name: relay_1
+        production_name: light_01_state
+        data_type: boolean
+        unit: bool
+        point_type: actuator
+        metric_kind: bool_state
+        storage_mode: on_change
+        category: CONTROL
+
+      - name: relay_2
+        production_name: light_02_state
+        data_type: boolean
+        unit: bool
+        point_type: actuator
+        metric_kind: bool_state
+        storage_mode: on_change
+        category: CONTROL
+
+      - name: relay_3
+        production_name: fan_speed_01_state
+        data_type: boolean
+        unit: bool
+        point_type: actuator
+        metric_kind: bool_state
+        storage_mode: on_change
+        category: CONTROL
+
+      - name: relay_4
+        production_name: fan_speed_02_state
+        data_type: boolean
+        unit: bool
+        point_type: actuator
+        metric_kind: bool_state
+        storage_mode: on_change
+        category: CONTROL
+
+      # ── Sensors: Energy ─────────────────────────────────────────
+      - name: power
+        production_name: power_01
+        data_type: float
+        unit: W
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: ENERGY
+        range: [0.0, 6000.0]
+
+      - name: energy
+        production_name: energy_01
+        data_type: float
+        unit: kWh
+        point_type: sensor
+        metric_kind: counter
+        counter_wire: cumulative_monotonic
+        category: ENERGY

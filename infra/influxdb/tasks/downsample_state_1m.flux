@@ -55,7 +55,7 @@ setpoint_vars = union(tables: [_empty, _setpoint_meta])
 state_src =
   from(bucket: "state_events")
     |> range(start: -2m)
-    |> filter(fn: (r) => r._measurement == "captia_point")
+    |> filter(fn: (r) => r._measurement == "captia_point_state")  // L-PV-19: local Telegraf clone usa name_override
     |> filter(fn: (r) => r._field == "value")
     |> filter(fn: (r) => contains(value: r.variable, set: state_vars))
     |> toFloat()
@@ -64,7 +64,7 @@ state_src =
 setpoint_src =
   from(bucket: "state_events")
     |> range(start: -2m)
-    |> filter(fn: (r) => r._measurement == "captia_point")
+    |> filter(fn: (r) => r._measurement == "captia_point_state")  // L-PV-19: local Telegraf clone usa name_override
     |> filter(fn: (r) => r._field == "value")
     |> filter(fn: (r) => contains(value: r.variable, set: setpoint_vars))
     |> toFloat()

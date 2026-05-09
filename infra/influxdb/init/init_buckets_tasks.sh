@@ -125,45 +125,95 @@ populate_metadata() {
     captia_env="${CAPTIA_ENV:-dev}"
     ts_ns=$(date +%s)000000000
 
-    # Idempotencia: borrar todos los registros previos de este dominio antes
-    # de re-poblar. La API REST /api/v2/delete tiene quirks con el predicate
-    # sobre _measurement; el CLI 'influx delete' es más fiable.
-    influx delete \
-        --bucket captia_metadata --org-id "${ORG_ID}" \
-        --start 1970-01-01T00:00:00Z --stop 2099-12-31T23:59:59Z \
-        --predicate "_measurement=\"captia_metadata\" AND domain_id=\"${domain_id}\"" \
-        >/dev/null 2>&1 \
-        && echo "  - cleared existing records for domain=${domain_id}" \
-        || echo "  - (no previous records to clear for domain=${domain_id})"
-    # Tiny YAML parser (sh-only): emit one influx line-protocol per variable.
-    # Each variable becomes:
-    #   captia_metadata,captia_env=<env>,domain_id=<domain>,site_id=<site>,variable=<name>
-    #     unit="<unit>",metric_kind="<kind>",range_min=<n>,range_max=<n>
+    # Idempotencia: borrar todos los registros previos del measurement
+    # captia_point_meta (alineado con producción slide 9) para este dominio
+    # antes de re-poblar. Mantiene el bucket coherente entre re-runs.
+    # Nota: también limpia legacy captia_metadata measurement (pre-T-PV-23).
+    for legacy_measurement in captia_point_meta captia_metadata; do
+        influx delete \
+            --bucket captia_metadata --org-id "${ORG_ID}" \
+            --start 1970-01-01T00:00:00Z --stop 2099-12-31T23:59:59Z \
+            --predicate "_measurement=\"${legacy_measurement}\" AND domain_id=\"${domain_id}\"" \
+            >/dev/null 2>&1 || true
+    done
+    echo "  - cleared previous records for domain=${domain_id}"
+
+    # YAML parser (sh-portable): emite 1 line-protocol record por variable a
+    # measurement captia_point_meta (alineado con docs/influxdb-simarro-buckets.pptx
+    # slide 9 y consumido por las Flux tasks tier-1 vía allowlist por metric_kind).
+    # Tags: captia_env, domain_id, site_id, asset_type, variable
+    # Fields: metric_kind, storage_mode, data_type, unit, point_type, category,
+    #         range_min, range_max, vendor_name (si production_name override).
+    # Soporta:
+    #   - Indent vendor real (6 spaces lista entry, 8 spaces fields).
+    #   - range: [a, b] (lista YAML compacta).
+    #   - production_name: <prod_name> (override local; alinea con simarro-prod).
     awk -v env="${captia_env}" -v domain="${domain_id}" -v site="${site_id}" -v ts="${ts_ns}" '
-        /^  - name:/ {
+        BEGIN {
+            asset_type = "classroom"
+            name = ""
+        }
+        # Capture asset_type (e.g., "  classroom:" inside "asset_types:").
+        /^  [a-z_][a-z_0-9]*:[[:space:]]*$/ {
+            t = $1; gsub(":", "", t); gsub("^ +", "", t); asset_type = t
+            next
+        }
+        # Variable list entry start: "      - name: foo" (6 spaces + dash).
+        /^      - name:/ {
             if (name != "") emit();
             name = $3; gsub("\"|'\''", "", name);
-            unit=""; kind=""; rmin=""; rmax="";
+            prod_name = ""; data_type = ""; unit = "";
+            point_type = ""; metric_kind = ""; category = "";
+            storage_mode = ""; rmin = ""; rmax = "";
             next;
         }
-        /^    unit:/         { sub(/^    unit:[[:space:]]*/, ""); gsub("\"|'\''", ""); unit=$0; next }
-        /^    metric_kind:/  { sub(/^    metric_kind:[[:space:]]*/, ""); kind=$0; next }
-        /^    rango_min:/    { sub(/^    rango_min:[[:space:]]*/, ""); rmin=$0; next }
-        /^    rango_max:/    { sub(/^    rango_max:[[:space:]]*/, ""); rmax=$0; next }
+        /^        production_name:/ { val = $0; sub(/^        production_name:[[:space:]]*/, "", val); gsub("\"|'\''", "", val); prod_name = val; next }
+        /^        data_type:/       { val = $0; sub(/^        data_type:[[:space:]]*/, "", val); data_type = val; next }
+        /^        unit:/            { val = $0; sub(/^        unit:[[:space:]]*/, "", val); gsub("\"|'\''", "", val); unit = val; next }
+        /^        point_type:/      { val = $0; sub(/^        point_type:[[:space:]]*/, "", val); point_type = val; next }
+        /^        metric_kind:/     { val = $0; sub(/^        metric_kind:[[:space:]]*/, "", val); metric_kind = val; next }
+        /^        category:/        { val = $0; sub(/^        category:[[:space:]]*/, "", val); category = val; next }
+        /^        storage_mode:/    { val = $0; sub(/^        storage_mode:[[:space:]]*/, "", val); storage_mode = val; next }
+        /^        range:/ {
+            val = $0;
+            sub(/^        range:[[:space:]]*\[/, "", val);
+            sub(/\][[:space:]]*$/, "", val);
+            n = split(val, a, /,[[:space:]]*/);
+            if (n >= 2) { rmin = a[1]; rmax = a[2]; }
+            next;
+        }
         END { if (name != "") emit(); }
-        function emit() {
-            tags = "captia_env=" env ",domain_id=" domain ",site_id=" site ",variable=" name;
-            fields = "unit=\"" unit "\",metric_kind=\"" kind "\""
-            if (rmin != "") fields = fields ",range_min=" rmin
-            if (rmax != "") fields = fields ",range_max=" rmax
-            print "captia_metadata," tags " " fields " " ts
+        function emit(    emit_name, tags, fields) {
+            # Use production_name if defined, else fall back to vendor name.
+            emit_name = (prod_name != "") ? prod_name : name;
+            # InfluxDB tag values escape spaces and commas.
+            gsub(/[, ]/, "_", emit_name);
+            # Derive storage_mode from metric_kind if absent (partner spec slide 8).
+            if (storage_mode == "") {
+                if (metric_kind == "bool_state" || metric_kind == "setpoint_step") {
+                    storage_mode = "on_change";
+                } else {
+                    storage_mode = "continuous";
+                }
+            }
+            tags = "captia_env=" env ",domain_id=" domain ",site_id=" site ",asset_type=" asset_type ",variable=" emit_name;
+            # Required fields. Strings double-quoted; numbers raw.
+            fields = "metric_kind=\"" metric_kind "\",storage_mode=\"" storage_mode "\""
+            if (data_type != "")  fields = fields ",data_type=\"" data_type "\""
+            if (unit != "")       fields = fields ",unit=\"" unit "\""
+            if (point_type != "") fields = fields ",point_type=\"" point_type "\""
+            if (category != "")   fields = fields ",category=\"" category "\""
+            if (rmin != "")       fields = fields ",range_min=" rmin
+            if (rmax != "")       fields = fields ",range_max=" rmax
+            if (prod_name != "" && prod_name != name) fields = fields ",vendor_name=\"" name "\""
+            print "captia_point_meta," tags " " fields " " ts
         }
     ' "${yaml_file}" > /tmp/metadata.lp
-    lines=$(wc -l < /tmp/metadata.lp || echo 0)
+    lines=$(wc -l < /tmp/metadata.lp 2>/dev/null || echo 0)
     if [ "${lines}" -gt 0 ]; then
         influx write --org-id "${ORG_ID}" --bucket captia_metadata \
             --file /tmp/metadata.lp \
-            && echo "  - wrote ${lines} captia_metadata records"
+            && echo "  - wrote ${lines} captia_point_meta records"
     else
         echo "  - WARN: no variables parsed from ${yaml_file}"
     fi
