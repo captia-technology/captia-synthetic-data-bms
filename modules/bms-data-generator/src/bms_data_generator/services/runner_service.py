@@ -96,10 +96,9 @@ def _build_runner(config_path: Path) -> tuple[Any, Any]:
     # T-PV-07 (cierra L-PV-04): wire calibration_loader.
     # Carga simbólica de faults_config y physics_overrides para que estén
     # disponibles cuando se implemente FaultInjector wiring (T-PV-08).
-    # Por ahora se loggean para verificar cableado; no afectan al runner aún.
-    # Path: config_path es config/projects/<scenario>.yaml → faults.yaml está en
-    # config/domains/<domain_id>/faults.yaml (sibling directory).
-    faults_yaml = config_path.parent.parent / "domains" / config.domain.id / "faults.yaml"
+    # Path resolution robusta: prueba sibling, walk-up desde config, walk-up
+    # desde módulo (cubre tests con configs en /tmp).
+    faults_yaml = _resolve_domain_config_path(config_path, config.domain.id, "faults.yaml")
     faults_config = load_faults_config(faults_yaml)
     physics_overrides = load_physics_overrides()
     LOG.info(
@@ -140,6 +139,46 @@ def _build_runner(config_path: Path) -> tuple[Any, Any]:
     return runner, sink
 
 
+def _resolve_domain_config_path(config_path: Path, domain_id: str, filename: str) -> Path:
+    """Resolve path to a domain-config file (variables.yaml, faults.yaml, ...).
+
+    Tries multiple strategies, in order:
+      1. Sibling layout: config_path is config/projects/<scenario>.yaml →
+         config_path.parent.parent / "domains" / domain_id / filename
+      2. Walk up from config_path looking for `config/domains/<domain_id>/<filename>`.
+      3. Walk up from this module file looking for `config/domains/<domain_id>/<filename>`
+         (works when config_path is outside the repo, e.g. in /tmp during tests).
+
+    Returns the first existing path, or the strategy-1 path (which won't exist)
+    so the caller's `.exists()` check fails informatively.
+    """
+    candidate = config_path.parent.parent / "domains" / domain_id / filename
+    if candidate.exists():
+        return candidate
+
+    # Strategy 2: walk up from config_path.
+    current = config_path.resolve().parent
+    for _ in range(8):
+        c = current / "config" / "domains" / domain_id / filename
+        if c.exists():
+            return c
+        if current.parent == current:
+            break
+        current = current.parent
+
+    # Strategy 3: walk up from this module file.
+    current = Path(__file__).resolve().parent
+    for _ in range(8):
+        c = current / "config" / "domains" / domain_id / filename
+        if c.exists():
+            return c
+        if current.parent == current:
+            break
+        current = current.parent
+
+    return candidate  # original (non-existing) for informative error
+
+
 def _maybe_wrap_with_alias(sinks: list, config_path: Path, domain_id: str) -> list:
     """Wrap each sink with AliasSinkAdapter if production_alias_enabled.
 
@@ -156,7 +195,7 @@ def _maybe_wrap_with_alias(sinks: list, config_path: Path, domain_id: str) -> li
 
     from bms_signal_alias import AliasSinkAdapter, build_alias_map_from_yaml
 
-    variables_yaml = config_path.parent.parent / "domains" / domain_id / "variables.yaml"
+    variables_yaml = _resolve_domain_config_path(config_path, domain_id, "variables.yaml")
     aliases = build_alias_map_from_yaml(variables_yaml)
     if not aliases:
         LOG.info(
@@ -165,7 +204,12 @@ def _maybe_wrap_with_alias(sinks: list, config_path: Path, domain_id: str) -> li
         )
         return sinks
 
-    LOG.info("wrapping %d sink(s) with AliasSinkAdapter (%d aliases)", len(sinks), len(aliases))
+    LOG.info(
+        "wrapping %d sink(s) with AliasSinkAdapter (%d aliases) using %s",
+        len(sinks),
+        len(aliases),
+        variables_yaml,
+    )
     return [AliasSinkAdapter(s, aliases) for s in sinks]
 
 
@@ -208,7 +252,7 @@ def _build_fault_emitter_hook(
         "site_id": config.project.site_id,
         "namespace": config.project.namespace,
     }
-    domain_yaml_path = config_path.parent.parent / "domains" / config.domain.id / "domain.yaml"
+    domain_yaml_path = _resolve_domain_config_path(config_path, config.domain.id, "domain.yaml")
     domain_cfg: dict = {}
     if domain_yaml_path.exists():
         with domain_yaml_path.open(encoding="utf-8") as fh:

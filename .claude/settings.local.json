@@ -35,7 +35,8 @@
       "Read(.env)",
       "Read(.env.example)",
       "Bash(python -c ' *)",
-      "Bash(BMS_N_AULAS=2 BMS_PRODUCTION_ALIAS_ENABLED=true uv run python -c ' *)"
+      "Bash(BMS_N_AULAS=2 BMS_PRODUCTION_ALIAS_ENABLED=true uv run python -c ' *)",
+      "Bash(rm -f output/audit_mini.csv)"
     ],
     "deny": [
       "Bash(rm -rf:*)",

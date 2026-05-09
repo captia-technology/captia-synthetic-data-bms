@@ -117,16 +117,24 @@ class AliasSinkAdapter:
         if hasattr(self.real_sink, "flush"):
             self.real_sink.flush()
 
-    def emit(self, point: Any) -> None:
-        self.real_sink.emit(self._rename(point))
+    def emit(self, point: Any) -> Any:
+        # Forward return value (vendor sinks may return None or int depending on impl).
+        return self.real_sink.emit(self._rename(point))
 
-    def emit_batch(self, points: Iterable[Any]) -> None:
-        renamed = (self._rename(p) for p in points)
+    def emit_batch(self, points: Iterable[Any]) -> int:
+        # BUG FIX (audit E2E):
+        #   - vendor FileSinkAdapter.emit_batch llama len(points) → falla con generator.
+        #     Materializamos a list para preservar compatibilidad con Sequence-based sinks.
+        #   - vendor ScenarioRunner.run_backfill hace `result.points_emitted += sink.emit_batch(batch)`.
+        #     emit_batch DEBE retornar int (cuenta de puntos emitidos). Forward return.
+        renamed = [self._rename(p) for p in points]
         if hasattr(self.real_sink, "emit_batch"):
-            self.real_sink.emit_batch(renamed)
+            n = self.real_sink.emit_batch(renamed)
+            return n if n is not None else len(renamed)
         else:
             for p in renamed:
                 self.real_sink.emit(p)
+            return len(renamed)
 
     def _rename(self, point: Any) -> Any:
         """Rename ``point.variable`` if in alias map; else passthrough.
