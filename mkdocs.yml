@@ -104,6 +104,7 @@ nav:
   - Operaciones:
     - Inicialización .env: operations/init-env.md
     - Healthchecks: operations/healthchecks.md
+    - Dependabot: operations/dependabot.md
   - Decisiones:
     - Índice ADR: decisions/index.md
   - Archivo:
