@@ -3,6 +3,8 @@
 # smoke_grafana.sh — verifica Grafana healthz + datasources provisionados.
 # =============================================================================
 set -euo pipefail
+# shellcheck disable=SC1091
+source "$(dirname "$0")/_load_env.sh"
 
 PORT="${GRAFANA_PORT_HOST:-3001}"
 URL="http://localhost:${PORT}"

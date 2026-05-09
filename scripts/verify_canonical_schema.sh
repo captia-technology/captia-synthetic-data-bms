@@ -7,6 +7,8 @@
 #   - field `value` (float).
 # =============================================================================
 set -euo pipefail
+# shellcheck disable=SC1091
+source "$(dirname "$0")/_load_env.sh"
 
 URL="http://localhost:${INFLUXDB_PORT_HOST:-8087}"
 TOKEN="${INFLUXDB_TOKEN:?required}"

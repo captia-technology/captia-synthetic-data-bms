@@ -4,6 +4,8 @@
 # Uso: ./export_dump.sh {caseB|caseC|caseD}
 # =============================================================================
 set -euo pipefail
+# shellcheck disable=SC1091
+source "$(dirname "$0")/_load_env.sh"
 
 CASE="${1:-caseB}"
 PORT="${BMS_GENERATOR_PORT_HOST:-8120}"

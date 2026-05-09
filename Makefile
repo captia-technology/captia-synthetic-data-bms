@@ -9,6 +9,17 @@ SHELL          := bash
 .DEFAULT_GOAL  := help
 
 ENV_FILE       ?= .env
+
+# Si .env existe, leerlo y exportar todas las KEY=VALUE para que las recetas
+# bash dispongan de $$INFLUXDB_TOKEN, $$BMS_API_TOKEN, $$GRAFANA_PORT_HOST...
+# Saltamos cualquier línea que contenga ';' (formato Windows COMPOSE_FILE) o
+# que no sea una asignación válida.
+ifneq (,$(wildcard $(ENV_FILE)))
+include $(ENV_FILE)
+EXPORTED_ENV_VARS := $(shell awk -F= '/^[A-Za-z_][A-Za-z_0-9]*=/ && $$0 !~ /;/ {print $$1}' $(ENV_FILE))
+export $(EXPORTED_ENV_VARS)
+endif
+
 COMPOSE_FILES  := -f compose/base.yaml -f compose/observability.yaml -f compose/generator.yaml -f compose/data-plane-init.yaml
 COMPOSE_INFRA  := -f compose/base.yaml -f compose/observability.yaml -f compose/data-plane-init.yaml
 COMPOSE        := docker compose --env-file $(ENV_FILE) $(COMPOSE_FILES)
@@ -42,10 +53,27 @@ preflight:  ## Validate Docker, ports and .env
 	bash scripts/preflight.sh
 
 .PHONY: quickstart
-quickstart: init-env install preflight up wait-healthy smoke urls  ## One-shot: env + sync + preflight + up + wait + smoke + urls
+quickstart: init-env install preflight up wait-healthy wait-init smoke urls  ## One-shot completo (incluye build de bms-data-generator)
+	@echo ""
+	@echo "==> Listo. Abre Grafana en http://localhost:$${GRAFANA_PORT_HOST:-3001} (admin/admin)."
 
 .PHONY: quickstart-infra
-quickstart-infra: init-env install preflight up-infra wait-healthy-infra smoke-infra urls  ## quickstart without the generator container (run generator on host)
+quickstart-infra: init-env install preflight up-infra wait-healthy-infra wait-init smoke-infra urls  ## quickstart pero solo la infra (sin build del generator)
+
+.PHONY: demo
+demo: init-env preflight up-infra wait-healthy-infra wait-init smoke-infra urls  ## ⭐ MODO ALUMNO: arranca toda la infra y la valida (sin build del generator)
+	@echo ""
+	@echo "================================================================"
+	@echo "  Stack BMS listo. Lo siguiente que puedes hacer:"
+	@echo "================================================================"
+	@echo " 1. Abre Grafana:    http://localhost:$${GRAFANA_PORT_HOST:-3001}"
+	@echo "                     usuario: admin   contrasenya: admin"
+	@echo " 2. (Opcional) lanza el generador en tu host (otra terminal):"
+	@echo "       make run-host"
+	@echo " 3. Cuando termines:"
+	@echo "       make down       # apaga el stack (mantiene datos)"
+	@echo "       make clean      # apaga y borra todos los volumenes"
+	@echo "================================================================"
 
 .PHONY: up
 up:  ## docker compose up -d (full stack, builds bms-data-generator)
@@ -63,6 +91,7 @@ down:  ## docker compose down (preserves volumes)
 
 .PHONY: clean
 clean:  ## docker compose down -v (DELETES volumes)
+	$(ENV_GUARD)
 	$(COMPOSE) down -v
 
 .PHONY: ps
@@ -84,6 +113,19 @@ config-render:  ## Print the merged compose configuration
 .PHONY: wait-healthy
 wait-healthy:  ## Block until all 9 services report healthy (max 120s)
 	bash scripts/wait_healthy.sh
+
+.PHONY: wait-init
+wait-init:  ## Block until influx-init exits successfully (max 60s)
+	@deadline=$$(( $$(date +%s) + 60 )); \
+	while [ $$(date +%s) -lt $$deadline ]; do \
+	    state=$$(docker inspect --format='{{.State.Status}}' captia-bms-influx-init 2>/dev/null || echo missing); \
+	    code=$$(docker inspect --format='{{.State.ExitCode}}' captia-bms-influx-init 2>/dev/null || echo 0); \
+	    if [ "$$state" = "exited" ] && [ "$$code" = "0" ]; then echo "==> influx-init OK"; exit 0; fi; \
+	    if [ "$$state" = "exited" ] && [ "$$code" != "0" ]; then echo "ERROR: influx-init exited with code $$code"; docker logs captia-bms-influx-init | tail -20; exit 1; fi; \
+	    sleep 2; \
+	done; \
+	echo "ERROR: timeout waiting for influx-init"; \
+	docker logs captia-bms-influx-init 2>&1 | tail -20; exit 1
 
 .PHONY: wait-healthy-infra
 wait-healthy-infra:  ## Block until infra services (no generator) are healthy
