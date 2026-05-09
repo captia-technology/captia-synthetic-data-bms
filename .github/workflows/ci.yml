@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "0.5.18"
+          enable-cache: true
+
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+
+      - name: Sync workspace
+        run: uv sync --frozen
+
+      - name: ruff check
+        run: uv run ruff check .
+
+      - name: ruff format check
+        run: uv run ruff format --check .
+
+  test:
+    name: Tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "0.5.18"
+          enable-cache: true
+
+      - name: Set up Python ${{ matrix.python }}
+        run: uv python install ${{ matrix.python }}
+
+      - name: Sync workspace
+        run: uv sync --frozen
+
+      - name: Unit tests (workspace)
+        run: uv run pytest -m unit -q --no-header
+
+      - name: Integration tests (in-process)
+        run: uv run pytest -m integration -q --no-header
+
+      - name: Snapshot determinism
+        run: uv run pytest -m snapshot -q --no-header
+
+      - name: Vendor unit tests
+        run: |
+          uv run pytest vendor/synthetic-generator/tests/unit \
+            -q --no-header --override-ini="markers=" -p no:cacheprovider
+
+  docker-build:
+    name: Build Docker image (bms-data-generator)
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: modules/bms-data-generator/Dockerfile
+          push: false
+          tags: captia-bms-data-generator:ci-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  compose-validate:
+    name: Validate docker compose files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Render compose config
+        env:
+          INFLUXDB_TOKEN: dummy-ci-token-not-a-secret-value-for-validation
+          INFLUXDB_ADMIN_PASSWORD: dummy-ci-password-not-a-secret-value
+          BMS_API_TOKEN: dummy-ci-bms-api-token-for-validation
+        run: |
+          docker compose \
+            -f compose/base.yaml \
+            -f compose/observability.yaml \
+            -f compose/generator.yaml \
+            -f compose/data-plane-init.yaml \
+            config > /dev/null

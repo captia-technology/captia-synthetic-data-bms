@@ -130,7 +130,7 @@ task config:render       # Ver compose merged
 
 ## Licencia
 
-Proprietary — CAPTIA Technology.
+Apache License 2.0 — © 2026 CAPTIA Technology. Ver [`LICENSE`](LICENSE) y [`NOTICE`](NOTICE).
 
 ## Soporte
 
