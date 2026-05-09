@@ -1,0 +1,38 @@
+[project]
+name = "bms-calibration"
+version = "0.1.0"
+description = "BMS-specific calibration overrides and HVAC fault injection for synthetic data"
+requires-python = ">=3.12"
+authors = [{ name = "CAPTIA Technology", email = "tech@captiatechnology.com" }]
+readme = "README.md"
+license = { text = "Proprietary" }
+
+dependencies = [
+    "numpy>=1.24",
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "synthetic-generator",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.8.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bms_calibration"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-v --tb=short --strict-markers"
+markers = [
+    "unit: unit tests",
+    "snapshot: deterministic regression",
+]
