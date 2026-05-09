@@ -17,7 +17,6 @@ from pathlib import Path
 import pytest
 import yaml
 
-
 REPO_ROOT = Path(__file__).resolve().parents[4]
 DOMAIN_YAML_LOCAL = REPO_ROOT / "config" / "domains" / "bms_classrooms" / "domain.yaml"
 

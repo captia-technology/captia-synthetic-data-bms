@@ -128,15 +128,85 @@ def _build_runner(config_path: Path) -> tuple[Any, Any]:
 
     sink = sinks[0] if len(sinks) == 1 else CompositeSink(sinks)
 
+    # T-PV-08 + T-PV-30: si faults activos, envuelve sink con _LateCloseSink
+    # para que sobreviva al close() interno del runner y permita al fault_hook
+    # emitir DataPoints adicionales después de runner.run().
+    from ..config import get_settings
+    if get_settings().faults_enabled and faults_config:
+        sink = _LateCloseSink(sink)
+
     with _suppress_signal_setup():
         runner = ScenarioRunner(config, domain, sink)
 
-    # T-PV-08 + T-PV-30 (cierra L-PV-02): construye hook que emite FaultEvents
-    # post-runner.run() si BMS_FAULTS_ENABLED=true.
     fault_hook = _build_fault_emitter_hook(sink, config, domain, faults_config, config_path)
     if fault_hook is not None:
         return runner, sink, fault_hook
     return runner, sink
+
+
+class _LateCloseSink:
+    """Sink wrapper que difiere ``close()`` hasta ``release_close()``.
+
+    Necesario para T-PV-08/T-PV-30: el vendor ScenarioRunner.run() cierra el
+    sink al terminar, lo que rompe el fault_hook posterior. Este wrapper:
+      - Delega open/emit/emit_batch/flush al sink real.
+      - Intercepta close(): solo flushea (no cierra).
+      - Expone release_close() para cerrar de verdad cuando _run_job termina.
+    """
+
+    def __init__(self, real_sink: Any):
+        self.real_sink = real_sink
+        self._released = False
+
+    @property
+    def name(self) -> str:
+        return getattr(self.real_sink, "name", "late_close")
+
+    def open(self) -> None:
+        if hasattr(self.real_sink, "open"):
+            self.real_sink.open()
+
+    def emit(self, point: Any) -> Any:
+        return self.real_sink.emit(point)
+
+    def emit_batch(self, points: Any) -> int:
+        if hasattr(self.real_sink, "emit_batch"):
+            return self.real_sink.emit_batch(points)
+        n = 0
+        for p in points:
+            self.real_sink.emit(p)
+            n += 1
+        return n
+
+    def flush(self) -> None:
+        if hasattr(self.real_sink, "flush"):
+            self.real_sink.flush()
+
+    def close(self) -> None:
+        # Diferir close real — flush sí.
+        if hasattr(self.real_sink, "flush"):
+            self.real_sink.flush()
+
+    def release_close(self) -> None:
+        """Cierra el sink real. Llamar tras invocar el fault_hook."""
+        if self._released:
+            return
+        self._released = True
+        if hasattr(self.real_sink, "close"):
+            self.real_sink.close()
+
+    # Forward AliasSink-specific properties for tests.
+    @property
+    def renamed_count(self) -> int:
+        return getattr(self.real_sink, "renamed_count", 0)
+
+    @property
+    def passthrough_count(self) -> int:
+        return getattr(self.real_sink, "passthrough_count", 0)
+
+    @property
+    def aliases(self) -> dict:
+        return getattr(self.real_sink, "aliases", {})
 
 
 def _resolve_domain_config_path(config_path: Path, domain_id: str, filename: str) -> Path:
@@ -379,11 +449,16 @@ class RunnerService:
             results = runner.run()
             points = sum(getattr(r, "points_emitted", 0) for r in results)
             # T-PV-30: post-run hook emits FaultEvents to the sink (Caso C real).
+            # El sink está envuelto con _LateCloseSink, así que sigue abierto
+            # tras runner.run(). Cerramos explícitamente tras el hook.
             if fault_hook is not None:
                 try:
                     points += fault_hook() or 0
                 except Exception as exc:  # noqa: BLE001
                     LOG.warning("Fault emitter hook failed: %s", exc)
+                finally:
+                    if hasattr(_sink, "release_close"):
+                        _sink.release_close()
             with self._lock:
                 self._jobs[job_id].phase = "completed"
                 self._jobs[job_id].points_emitted = points

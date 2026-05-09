@@ -21,6 +21,9 @@ simulation:
 
 domain:
   id: bms_classrooms
+  # T-PV-09: apuntar al override local con holidays expandidos Valencia 2025-26.
+  # Sin esto, vendor usa su domain.yaml default sin festivos completos.
+  config_path: "config/domains/bms_classrooms/domain.yaml"
 
 phases:
   backfill:
