@@ -70,6 +70,7 @@ Grafana                          : 4 datasources + 4 dashboards
 - **2026-05-10 01:15** — follow-up Must — H-21 cerrada (PATCH 005 TZ-aware `datetime.now`), H-22 cerrada (PATCH 006 doble scrape Prometheus mode=container/host, verificado live), gap #27 cerrado (`make stream` + `scripts/stream_live.sh`). Suite 194 → **198/198 PASS**. L-PV-02 confirmada cableada vía tests Caso C (live E2E pendiente).
 - **2026-05-10 01:20** — Hallazgos abiertos del ACTION_PLAN: **22** (1 alta · 11 media · 10 baja). Único alta restante: **H-01** event payload `ts_ns` vs ISO `ts` — requiere decisión arquitectónica con upstream CAPTIA-connect.
 - **2026-05-10 16:30** — bloque Should del ACTION_PLAN — 5 hallazgos cerrados: **H-02** (Telegraf healthcheck `curl /metrics`), **F-8** (CO₂ gen ASHRAE 4.5), **F-7** (PATCH 007 valve rate limiter), **F-5** (PATCH 008 thermal α heat vs cool), **H-05** (coverage gating CI 80 %, baseline 89.15 %). Suite 198 → **211/211 PASS**. Hallazgos abiertos: **17** (1 alta · 8 media · 8 baja).
+- **2026-05-10 17:00** — bloque Should completado — 3 hallazgos finales cerrados: **H-12** (matriz `SPEC_TEST_TRACEABILITY.md` 49 reglas + test estático 4 cases), **H-03** (slowapi rate limiting 10/5/60 per minute, 5 tests), **H-06** (job CI `e2e-stack` que ejecuta `make demo` + captura logs on failure). Suite 211 → **220/220 PASS**. Hallazgos abiertos: **14** (1 alta · 5 media · 8 baja). Único alta restante sigue siendo H-01.
 
 ## Fase 11 — Notebooks didácticos y casos de uso explícitos
 

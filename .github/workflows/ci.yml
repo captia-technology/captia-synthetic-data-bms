@@ -137,3 +137,59 @@ jobs:
             -f compose/generator.yaml \
             -f compose/data-plane-init.yaml \
             config > /dev/null
+
+  e2e-stack:
+    # H-06 (AUDIT_REPORT.md): CI levanta el stack y valida smoke. Cubre
+    # mosquitto + telegraf + influxdb + redis + grafana + prom + loki +
+    # promtail + influx-init (one-shot). Genera .env con secretos random
+    # vía scripts/init_env.sh, espera healthy, ejecuta smoke checks,
+    # tear down al final con `always()` para liberar runners.
+    #
+    # No levanta el bms-data-generator (modo demo: el build de la imagen
+    # depende de python:3.12-slim que en GitHub Actions runners ocasionales
+    # tiene rate-limits — `make demo` skippea el build).
+    name: E2E stack smoke (infra-only)
+    runs-on: ubuntu-latest
+    needs: [lint, test, compose-validate]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "0.5.18"
+          enable-cache: true
+
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+
+      - name: Bootstrap .env with random secrets
+        run: bash scripts/init_env.sh
+
+      - name: make demo (init + up-infra + wait + smoke)
+        run: make demo
+
+      - name: Capture container logs on failure
+        if: failure()
+        run: |
+          mkdir -p /tmp/ci-logs
+          for c in mosquitto telegraf influxdb redis grafana prometheus loki promtail influx-init; do
+            docker logs "captia-bms-${c}" > "/tmp/ci-logs/${c}.log" 2>&1 || true
+          done
+
+      - name: Upload logs artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-stack-logs
+          path: /tmp/ci-logs/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Tear down
+        if: always()
+        run: make clean

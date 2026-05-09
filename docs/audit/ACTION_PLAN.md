@@ -28,10 +28,10 @@
 - **CI gate**: H-05 coverage 80 % `fail_under` (baseline 89.15 %).
 - **Operacional**: `make stream` (gap #27) mantiene el generator vivo con
   auto-restart + monitoreo `phase` cada 30 s.
-- **Hallazgos cerrados durante la auditoría + follow-up**: **14**
-  (gap #5, #7, #9, #27; H-02, H-05, H-14, H-21, H-22, H-23; F-1, F-2, F-4,
-  F-5, F-7, F-8; L-PV-02, L-PV-03, L-PV-07, L-PV-09).
-- **Hallazgos abiertos**: **17** (1 alta · 8 media · 8 baja).
+- **Hallazgos cerrados durante la auditoría + follow-up**: **17**
+  (gap #5, #7, #9, #27; H-02, H-03, H-05, H-06, H-12, H-14, H-21, H-22,
+  H-23; F-1, F-2, F-4, F-5, F-7, F-8; L-PV-02, L-PV-03, L-PV-07, L-PV-09).
+- **Hallazgos abiertos**: **14** (1 alta · 5 media · 8 baja).
   - El único bloqueador alta restante es **H-01** (event payload `ts_ns`
     vs ISO `ts`) — requiere decisión spec con upstream.
 
@@ -63,10 +63,10 @@ Tests de regresión: **15 tests nuevos**, todos verdes.
 | ID | Título | Acción | Effort | Estado |
 |---|---|---|---|---|
 | H-02 | Telegraf healthcheck `pgrep` insuficiente | Cambio a `curl /metrics \| head -1 \| grep -q '^# HELP'` (verifica ingest healthy) | S | ✅ cerrada |
-| H-03 | Endpoints `/v1/*` sin rate limiting | Añadir `slowapi` o equivalent | M (2 d) | ⚪ pendiente |
+| H-03 | Endpoints `/v1/*` sin rate limiting | `slowapi` cableado en `main.py`, límites por endpoint (control 10/min, datasets 5/min, query 60/min) + 5 tests | M | ✅ cerrada |
 | H-05 | Sin coverage gating en CI | `pytest-cov` + `[tool.coverage]` con `fail_under=80`. Baseline 89.15 % | S | ✅ cerrada |
-| H-06 | CI no levanta el stack | Añadir job `docker-compose-test` | M (3 d) | ⚪ pendiente |
-| H-12 | Physics specs ortogonales a tests | Añadir cross-references spec ↔ test | S (1 d) | ⚪ pendiente |
+| H-06 | CI no levanta el stack | Job `e2e-stack` en `ci.yml` que ejecuta `make demo` (`init-env + up-infra + wait + smoke`) y captura logs al fallar | M | ✅ cerrada |
+| H-12 | Physics specs ortogonales a tests | Matriz [`SPEC_TEST_TRACEABILITY.md`](SPEC_TEST_TRACEABILITY.md) con 49 reglas mapeadas + test estático que valida link integrity | S | ✅ cerrada |
 | F-7 | Válvula sin rate limiter | **PATCH 007** `valve_max_rate_per_min=60.0` (1 %/s, TRV-realista) + 5 tests | S | ✅ cerrada |
 | F-5 | Cooling/heating mismo α en thermal | **PATCH 008** `tau_cool_minutes=60` vs `tau_minutes=90` + 4 tests | M | ✅ cerrada |
 | F-8 | CO₂ `gen=7.5` vs ASHRAE 4.5 | `domain.yaml` actualizado a 4.5 ppm/p/min (literatura ASHRAE 62.1 / EN 16798) | S | ✅ cerrada |
