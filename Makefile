@@ -1,7 +1,16 @@
-.PHONY: install lint format test test-integration up down clean smoke dump-caseB ps logs help
+.PHONY: help quickstart init-env install lint format test test-integration up down clean smoke dump-caseB ps logs urls
 
 help:
 	@task --list
+
+quickstart:
+	task quickstart
+
+init-env:
+	task init:env
+
+urls:
+	task urls
 
 install:
 	task install

@@ -12,6 +12,39 @@ tasks:
     cmds:
       - task --list
 
+  quickstart:
+    desc: "One-shot bootstrap: env + sync + preflight + up + wait + smoke"
+    cmds:
+      - task: init:env
+      - task: install
+      - task: preflight
+      - task: up
+      - task: wait:healthy
+      - task: smoke
+      - task: urls
+
+  init:env:
+    desc: "Generate .env from .env.example with fresh random secrets (idempotent)"
+    cmds:
+      - bash scripts/init_env.sh
+
+  init:env:force:
+    desc: "Re-generate .env with new secrets (overwrites existing)"
+    cmds:
+      - bash scripts/init_env.sh --force
+
+  urls:
+    desc: "Print key local URLs once the stack is running"
+    cmds:
+      - 'echo "Generator API : http://localhost:${BMS_GENERATOR_PORT_HOST:-8120}"'
+      - 'echo "Healthz       : http://localhost:${BMS_GENERATOR_PORT_HOST:-8120}/healthz"'
+      - 'echo "Metrics       : http://localhost:${BMS_GENERATOR_PORT_HOST:-8120}/metrics"'
+      - 'echo "OpenAPI docs  : http://localhost:${BMS_GENERATOR_PORT_HOST:-8120}/docs"'
+      - 'echo "InfluxDB UI   : http://localhost:${INFLUXDB_PORT_HOST:-8087}"'
+      - 'echo "Grafana       : http://localhost:${GRAFANA_PORT_HOST:-3001} (admin / admin by default)"'
+      - 'echo "Prometheus    : http://localhost:${PROMETHEUS_PORT_HOST:-9090}"'
+      - 'echo "Loki          : http://localhost:${LOKI_PORT_HOST:-3100}"'
+
   install:
     desc: "Sync dependencies via uv workspace"
     cmds:

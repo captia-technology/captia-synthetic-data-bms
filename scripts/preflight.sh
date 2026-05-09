@@ -23,8 +23,8 @@ echo "  - docker compose v2 OK"
 
 # .env
 if [ ! -f .env ]; then
-    echo "AVISO: .env no existe. Copia .env.example a .env y rellena valores reales."
-    echo "       cp .env.example .env"
+    echo "  - .env not found, generating with random secrets (run task init:env:force to regenerate)."
+    bash scripts/init_env.sh
 fi
 
 # Variables críticas
