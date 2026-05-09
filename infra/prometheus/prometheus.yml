@@ -1,0 +1,51 @@
+# =============================================================================
+# Prometheus configuration — CAPTIA-SYNTHETIC-DATA-BMS
+# Solo scrapes de servicios del stack BMS. Sin dependencias externas.
+# =============================================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'captia-bms-local'
+    env: 'development'
+
+alerting:
+  alertmanagers: []
+
+rule_files:
+  - /etc/prometheus/rules/*.rules.yml
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  - job_name: 'bms-data-generator'
+    static_configs:
+      - targets: ['bms-data-generator:8120']
+        labels:
+          service: 'bms-data-generator'
+    metrics_path: '/metrics'
+
+  - job_name: 'telegraf'
+    static_configs:
+      - targets: ['telegraf:9273']
+        labels:
+          service: 'telegraf'
+
+  - job_name: 'influxdb'
+    static_configs:
+      - targets: ['influxdb:8086']
+        labels:
+          service: 'influxdb'
+    metrics_path: '/metrics'
+
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+        labels:
+          service: 'grafana'
+    metrics_path: '/metrics'

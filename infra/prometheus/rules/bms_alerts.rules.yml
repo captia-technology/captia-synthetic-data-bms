@@ -1,0 +1,39 @@
+groups:
+  - name: bms_alerts
+    interval: 30s
+    rules:
+      - alert: BMSGeneratorDown
+        expr: up{job="bms-data-generator"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "BMS data generator is down"
+          description: "El servicio bms-data-generator no responde a /metrics desde hace 1 minuto."
+
+      - alert: BMSPublishErrorRateHigh
+        expr: rate(captia_bms_publish_errors_total[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "BMS publish error rate above 1%"
+          description: "La tasa de errores de publicación MQTT supera el 1% durante 5 minutos."
+
+      - alert: BMSDumpExportStuck
+        expr: captia_bms_active_jobs > 0 and changes(captia_bms_points_generated_total[10m]) == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Dump export stuck"
+          description: "Hay un job activo pero no se generan puntos desde hace 10 minutos."
+
+      - alert: BMSMQTTDisconnected
+        expr: captia_bms_connected == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "BMS generator disconnected from MQTT"
+          description: "El generador BMS perdió la conexión con Mosquitto durante más de 2 minutos."

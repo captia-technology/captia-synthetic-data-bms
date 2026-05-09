@@ -1,0 +1,46 @@
+# =============================================================================
+# Grafana Datasources Provisioning — CAPTIA-SYNTHETIC-DATA-BMS
+# Adaptado para BMS-only stack (sin Tempo).
+# =============================================================================
+
+apiVersion: 1
+
+datasources:
+  - name: InfluxDB
+    uid: influxdb
+    type: influxdb
+    access: proxy
+    url: http://influxdb:8086
+    jsonData:
+      version: Flux
+      organization: $INFLUXDB_ORG
+      defaultBucket: $INFLUXDB_BUCKET
+    secureJsonData:
+      token: $INFLUXDB_TOKEN
+    isDefault: true
+
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    jsonData:
+      timeInterval: "15s"
+      httpMethod: POST
+    isDefault: false
+
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      maxLines: 1000
+    isDefault: false
+
+  - name: Redis
+    uid: redis
+    type: redis-datasource
+    access: proxy
+    url: redis://redis:6379
+    isDefault: false

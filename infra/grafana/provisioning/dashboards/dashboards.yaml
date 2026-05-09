@@ -1,0 +1,17 @@
+# =============================================================================
+# Grafana Dashboards Provisioning — CAPTIA-SYNTHETIC-DATA-BMS
+# =============================================================================
+
+apiVersion: 1
+
+providers:
+  - name: 'CAPTIA-BMS Dashboards'
+    orgId: 1
+    folder: 'CAPTIA-BMS'
+    folderUid: 'captia-bms'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards

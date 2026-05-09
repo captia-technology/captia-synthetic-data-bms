@@ -1,0 +1,58 @@
+# =============================================================================
+# CAPTIA-SYNTHETIC-DATA-BMS — generator compose
+# Servicio: bms-data-generator (FastAPI control plane + vendor synthetic-generator).
+# =============================================================================
+
+name: captia-bms
+
+services:
+  bms-data-generator:
+    build:
+      context: .
+      dockerfile: modules/bms-data-generator/Dockerfile
+    image: captia-bms-data-generator:0.1.0
+    container_name: captia-bms-generator
+    restart: unless-stopped
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      telegraf:
+        condition: service_healthy
+    ports:
+      - "${BMS_GENERATOR_PORT_HOST:-8120}:8120"
+    environment:
+      - BMS_PORT=8120
+      - BMS_LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - BMS_DOMAIN_ID=${BMS_DOMAIN_ID:-bms_classrooms}
+      - BMS_N_AULAS=${BMS_N_AULAS:-10}
+      - BMS_SEED=${BMS_SEED:-42}
+      - BMS_API_TOKEN=${BMS_API_TOKEN:?required}
+      - BMS_MQTT_HOST=${MQTT_HOST:-mosquitto}
+      - BMS_MQTT_PORT=${MQTT_PORT:-1883}
+      - BMS_CAPTIA_ENV=${CAPTIA_ENV:-dev}
+      - BMS_CAPTIA_TENANT=${CAPTIA_TENANT:-default}
+      - BMS_CAPTIA_SITE=${CAPTIA_SITE:-ies_simarro}
+      - BMS_DEFAULT_CONFIG=/app/config/projects/bms_v1_demo.yaml
+      - BMS_OUTPUT_DIR=/app/output
+    volumes:
+      - ./config:/app/config:ro
+      - bms_output:/app/output
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8120/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    mem_limit: 1g
+    cpus: 1.5
+
+volumes:
+  bms_output:
+
+networks:
+  default:
+    name: ${CAPTIA_NETWORK_NAME:-captia-network}

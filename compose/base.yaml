@@ -1,0 +1,152 @@
+# =============================================================================
+# CAPTIA-SYNTHETIC-DATA-BMS — base compose
+# Servicios persistentes: mosquitto, influxdb, redis, telegraf, grafana.
+# =============================================================================
+
+name: captia-bms
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0.18
+    container_name: captia-bms-mosquitto
+    restart: unless-stopped
+    ports:
+      - "${MQTT_PORT_HOST:-1884}:1883"
+      - "${MQTT_WS_PORT_HOST:-9002}:9001"
+    volumes:
+      - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -h localhost -t '$$SYS/broker/uptime' -C 1 -W 5 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    mem_limit: 256m
+    cpus: 0.5
+
+  influxdb:
+    image: influxdb:2.7
+    container_name: captia-bms-influxdb
+    restart: unless-stopped
+    ports:
+      - "${INFLUXDB_PORT_HOST:-8087}:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_ADMIN_USER:-admin}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_ADMIN_PASSWORD:?required}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG:-captia}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET:-telemetry}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_TOKEN:?required}
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8086/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    mem_limit: 1g
+    cpus: 1.0
+
+  redis:
+    image: redis:7-alpine
+    container_name: captia-bms-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    mem_limit: 256m
+    cpus: 0.5
+
+  telegraf:
+    image: telegraf:1.32
+    container_name: captia-bms-telegraf
+    restart: unless-stopped
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+    volumes:
+      - ./infra/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      - telegraf_state:/var/lib/telegraf
+    environment:
+      - INFLUXDB_URL=${INFLUXDB_URL:-http://influxdb:8086}
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN:?required}
+      - INFLUXDB_ORG=${INFLUXDB_ORG:-captia}
+      - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-telemetry}
+      - INFLUXDB_BUCKET_STATE_EVENTS=${INFLUXDB_BUCKET_STATE_EVENTS:-state_events}
+      - MQTT_HOST=${MQTT_HOST:-mosquitto}
+      - MQTT_PORT=${MQTT_PORT:-1883}
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f telegraf || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    mem_limit: 256m
+    cpus: 0.5
+
+  grafana:
+    build:
+      context: ./infra/grafana
+      dockerfile: Dockerfile
+    image: captia-bms-grafana:local
+    container_name: captia-bms-grafana
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+    ports:
+      - "${GRAFANA_PORT_HOST:-3001}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_LIVE_HA_ENGINE=${GF_LIVE_HA_ENGINE:-redis}
+      - GF_LIVE_HA_REDIS_ADDRESS=${GF_LIVE_HA_REDIS_ADDRESS:-redis:6379}
+      - INFLUXDB_ORG=${INFLUXDB_ORG:-captia}
+      - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-telemetry}
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN:?required}
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    mem_limit: 512m
+    cpus: 1.0
+
+volumes:
+  mosquitto_data:
+  mosquitto_log:
+  influxdb_data:
+  influxdb_config:
+  redis_data:
+  telegraf_state:
+  grafana_data:
+
+networks:
+  default:
+    name: ${CAPTIA_NETWORK_NAME:-captia-network}

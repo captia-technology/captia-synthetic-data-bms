@@ -1,0 +1,71 @@
+# =============================================================================
+# Promtail Configuration for CAPTIA-SYNTHETIC-DATA-BMS
+# =============================================================================
+# Filtro: com.docker.compose.project=captia-bms (definido en compose/base.yaml).
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Docker container logs for CAPTIA-BMS compose project.
+  # NOTE: project label es `captia-bms` (definido en compose/base.yaml).
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: label
+            values: ["com.docker.compose.project=captia-bms"]
+    relabel_configs:
+      # Extract container name
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      # Extract compose service name
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'service'
+      # Extract compose project name
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_project']
+        target_label: 'project'
+    pipeline_stages:
+      # Parse JSON logs from FastAPI services (bms-data-generator).
+      - match:
+          selector: '{service="bms-data-generator"}'
+          stages:
+            - json:
+                expressions:
+                  level: level
+                  ts: ts
+                  logger: logger
+                  message: message
+            - labels:
+                level:
+      # Parse common log formats for timeseries/infra services
+      - match:
+          selector: '{service=~"telegraf|influxdb|grafana|redis"}'
+          stages:
+            - regex:
+                expression: '(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z?)\s+(?P<level>\w+)\s+(?P<message>.*)'
+            - labels:
+                level:
+      # Mosquitto broker log format:
+      #   2026-04-07 22:15:10: New client connected from 172.18.0.7:51234 as captia-adapter
+      #   1775597000: Client captia-telegraf disconnected
+      # Parse both epoch-prefix and ISO-prefix variants; extract severity heuristics.
+      - match:
+          selector: '{service="mosquitto"}'
+          stages:
+            - regex:
+                expression: '^(?P<ts>(?:\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}|\d{10}))(?::|\s*)\s*(?P<message>.*)$'
+            - template:
+                source: level
+                template: '{{ if or (contains "Error" .message) (contains "error" .message) }}error{{ else if or (contains "Warning" .message) (contains "warning" .message) (contains "denied" .message) }}warning{{ else }}info{{ end }}'
+            - labels:
+                level:

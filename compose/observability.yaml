@@ -1,0 +1,72 @@
+# =============================================================================
+# CAPTIA-SYNTHETIC-DATA-BMS — observability compose
+# Servicios: prometheus, loki, promtail.
+# =============================================================================
+
+name: captia-bms
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.49.1
+    container_name: captia-bms-prometheus
+    restart: unless-stopped
+    ports:
+      - "${PROMETHEUS_PORT_HOST:-9090}:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus_data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    mem_limit: 512m
+    cpus: 0.5
+
+  loki:
+    image: grafana/loki:2.9.4
+    container_name: captia-bms-loki
+    restart: unless-stopped
+    ports:
+      - "${LOKI_PORT_HOST:-3100}:3100"
+    volumes:
+      - ./infra/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+    command: ["-config.file=/etc/loki/loki-config.yml"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3100/ready | grep -q ready || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    mem_limit: 512m
+    cpus: 0.5
+
+  promtail:
+    image: grafana/promtail:2.9.4
+    container_name: captia-bms-promtail
+    restart: unless-stopped
+    depends_on:
+      loki:
+        condition: service_healthy
+    volumes:
+      - ./infra/promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: ["-config.file=/etc/promtail/promtail-config.yml"]
+    mem_limit: 256m
+    cpus: 0.5
+
+volumes:
+  prometheus_data:
+  loki_data:
+
+networks:
+  default:
+    name: ${CAPTIA_NETWORK_NAME:-captia-network}
