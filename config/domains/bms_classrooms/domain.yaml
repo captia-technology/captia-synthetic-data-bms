@@ -107,6 +107,10 @@ physics:
     # on-change a un orden de magnitud realista (~5 ev/h por aula).
     setpoint_jitter_std: 0.05
     setpoint_manual_jitter_std: 0.8
+    # L-PV-07 (PATCH 004): anti short-cycle HVAC. Min on/off time tras cada transición.
+    # Compresores reales se dañan con cycles < 3 min; 5 min es práctica estándar HVAC.
+    hvac_min_on_minutes: 5.0
+    hvac_min_off_minutes: 5.0
   co2:
     # Well-mixed CO2 dynamics. Defaults vendor.
     outdoor_ppm: 420                          # baseline outdoor

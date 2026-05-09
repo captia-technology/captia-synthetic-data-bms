@@ -147,7 +147,9 @@ class BMSClassroomsPlugin(DomainPlugin):
                 time_index, ctx.outdoor_temp, occ, setp,
                 pd.Series(enable0, index=time_index), cfg_indoor, aula_rng
             )
-            enable = hvac_enable(indoor_temp, setp, occ, scene)
+            # L-PV-07 / PATCH 004: pasar cfg_indoor para activar anti short-cycle
+            # (hvac_min_on_minutes / hvac_min_off_minutes en domain.yaml).
+            enable = hvac_enable(indoor_temp, setp, occ, scene, cfg_indoor)
 
             # Re-simulate with actual enable
             indoor_temp = simulate_indoor_temperature(

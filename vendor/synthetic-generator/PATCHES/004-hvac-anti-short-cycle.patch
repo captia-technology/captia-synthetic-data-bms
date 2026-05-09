@@ -1,0 +1,113 @@
+# 004-hvac-anti-short-cycle.patch
+
+**Title**: Anti short-cycle en hvac_enable (L-PV-07).
+
+**Status**: Applied.
+
+**Applied on**: 2026-05-10.
+
+**Linked finding**: `docs/audit/PHYSICAL_REALISM_REPORT.md` F-2 (hvac_enable
+toggle posible cada 5 s).
+
+**Linked open question**: `docs/specs/digital-twin-bms-physics-validation/02-physics-questions.md` L-PV-07.
+
+**Linked rule**: `docs/specs/digital-twin-bms-physics-validation/04-physical-plausibility-rules.md` R-HVAC-EN-03 (anti short-cycle).
+
+## Problema
+
+`vendor/.../physics/actuators.py:hvac_enable` calculaba el enable
+puramente como una operación vectorial sobre la serie:
+
+```python
+((scene == "class") & (occ > 0) & (err > 0.4)) | (err > 1.5)
+```
+
+Sin memoria entre samples. Con frecuencia 5 s y jitter del setpoint y
+ruido térmico, el resultado podía toggle entre `0` y `1` sample-a-sample
+(intervalo ~5 s). Un compresor HVAC real se daña por *short-cycling*:
+encendido/apagado < 3 min causa fatiga térmica y eléctrica.
+
+R-HVAC-EN-03 requiere **p10(run_length) ≥ 5 min** y **p10(off_length) ≥
+5 min**. La medición previa (E2E_VALIDATION_REPORT.md F-3 fault injection)
+ya mostraba conteos de `ac_state` elevados en `state_events`.
+
+## Cambio
+
+Se introduce un nuevo helper privado `_enforce_min_dwell(enable, dt_min,
+min_on_min, min_off_min)` que recorre la serie y, ante una transición que
+ocurre antes del dwell mínimo, mantiene el estado anterior.
+
+`hvac_enable` recibe ahora un parámetro opcional `cfg_indoor` que, si está
+presente, dispara el post-process con los siguientes defaults configurables:
+
+- `hvac_min_on_minutes` (default `0.0`) — minutos mínimos en estado ON.
+- `hvac_min_off_minutes` (default `0.0`) — minutos mínimos en estado OFF.
+
+`domain.yaml` setea ambos a `5.0` minutos (práctica estándar HVAC).
+Cualquier consumidor externo que no pase `cfg_indoor` o lo pase sin las
+claves nuevas, conserva el comportamiento legacy (sin dwell).
+
+`plugin.py` pasa `cfg_indoor` a `hvac_enable` (ya estaba disponible).
+
+## Diff
+
+```diff
+--- a/src/synthetic_generator/domains/bms_classrooms/physics/actuators.py
++++ b/src/synthetic_generator/domains/bms_classrooms/physics/actuators.py
+@@ -120,6 +120,38 @@ def hvac_mode(
+     return pd.Series(mode, index=outdoor_temp.index, name="hvac_mode")
++def _enforce_min_dwell(enable, dt_min, min_on_min, min_off_min):
++    """Apply min-on / min-off dwell to a binary enable signal."""
++    if (min_on_min <= 0 and min_off_min <= 0) or len(enable) <= 1:
++        return enable
++    out = enable.copy()
++    last_change_idx = 0
++    for i in range(1, len(out)):
++        if out[i] != out[i-1]:
++            held_min = (i - last_change_idx) * dt_min
++            required = min_on_min if out[i-1] == 1 else min_off_min
++            if held_min < required:
++                out[i] = out[i-1]
++            else:
++                last_change_idx = i
++    return out
+@@ -127,7 +127,8 @@ def hvac_enable(
+     setpoint: pd.Series,
+     occupancy: pd.Series,
+-    scene: pd.Series
++    scene: pd.Series,
++    cfg_indoor: Dict[str, Any] | None = None,
+ ) -> pd.Series:
+     err = np.abs(indoor_temp.values - setpoint.values)
+-    enable = (
++    raw = (
+         ((scene.values == "class") & (occupancy.values > 0) & (err > 0.4)) |
+         (err > 1.5)
+-    )
+-    return pd.Series(enable.astype(int), ...)
++    ).astype(int)
++    if cfg_indoor is not None and len(indoor_temp) > 1:
++        min_on = float(cfg_indoor.get("hvac_min_on_minutes", 0.0))
++        min_off = float(cfg_indoor.get("hvac_min_off_minutes", 0.0))
++        if min_on > 0 or min_off > 0:
++            dt_min = (indoor_temp.index[1] - indoor_temp.index[0]).total_seconds() / 60.0
++            raw = _enforce_min_dwell(raw, dt_min, min_on, min_off)
++    return pd.Series(raw, index=indoor_temp.index, name="hvac_enable")
+```
+
+## Validación
+
+- `tests/integration/test_hvac_anti_short_cycle_audit.py`:
+  1. Sin `cfg_indoor` → comportamiento legacy preservado (signature back-compat).
+  2. Con `min_on=0, min_off=0` → comportamiento legacy preservado (escape hatch).
+  3. Con `min_on=5, min_off=5` y serie sintética con toggles ráfaga →
+     conteo de toggles cae al menos 5×, p10(run_length) ≥ 5 min.
+  4. Edge cases: serie de 1 sample, serie completamente OFF, serie
+     completamente ON.
+
+## Reversibilidad
+
+- Eliminar `hvac_min_on_minutes` y `hvac_min_off_minutes` de `domain.yaml`
+  → defaults `0.0` desactivan el post-process completamente.
+- Si se quiere quitar la firma cambiada de `hvac_enable`, basta con no
+  pasar `cfg_indoor` desde `plugin.py` (línea modificada).

@@ -122,32 +122,75 @@ def hvac_mode(
     return pd.Series(mode, index=outdoor_temp.index, name="hvac_mode")
 
 
+def _enforce_min_dwell(
+    enable: np.ndarray,
+    dt_min: float,
+    min_on_min: float,
+    min_off_min: float,
+) -> np.ndarray:
+    """Apply min-on / min-off dwell to a binary enable signal.
+
+    L-PV-07 / PATCH 004: an HVAC compressor short-cycling sub-minute is
+    physically destructive in real hardware. R-HVAC-EN-03 requires
+    p10(run_length) ≥ 5 min and p10(off_length) ≥ 5 min. This routine
+    is a deterministic post-process that holds the previous state until
+    the configured dwell has elapsed.
+    """
+    if (min_on_min <= 0 and min_off_min <= 0) or len(enable) <= 1:
+        return enable
+    out = enable.copy()
+    last_change_idx = 0
+    for i in range(1, len(out)):
+        if out[i] != out[i - 1]:
+            held_min = (i - last_change_idx) * dt_min
+            required = min_on_min if out[i - 1] == 1 else min_off_min
+            if held_min < required:
+                out[i] = out[i - 1]
+            else:
+                last_change_idx = i
+    return out
+
+
 def hvac_enable(
     indoor_temp: pd.Series,
     setpoint: pd.Series,
     occupancy: pd.Series,
-    scene: pd.Series
+    scene: pd.Series,
+    cfg_indoor: Dict[str, Any] | None = None,
 ) -> pd.Series:
     """Determine HVAC enable state.
 
     Enable when: occupied class scene with error > 0.4°C, or any error > 1.5°C.
+
+    When ``cfg_indoor`` is provided and ``hvac_min_on_minutes`` /
+    ``hvac_min_off_minutes`` are configured (>0), a deterministic min-dwell
+    post-process is applied to prevent short-cycling (L-PV-07).
 
     Args:
         indoor_temp: Indoor temperature series
         setpoint: Temperature setpoint series
         occupancy: Occupancy count series
         scene: Scene state series
+        cfg_indoor: Optional indoor physics configuration. If None, no
+            min-dwell enforcement is applied (legacy).
 
     Returns:
         Series of HVAC enable states (0/1)
     """
     err = np.abs(indoor_temp.values - setpoint.values)
-    enable = (
+    raw = (
         ((scene.values == "class") & (occupancy.values > 0) & (err > 0.4)) |
         (err > 1.5)
-    )
+    ).astype(int)
 
-    return pd.Series(enable.astype(int), index=indoor_temp.index, name="hvac_enable")
+    if cfg_indoor is not None and len(indoor_temp) > 1:
+        min_on = float(cfg_indoor.get("hvac_min_on_minutes", 0.0))
+        min_off = float(cfg_indoor.get("hvac_min_off_minutes", 0.0))
+        if min_on > 0 or min_off > 0:
+            dt_min = (indoor_temp.index[1] - indoor_temp.index[0]).total_seconds() / 60.0
+            raw = _enforce_min_dwell(raw, dt_min, min_on, min_off)
+
+    return pd.Series(raw, index=indoor_temp.index, name="hvac_enable")
 
 
 def heating_valve_position(
