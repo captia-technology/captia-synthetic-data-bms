@@ -1,0 +1,46 @@
+[project]
+name = "captia-synthetic-data-bms"
+version = "0.1.0"
+description = "CAPTIA synthetic data generator for BMS (Building Management System) domains"
+requires-python = ">=3.12"
+authors = [{ name = "CAPTIA Technology", email = "tech@captiatechnology.com" }]
+readme = "README.md"
+license = { text = "Proprietary" }
+
+[tool.uv.workspace]
+members = [
+    "modules/bms-data-generator",
+    "extensions/bms_calibration",
+    "vendor/synthetic-generator",
+]
+
+[tool.uv.sources]
+synthetic-generator = { workspace = true }
+bms-calibration = { workspace = true }
+bms-data-generator = { workspace = true }
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["modules/bms-data-generator/src", "extensions/bms_calibration/src", "vendor/synthetic-generator/src"]
+extend-exclude = ["vendor/synthetic-generator"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "B", "UP"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["B011"]
+
+[tool.pytest.ini_options]
+testpaths = ["modules", "extensions", "tests"]
+asyncio_mode = "auto"
+addopts = "-v --tb=short --strict-markers"
+markers = [
+    "unit: pure unit tests, no I/O",
+    "integration: requires services (mqtt, influx, redis)",
+    "smoke: post-deploy health verification",
+    "snapshot: deterministic regression",
+    "performance: throughput benchmarks",
+    "slow: takes more than 5 seconds",
+]
