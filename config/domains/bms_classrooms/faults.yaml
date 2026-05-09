@@ -1,0 +1,23 @@
+# =============================================================================
+# BMS Classrooms — Configuración de fallos HVAC v1 (Caso C)
+# Probabilidades calibradas a 1-2 fallos/aula·mes en defaults.
+# Ver docs/specs/synthetic-bms/02-domain-spec.md y 09-decision-log.md (ADR-010).
+# =============================================================================
+
+sensor_drift:
+  probability_per_day: 0.001
+  drift_rate: 0.5            # °C / día acumulativo
+  duration_minutes: 1440     # 24 h por episodio
+
+valve_stuck:
+  probability_per_day: 0.0005
+  duration_minutes: 60       # 1 h por episodio
+
+fan_failure:
+  probability_per_day: 0.0002
+  duration_minutes: 240      # 4 h por episodio
+
+refrigerant_low:
+  probability_per_day: 0.0001
+  drift_rate: 2.0            # °C reducción capacidad de enfriamiento
+  duration_minutes: 720      # 12 h por episodio
