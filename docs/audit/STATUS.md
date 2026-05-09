@@ -81,10 +81,10 @@ contratos extraídos para integradores.
 | Sub-fase | Entregable | Estado |
 |---|---|---|
 | 11.0 | `docs/audit/USE_CASE_MATRIX.md` (10 casos + extra, capas Medallion) | ✅ |
-| 11.1 | `docs/audit/NOTEBOOK_PLAN.md` (42 notebooks, niveles, deps) | ✅ |
+| 11.1 | `docs/audit/NOTEBOOK_PLAN.md` (45 notebooks, niveles, deps) | ✅ |
 | 11.2 | `docs/audit/DOCS_REPORT.md` (mapa de la nueva docs/) | ✅ |
 | 11.3 | `notebooks/_common/` helpers + `notebooks/_data/` mocks | ✅ |
-| 11.4 | 42 notebooks didácticos (3 overview + 39 casos A-J) | ✅ |
+| 11.4 | 45 notebooks didácticos (3 overview + 42 casos A-J) | ✅ |
 | 11.5 | `docs/use-cases/`, `docs/contracts/`, `docs/validation/`, `docs/operations/`, `docs/notebooks/` | ✅ |
 | 11.6 | Actualización `mkdocs.yml` con la nueva navegación | ✅ |
 | 11.7 | Validación notebooks (JSON, sin secretos, paths relativos) | ✅ |
@@ -98,7 +98,7 @@ contratos extraídos para integradores.
   `02-domain-spec.md`).
 - **2026-05-10 09:30** — sub-fase 11.0–11.2 cerradas (auditoría docente).
 - **2026-05-10 11:30** — sub-fase 11.3 cerrada (helpers + mocks deterministas).
-- **2026-05-10 14:00** — sub-fase 11.4 cerrada (42 notebooks generados con
+- **2026-05-10 14:00** — sub-fase 11.4 cerrada (45 notebooks generados con
   18-section template, mocks etiquetados, `seed=42`).
 - **2026-05-10 15:00** — sub-fase 11.5 cerrada (28 markdowns nuevos en
   `docs/use-cases/`, `docs/contracts/`, `docs/validation/`, `docs/operations/`,
@@ -110,7 +110,7 @@ contratos extraídos para integradores.
 
 ## Resumen de cobertura final
 
-- **42 notebooks** repartidos en 11 directorios (overview + 10 casos).
+- **45 notebooks** repartidos en 11 directorios (overview + 10 casos).
 - **28 documentos web nuevos** en 5 secciones (`use-cases`, `contracts`,
   `validation`, `operations`, `notebooks`).
 - **3 documentos de auditoría docente** (`USE_CASE_MATRIX.md`,

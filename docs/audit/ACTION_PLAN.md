@@ -10,10 +10,11 @@
 - **Stack base 100 % funcional**: 8 servicios Docker `healthy`, 24 aulas
   emitiendo a 5 s, ~210 K puntos InfluxDB en 24 h, Telegraf consumer +
   3 outputs activos, 4 dashboards Grafana provisionados, 4 datasources
-  conectados, suite de tests **211 / 211 PASS**, coverage **89.15 %**.
-- **Score físico estimado**: **0.94** → tras patches 007 y 008 más
-  alineación CO₂ con ASHRAE, todas las dimensiones D1/D2/D4 al 1.00.
-- **Patches al vendor aplicados** (7 totales, todos retrocompatibles):
+  conectados, suite de tests **240 / 240 PASS**, coverage **89.15 %**.
+- **Score físico estimado**: **0.94** → tras patches 007/008/009 más
+  alineación CO₂ con ASHRAE, todas las dimensiones D1/D2/D4 al 1.00 y
+  D6 (humedad) con dinámica realista.
+- **Patches al vendor aplicados** (8 totales, todos retrocompatibles):
   - **001** vendoring slim BMS-only.
   - **002** H-23 / F-4 jitter setpoint configurable (`setpoint_jitter_std=0.05`).
   - **003** L-PV-09 / F-1 humidity dehumidification en cooling.
@@ -21,6 +22,7 @@
   - **005** H-21 TZ-aware `datetime.now()` en `runner.py`.
   - **007** F-7 valve rate limiter (`valve_max_rate_per_min=60`).
   - **008** F-5 thermal α heat vs cool (`tau_cool_minutes=60` vs 90).
+  - **009** F-6 noise EWMA en transiciones (`noise.tau_minutes=3.0`).
 - **Patches infra adicionales**:
   - **006** H-22 doble Prometheus scrape (`mode=container` + `mode=host`,
     `extra_hosts: host.docker.internal:host-gateway`).
@@ -28,12 +30,15 @@
 - **CI gate**: H-05 coverage 80 % `fail_under` (baseline 89.15 %).
 - **Operacional**: `make stream` (gap #27) mantiene el generator vivo con
   auto-restart + monitoreo `phase` cada 30 s.
-- **Hallazgos cerrados durante la auditoría + follow-up**: **17**
-  (gap #5, #7, #9, #27; H-02, H-03, H-05, H-06, H-12, H-14, H-21, H-22,
-  H-23; F-1, F-2, F-4, F-5, F-7, F-8; L-PV-02, L-PV-03, L-PV-07, L-PV-09).
-- **Hallazgos abiertos**: **14** (1 alta · 5 media · 8 baja).
-  - El único bloqueador alta restante es **H-01** (event payload `ts_ns`
-    vs ISO `ts`) — requiere decisión spec con upstream.
+- **Hallazgos cerrados durante la auditoría + follow-up + Could**: **25**
+  (gap #5, #7, #9, #27; H-02, H-03, H-04, H-05, H-06, H-08, H-09, H-10,
+  H-12, H-14, H-19, H-21, H-22, H-23; F-1, F-2, F-3, F-4, F-5, F-6, F-7,
+  F-8, F-9; L-PV-02, L-PV-03, L-PV-07, L-PV-09).
+- **Hallazgos abiertos**: **4** (1 alta · 0 media · 3 baja).
+  - **H-01** (alta) event payload `ts_ns` vs ISO `ts` — requiere decisión spec con upstream.
+  - **H-11** (baja) Dependabot abierto — acción manual sin código.
+  - **H-13** (baja) Telegraf controller heartbeat — documentar o añadir output.
+  - **F-10** (baja) Ocupación rampa lineal 5 min — PATCH futuro.
 
 ## Patches físicos aplicados en esta auditoría
 
@@ -73,21 +78,21 @@ Tests de regresión: **15 tests nuevos**, todos verdes.
 
 ### Could (mejoras, no urgentes)
 
-| ID | Título | Acción | Effort |
-|---|---|---|---|
-| H-04 | `telemetry_events` operativo aquí, deprecated upstream | ADR + plan de sincronización | S (0.5 d) |
-| H-08 | Schema verify solo local | Job CI `verify_canonical_schema` | S (0.5 d) |
-| H-09 | `init_env.sh` no documentado | Ampliar README + página operations | S (0.5 d) |
-| H-10 | `bms_signal_alias` con 1 test | Ampliar suite a 5+ tests | S (0.5 d) |
-| H-11 | Dependabot abierto | Cerrar PRs pendientes o merge | S (0.5 d) |
-| H-13 | Telegraf controller heartbeat omitido | Añadir output o documentar | S (1 d) |
-| H-14 | `tagexclude` no aplicado en `captia_cmd_event` | Añadir `tagexclude = ["topic", "type"]` | S (0.25 d) |
-| H-19 | Healthchecks no estandarizados | Estandarizar a curl o wget | S (1 d) |
+| ID | Título | Acción | Effort | Estado |
+|---|---|---|---|---|
+| H-04 | `telemetry_events` operativo aquí, deprecated upstream | ADR-017 documentando rationale + plan de sincronización | S | ✅ cerrada |
+| H-08 | Schema verify solo local | Step `Verify canonical schema (post-up)` en e2e-stack | S | ✅ cerrada |
+| H-09 | `init_env.sh` no documentado | `docs/operations/init-env.md` (flujo, secretos, troubleshooting, CI) | S | ✅ cerrada |
+| H-10 | `bms_signal_alias` con 1 test | 15/15 tests (la base ya tenía 11; +4 edge cases nuevos) | S | ✅ cerrada |
+| H-11 | Dependabot abierto | Revisar PRs pendientes (acción manual sin código) | S | ⚪ pendiente (manual) |
+| H-13 | Telegraf controller heartbeat omitido | Añadir output o documentar | S | ⚪ pendiente |
+| H-14 | `tagexclude` no aplicado en `captia_cmd_event` | `omit_hostname=true` + `processors.tag_limit` | S | ✅ cerrada |
+| H-19 | Healthchecks no estandarizados | `docs/operations/healthchecks.md` con convención + tabla 9 servicios | S | ✅ cerrada |
 | H-20 | Contratos sin doc unificado | **Cubierto por este sitio** (`docs/architecture/`, `docs/specs/`) | ✅ done |
-| F-9 | Iluminancia `target_off=70` lux | Verificar con datos reales L-01 | S (0.5 d) |
-| F-10 | Ocupación entrada/salida instantánea | PATCH 008 — rampa lineal 5 min | M (2 d) |
-| F-3 | `relay_1..4` no emitidas como variables | Mapear `light_state`/`fan_speed_*` → relays en sink | S (1 d) |
-| F-6 | Discontinuidad ruido `occ=0 → 1` | EWMA en `noise.std` | S (0.5 d) |
+| F-9 | Iluminancia `target_off=70` lux | `target_lux_off: 5` (oscuro real con persianas) | S | ✅ cerrada |
+| F-10 | Ocupación entrada/salida instantánea | PATCH (futuro) — rampa lineal 5 min | M (2 d) | ⚪ pendiente |
+| F-3 | `relay_1..4` no emitidas como variables | **Verificado**: ya emitidas vía AliasSinkAdapter como `light_01_state`, `light_02_state`, `fan_speed_01_state`, `fan_speed_02_state` | S | ✅ cerrada (no-gap) |
+| F-6 | Discontinuidad ruido `occ=0 → 1` | **PATCH 009** EWMA en `simulate_noise` (`noise.tau_minutes=3.0`) + 5 tests | S | ✅ cerrada |
 
 ### Won't (fuera de scope v1)
 
