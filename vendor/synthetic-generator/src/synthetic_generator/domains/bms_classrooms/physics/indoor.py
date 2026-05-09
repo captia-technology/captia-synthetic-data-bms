@@ -17,11 +17,17 @@ def simulate_indoor_temperature(
     setpoint: pd.Series,
     hvac_enable: pd.Series,
     cfg_indoor: Dict[str, Any],
-    rng: np.random.Generator
+    rng: np.random.Generator,
+    hvac_mode: pd.Series | None = None,
 ) -> pd.Series:
     """Simulate indoor temperature dynamics.
 
     First-order thermal model with HVAC control and occupancy heat gain.
+
+    F-5 / PATCH 008: when ``hvac_mode`` is provided and ``cfg_indoor`` exposes
+    ``tau_cool_minutes``, cooling uses a faster time constant than heating
+    (cold air convection from a cassette/split typically achieves 30-50 %
+    faster temperature change than radiator-based heating).
 
     Args:
         index: Time index
@@ -31,27 +37,36 @@ def simulate_indoor_temperature(
         hvac_enable: HVAC enable signal series
         cfg_indoor: Indoor physics configuration
         rng: NumPy random generator
+        hvac_mode: Optional HVAC mode series ('off'/'heat'/'cool'/'auto'). If
+            ``None``, uses the single ``tau_minutes`` for all enabled samples
+            (legacy).
 
     Returns:
         Series of indoor temperatures in °C
     """
     tau = float(cfg_indoor.get("tau_minutes", 90))
+    tau_cool = float(cfg_indoor.get("tau_cool_minutes", tau))
     initial = float(cfg_indoor.get("initial_temp", 20.5))
     gain = float(cfg_indoor.get("occupancy_heat_gain_c_per_person", 0.02))
 
     dt_min = (index[1] - index[0]).total_seconds() / 60.0 if len(index) > 1 else 5.0
-    alpha = dt_min / max(1.0, tau)
+    alpha_heat = dt_min / max(1.0, tau)
+    alpha_cool = dt_min / max(1.0, tau_cool)
 
     T = np.zeros(len(index), dtype=float)
     T[0] = initial + rng.normal(0, 0.4)
+
+    use_cool = (hvac_mode is not None) and (tau_cool != tau)
 
     for i in range(1, len(index)):
         occ_gain = gain * occupancy.iat[i]
         # Target: when HVAC enabled, move to setpoint; else drift toward outdoor
         if hvac_enable.iat[i] == 1:
             target = setpoint.iat[i] + occ_gain
+            alpha = alpha_cool if (use_cool and hvac_mode.iat[i] == "cool") else alpha_heat
         else:
             target = 0.7 * T[i - 1] + 0.3 * outdoor_temp.iat[i] + occ_gain
+            alpha = alpha_heat
         T[i] = T[i - 1] + alpha * (target - T[i - 1]) + rng.normal(0, 0.05)
 
     return pd.Series(T, index=index, name="temperature")

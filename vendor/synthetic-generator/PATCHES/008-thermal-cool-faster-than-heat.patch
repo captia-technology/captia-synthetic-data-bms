@@ -1,0 +1,105 @@
+# 008-thermal-cool-faster-than-heat.patch
+
+**Title**: Bifurcación `α_cool` vs `α_heat` en `simulate_indoor_temperature` (F-5).
+
+**Status**: Applied.
+
+**Applied on**: 2026-05-10.
+
+**Linked finding**: `docs/audit/PHYSICAL_REALISM_REPORT.md` F-5 (cooling con
+mismo α que heating en thermal model).
+
+**Linked open question**: `docs/specs/digital-twin-bms-physics-validation/02-physics-questions.md` L-PV-08.
+
+## Problema
+
+`vendor/.../physics/indoor.py:simulate_indoor_temperature` usaba un único
+`α = dt / tau_minutes` para HVAC enabled, sin distinguir entre heating y
+cooling:
+
+```python
+alpha = dt_min / max(1.0, tau)
+# ...
+T[i] = T[i-1] + alpha * (target - T[i-1]) + N(0, 0.05)
+```
+
+En realidad, una unidad AC en cooling (split/cassette típico de aulas)
+mueve el aire frío por convección y suele alcanzar el setpoint **30-50 %
+más rápido** que un radiador hidráulico en heating. Esto se observa en
+toda literatura HVAC y se confirma en mediciones de Simarro.
+
+Sin esta corrección, el dataset sintético sobrestima la lentitud del
+cooling y subestima la frecuencia de oscilaciones thermostat-on/off en
+verano, sesgando cualquier modelo de detección de ineficiencia.
+
+## Cambio
+
+`simulate_indoor_temperature` recibe ahora un parámetro opcional
+`hvac_mode: pd.Series | None`. Cuando se proporciona y `cfg_indoor` expone
+`tau_cool_minutes` distinto de `tau_minutes`, cada sample con
+`hvac_enable=1 AND mode=="cool"` usa `α_cool = dt / tau_cool_minutes`;
+los samples con `mode != "cool"` (heat, off, auto) usan `α_heat = dt /
+tau_minutes`.
+
+Si `hvac_mode` es `None` o `tau_cool_minutes == tau_minutes`,
+comportamiento legacy preservado (un solo α).
+
+`plugin.py` pasa `mode` (ya disponible localmente) en las dos llamadas a
+`simulate_indoor_temperature`.
+
+`domain.yaml` añade `tau_cool_minutes: 60` (~33 % más rápido que el
+default heating de 90 min).
+
+## Diff
+
+```diff
+--- a/src/synthetic_generator/domains/bms_classrooms/physics/indoor.py
++++ b/src/synthetic_generator/domains/bms_classrooms/physics/indoor.py
+@@ -13,7 +13,8 @@ def simulate_indoor_temperature(
+     setpoint: pd.Series,
+     hvac_enable: pd.Series,
+     cfg_indoor: Dict[str, Any],
+-    rng: np.random.Generator
++    rng: np.random.Generator,
++    hvac_mode: pd.Series | None = None,
+ ) -> pd.Series:
+@@ -38,15 +40,21 @@
+     tau = float(cfg_indoor.get("tau_minutes", 90))
++    tau_cool = float(cfg_indoor.get("tau_cool_minutes", tau))
+     gain = float(cfg_indoor.get("occupancy_heat_gain_c_per_person", 0.02))
+-    alpha = dt_min / max(1.0, tau)
++    alpha_heat = dt_min / max(1.0, tau)
++    alpha_cool = dt_min / max(1.0, tau_cool)
++    use_cool = (hvac_mode is not None) and (tau_cool != tau)
+     for i in range(1, len(index)):
+         occ_gain = gain * occupancy.iat[i]
+         if hvac_enable.iat[i] == 1:
+             target = setpoint.iat[i] + occ_gain
++            alpha = alpha_cool if (use_cool and hvac_mode.iat[i] == "cool") else alpha_heat
+         else:
+             target = 0.7 * T[i-1] + 0.3 * outdoor_temp.iat[i] + occ_gain
++            alpha = alpha_heat
+         T[i] = T[i-1] + alpha * (target - T[i-1]) + N(0, 0.05)
+
+--- a/src/synthetic_generator/domains/bms_classrooms/plugin.py
++++ b/src/synthetic_generator/domains/bms_classrooms/plugin.py
+@@ -146,3 +146,4 @@
+-            indoor_temp = simulate_indoor_temperature(time_index, outdoor_temp, occ, setp, ..., cfg_indoor, aula_rng)
++            # F-5 / PATCH 008: pasar hvac_mode.
++            indoor_temp = simulate_indoor_temperature(..., hvac_mode=mode)
+```
+
+## Validación
+
+- `tests/integration/test_thermal_cool_alpha_audit.py`:
+  1. Sin `hvac_mode` (legacy) → comportamiento idéntico al previo.
+  2. `tau_cool_minutes == tau_minutes` (escape hatch) → idéntico al legacy.
+  3. Con `tau_cool_minutes < tau_minutes` y serie con cooling sostenido,
+     el tiempo a alcanzar el setpoint cae proporcionalmente.
+  4. Heating con la misma config no se ve afectado.
+
+## Reversibilidad
+
+- Eliminar `tau_cool_minutes` de `domain.yaml` o ponerlo igual a
+  `tau_minutes` → el código degrada a comportamiento legacy.
+- Eliminar `hvac_mode=mode` en las llamadas de `plugin.py`.
