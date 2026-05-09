@@ -1,0 +1,66 @@
+{
+  "title": "BMS Fallos HVAC — Caso C",
+  "uid": "bms-faults-c",
+  "tags": ["captia", "bms", "faults", "caseC"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "30s",
+  "time": {"from": "now-7d", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Fallos inyectados (24h)",
+      "gridPos": {"x": 0, "y": 0, "w": 6, "h": 5},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(increase(captia_bms_faults_injected_total[24h]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "piechart",
+      "title": "Distribución por tipo (24h)",
+      "gridPos": {"x": 6, "y": 0, "w": 9, "h": 9},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (fault_type) (increase(captia_bms_faults_injected_total[24h]))",
+          "legendFormat": "{{fault_type}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Eventos de fallo (state_events)",
+      "gridPos": {"x": 15, "y": 0, "w": 9, "h": 9},
+      "targets": [
+        {
+          "datasource": {"type": "influxdb", "uid": "influxdb"},
+          "query": "from(bucket: \"state_events\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"captia_point\" and r.variable =~ /^fault\\..*/ )\n  |> aggregateWindow(every: 1h, fn: count, createEmpty: false)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Fallos activos por aula",
+      "gridPos": {"x": 0, "y": 9, "w": 24, "h": 10},
+      "targets": [
+        {
+          "datasource": {"type": "influxdb", "uid": "influxdb"},
+          "query": "from(bucket: \"state_events\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"captia_point\" and r.variable =~ /^fault\\..*/ and r._value == 1.0)\n  |> last()\n  |> group(columns: [\"asset_id\", \"variable\"])",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}
