@@ -6,8 +6,8 @@
 
 Microservicio listo para producir 6–12 meses de telemetría sintética conforme al schema canónico CAPTIA, publicarla por MQTT a Telegraf → InfluxDB y visualizarla en Grafana — todo en un único `task quickstart`.
 
-[![CI](https://github.com/jaimesendra/captia-synthetic-data-bms/actions/workflows/ci.yml/badge.svg)](https://github.com/jaimesendra/captia-synthetic-data-bms/actions/workflows/ci.yml)
-[![Security](https://github.com/jaimesendra/captia-synthetic-data-bms/actions/workflows/security.yml/badge.svg)](https://github.com/jaimesendra/captia-synthetic-data-bms/actions/workflows/security.yml)
+[![CI](https://github.com/captia-technology/captia-synthetic-data-bms/actions/workflows/ci.yml/badge.svg)](https://github.com/captia-technology/captia-synthetic-data-bms/actions/workflows/ci.yml)
+[![Security](https://github.com/captia-technology/captia-synthetic-data-bms/actions/workflows/security.yml/badge.svg)](https://github.com/captia-technology/captia-synthetic-data-bms/actions/workflows/security.yml)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-3776ab.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Docker Compose v2](https://img.shields.io/badge/Docker_Compose-v2-2496ed.svg?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
@@ -50,7 +50,7 @@ Microservicio listo para producir 6–12 meses de telemetría sintética conform
 ## TL;DR — diez segundos
 
 ```bash
-git clone https://github.com/jaimesendra/captia-synthetic-data-bms.git
+git clone https://github.com/captia-technology/captia-synthetic-data-bms.git
 cd captia-synthetic-data-bms
 task quickstart        # ó: make quickstart
 ```
@@ -122,7 +122,7 @@ Detalle completo en [`docs/specs/synthetic-bms/03-architecture-spec.md`](docs/sp
 ### Instalación reproducible
 
 ```bash
-git clone https://github.com/jaimesendra/captia-synthetic-data-bms.git
+git clone https://github.com/captia-technology/captia-synthetic-data-bms.git
 cd captia-synthetic-data-bms
 
 task quickstart     # one-shot
@@ -405,7 +405,7 @@ Stack local listo en una línea: `task quickstart`. Para añadir hooks pre-commi
 ## Licencia y soporte
 
 - Licencia: [Apache License 2.0](LICENSE) — © 2026 CAPTIA Technology. Atribución en [`NOTICE`](NOTICE).
-- Issues: <https://github.com/jaimesendra/captia-synthetic-data-bms/issues>
+- Issues: <https://github.com/captia-technology/captia-synthetic-data-bms/issues>
 - Contacto / divulgación responsable: **jaime.sendra@captiatechnology.com**
 - Más información: <https://captiatechnology.com>
 
