@@ -1,0 +1,57 @@
+# =============================================================================
+# Caso A — E2E "live" desde host (E2E del vendor real ScenarioRunner).
+# Usa broker MQTT en el puerto host (localhost:1884) y arranca solo 3 aulas
+# durante 30 minutos para que el flujo MQTT -> Telegraf -> InfluxDB sea
+# observable rápidamente.
+# =============================================================================
+
+project:
+  namespace: captia
+  site_id: ies_simarro
+  modo: synthetic
+  schema_version: v0.1
+
+simulation:
+  timezone: Europe/Madrid
+  seed: 42
+  start: "2026-05-09T18:00:00"
+  end: "2026-05-09T18:30:00"
+  freq: "5s"
+  n_aulas: 3
+
+domain:
+  id: bms_classrooms
+
+phases:
+  backfill:
+    enabled: false
+  live:
+    enabled: true
+    rate_points_per_sec: 30.0
+    lookahead_hours: 1
+    regenerate_on_exhaustion: true
+
+perturbations:
+  jitter_ms: 0.0
+
+anomalies:
+  p_missing: 0.0
+  p_outlier: 0.0
+
+sinks:
+  - type: mqtt
+    config:
+      broker_url: "tcp://localhost:1884"
+      qos: 1
+      client_id: bms-e2e-host
+      payload_format: json
+      captia_env: dev
+      # captia_tenant ocupa el 2º segmento del topic; Telegraf lo
+      # extrae como tag `domain_id`, así que aquí lleva el dominio.
+      captia_tenant: bms_classrooms
+      captia_site: ies_simarro
+
+output:
+  format: long
+  include_quality: true
+  include_mqtt: true
