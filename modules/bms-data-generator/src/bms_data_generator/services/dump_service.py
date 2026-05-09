@@ -157,6 +157,16 @@ class DumpService:
             raise ValueError(f"Unknown domain: {config.domain.id}")
 
         sink = FileSinkAdapter(FileSinkConfig(path=str(job.output_path), format=job.format))
+
+        # T-PV-21: aplica AliasSinkAdapter al dump file también para que el
+        # CSV/LP exportado tenga nombres producción (consumible por modelos ML
+        # entrenados contra simarro-prod).
+        from .runner_service import _maybe_wrap_with_alias
+
+        config_path = Path(job.config_path or "")
+        wrapped = _maybe_wrap_with_alias([sink], config_path, config.domain.id)
+        sink = wrapped[0]
+
         with _suppress_signal_setup():
             runner = ScenarioRunner(config, domain, sink)
         return runner.run()

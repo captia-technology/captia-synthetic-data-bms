@@ -15,7 +15,7 @@ import logging
 import signal
 import threading
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -121,11 +121,136 @@ def _build_runner(config_path: Path) -> tuple[Any, Any]:
             sinks.append(StdoutSinkAdapter())
     if not sinks:
         sinks.append(StdoutSinkAdapter())
+
+    # T-PV-21 (cierra L-PV-01 parcialmente): envuelve cada sink con
+    # AliasSinkAdapter cuando BMS_PRODUCTION_ALIAS_ENABLED=true (default true).
+    # Esto renombra DataPoints vendor → producción ANTES de emit a MQTT/file/Influx.
+    sinks = _maybe_wrap_with_alias(sinks, config_path, config.domain.id)
+
     sink = sinks[0] if len(sinks) == 1 else CompositeSink(sinks)
 
     with _suppress_signal_setup():
         runner = ScenarioRunner(config, domain, sink)
+
+    # T-PV-08 + T-PV-30 (cierra L-PV-02): construye hook que emite FaultEvents
+    # post-runner.run() si BMS_FAULTS_ENABLED=true.
+    fault_hook = _build_fault_emitter_hook(sink, config, domain, faults_config, config_path)
+    if fault_hook is not None:
+        return runner, sink, fault_hook
     return runner, sink
+
+
+def _maybe_wrap_with_alias(sinks: list, config_path: Path, domain_id: str) -> list:
+    """Wrap each sink with AliasSinkAdapter if production_alias_enabled.
+
+    Lazy import to keep unit tests light. Reads alias map from
+    ``config/domains/<domain_id>/variables.yaml`` (production_name field).
+    Returns the list unchanged if alias is disabled or if the variables.yaml
+    has no production_name overrides.
+    """
+    from ..config import get_settings
+
+    settings = get_settings()
+    if not settings.production_alias_enabled:
+        return sinks
+
+    from bms_signal_alias import AliasSinkAdapter, build_alias_map_from_yaml
+
+    variables_yaml = config_path.parent.parent / "domains" / domain_id / "variables.yaml"
+    aliases = build_alias_map_from_yaml(variables_yaml)
+    if not aliases:
+        LOG.info(
+            "production_alias enabled but no aliases found at %s — skipping wrap",
+            variables_yaml,
+        )
+        return sinks
+
+    LOG.info("wrapping %d sink(s) with AliasSinkAdapter (%d aliases)", len(sinks), len(aliases))
+    return [AliasSinkAdapter(s, aliases) for s in sinks]
+
+
+def _build_fault_emitter_hook(
+    sink: Any,
+    config: Any,
+    domain: Any,
+    faults_config: dict,
+    config_path: Path,
+) -> Callable[[], int] | None:
+    """Build a post-run hook that emits FaultEvent → DataPoint to the sink.
+
+    Returns a 0-arg callable that, when invoked, generates fault events for
+    every asset_id in the inventory using the FaultInjector and emits them
+    via FaultEventEmitter. Returns ``None`` if faults are disabled or
+    faults_config is empty.
+
+    Closes L-PV-02: con esto, los DataPoints con ``variable=fault.<tipo>``
+    aterrizan en MQTT/file, son detectados por Telegraf clone+dedup
+    (tagpass ``fault.*``) y enrutados a state_events bucket — habilitando
+    Caso C real con etiquetas verdaderas.
+    """
+    from ..config import get_settings
+
+    settings = get_settings()
+    if not settings.faults_enabled or not faults_config:
+        return None
+
+    # Lazy imports.
+    from collections.abc import Callable  # noqa: F401 — used in return type
+
+    import numpy as np
+    import pandas as pd
+    import yaml as _yaml
+
+    from bms_calibration import FaultEventEmitter, FaultInjector
+
+    # Build inventory from domain plug-in to get asset_ids list.
+    project_cfg = {
+        "site_id": config.project.site_id,
+        "namespace": config.project.namespace,
+    }
+    domain_yaml_path = config_path.parent.parent / "domains" / config.domain.id / "domain.yaml"
+    domain_cfg: dict = {}
+    if domain_yaml_path.exists():
+        with domain_yaml_path.open(encoding="utf-8") as fh:
+            domain_cfg = _yaml.safe_load(fh) or {}
+
+    inventory = domain.build_inventory(project_cfg, domain_cfg)
+    asset_ids = inventory.list_asset_ids()
+
+    # Build pandas time index from scenario simulation start/end/freq.
+    timestamps = (
+        pd.date_range(
+            start=config.simulation.start,
+            end=config.simulation.end,
+            freq=config.simulation.freq,
+            inclusive="left",
+        )
+        .to_pydatetime()
+        .tolist()
+    )
+
+    def hook() -> int:
+        emitter = FaultEventEmitter(
+            sink,
+            domain_id=config.domain.id,
+            site_id=config.project.site_id,
+        )
+        seed = config.simulation.seed
+        total = 0
+        for idx, asset_id in enumerate(asset_ids):
+            # Sub-RNG per asset for reproducibility (mirror del pattern del vendor).
+            rng = np.random.default_rng(seed + idx)
+            injector = FaultInjector(rng=rng, config=faults_config, seed=seed + idx)
+            events = list(injector.inject(timestamps, asset_id))
+            total += emitter.emit_events(events)
+        LOG.info(
+            "fault_emitter hook: emitted %d datapoints across %d assets",
+            total,
+            len(asset_ids),
+        )
+        return total
+
+    return hook
 
 
 RunnerFactory = Any  # Callable[[Path], tuple[ScenarioRunner, sink]]
@@ -200,9 +325,21 @@ class RunnerService:
         try:
             if not config_path.is_file():
                 raise FileNotFoundError(f"config not found: {config_path}")
-            runner, _sink = self._runner_factory(config_path)
+            # Factory returns (runner, sink) or (runner, sink, fault_hook).
+            factory_result = self._runner_factory(config_path)
+            if len(factory_result) == 3:
+                runner, _sink, fault_hook = factory_result
+            else:
+                runner, _sink = factory_result
+                fault_hook = None
             results = runner.run()
             points = sum(getattr(r, "points_emitted", 0) for r in results)
+            # T-PV-30: post-run hook emits FaultEvents to the sink (Caso C real).
+            if fault_hook is not None:
+                try:
+                    points += fault_hook() or 0
+                except Exception as exc:  # noqa: BLE001
+                    LOG.warning("Fault emitter hook failed: %s", exc)
             with self._lock:
                 self._jobs[job_id].phase = "completed"
                 self._jobs[job_id].points_emitted = points

@@ -118,3 +118,59 @@ def test_start_with_missing_config_marks_error(
         threading.Event().wait(0.02)
     assert service.status(job_id)["phase"] == "error"
     assert "config not found" in (service.status(job_id)["error"] or "")
+
+
+@pytest.mark.unit
+def test_factory_with_3_tuple_invokes_fault_hook(
+    existing_yaml: Path, release_event: threading.Event
+) -> None:
+    """T-PV-30: factory que devuelve (runner, sink, hook) — hook se invoca y suma puntos."""
+    hook_calls: list[int] = []
+
+    def _post_hook() -> int:
+        hook_calls.append(1)
+        return 42  # extra fault datapoints
+
+    def _factory_3tuple(_path: Path):
+        return _FakeRunner(release_event, points=100), object(), _post_hook
+
+    s = RunnerService(runner_factory=_factory_3tuple)
+    release_event.set()
+    job_id = s.start(
+        config_path=str(existing_yaml), mode="backfill", aulas=1, faults=["sensor_drift"]
+    )
+    for _ in range(50):
+        st = s.status(job_id)
+        if st["phase"] in {"completed", "error"}:
+            break
+        threading.Event().wait(0.02)
+    st = s.status(job_id)
+    assert st["phase"] == "completed"
+    # 100 from runner.run() + 42 from hook
+    assert st["points_emitted"] == 142
+    assert hook_calls == [1]
+
+
+@pytest.mark.unit
+def test_factory_with_3_tuple_handles_hook_exception(
+    existing_yaml: Path, release_event: threading.Event
+) -> None:
+    """Hook que falla NO debe romper el job; debe loggear y continuar."""
+
+    def _failing_hook() -> int:
+        raise RuntimeError("simulated hook failure")
+
+    def _factory_3tuple(_path: Path):
+        return _FakeRunner(release_event, points=50), object(), _failing_hook
+
+    s = RunnerService(runner_factory=_factory_3tuple)
+    release_event.set()
+    job_id = s.start(config_path=str(existing_yaml), mode="backfill", aulas=1, faults=[])
+    for _ in range(50):
+        st = s.status(job_id)
+        if st["phase"] in {"completed", "error"}:
+            break
+        threading.Event().wait(0.02)
+    st = s.status(job_id)
+    assert st["phase"] == "completed"
+    assert st["points_emitted"] == 50  # only runner.run() points
