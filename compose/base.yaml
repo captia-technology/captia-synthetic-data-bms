@@ -14,7 +14,7 @@ services:
       - "${MQTT_PORT_HOST:-1884}:1883"
       - "${MQTT_WS_PORT_HOST:-9002}:9001"
     volumes:
-      - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ../infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - mosquitto_data:/mosquitto/data
       - mosquitto_log:/mosquitto/log
     healthcheck:
@@ -85,7 +85,7 @@ services:
       influxdb:
         condition: service_healthy
     volumes:
-      - ./infra/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      - ../infra/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
       - telegraf_state:/var/lib/telegraf
     environment:
       - INFLUXDB_URL=${INFLUXDB_URL:-http://influxdb:8086}
@@ -105,8 +105,9 @@ services:
 
   grafana:
     build:
-      context: ./infra/grafana
+      context: ../infra/grafana
       dockerfile: Dockerfile
+      pull: false
     image: captia-bms-grafana:local
     container_name: captia-bms-grafana
     restart: unless-stopped
@@ -126,8 +127,8 @@ services:
       - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-telemetry}
       - INFLUXDB_TOKEN=${INFLUXDB_TOKEN:?required}
     volumes:
-      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ../infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:3000/api/health"]

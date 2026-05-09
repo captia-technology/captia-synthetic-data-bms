@@ -13,8 +13,8 @@ services:
     ports:
       - "${PROMETHEUS_PORT_HOST:-9090}:9090"
     volumes:
-      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./infra/prometheus/rules:/etc/prometheus/rules:ro
+      - ../infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../infra/prometheus/rules:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus
     command:
       - --config.file=/etc/prometheus/prometheus.yml
@@ -36,7 +36,7 @@ services:
     ports:
       - "${LOKI_PORT_HOST:-3100}:3100"
     volumes:
-      - ./infra/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - ../infra/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
       - loki_data:/loki
     command: ["-config.file=/etc/loki/loki-config.yml"]
     healthcheck:
@@ -56,7 +56,7 @@ services:
       loki:
         condition: service_healthy
     volumes:
-      - ./infra/promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - ../infra/promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
     command: ["-config.file=/etc/promtail/promtail-config.yml"]

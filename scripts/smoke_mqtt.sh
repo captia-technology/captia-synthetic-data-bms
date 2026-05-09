@@ -5,8 +5,13 @@
 set -euo pipefail
 
 PORT="${MQTT_PORT_HOST:-1884}"
-TOPIC="captia/dev/default/ies_simarro/AULA01/telemetry/co2"
-PAYLOAD='{"value": 712.0, "ts_ns": 1715260800000000000}'
+ENV_NAME="${CAPTIA_ENV:-dev}"
+DOMAIN="${BMS_DOMAIN_ID:-bms_classrooms}"
+SITE="${CAPTIA_SITE:-ies_simarro}"
+TOPIC="captia/${ENV_NAME}/${DOMAIN}/${SITE}/AULA01/telemetry/co2"
+# Use current epoch ns so the point falls inside the bucket retention window.
+TS_NS="$(date +%s)000000000"
+PAYLOAD="{\"value\":712.0,\"ts_ns\":${TS_NS}}"
 
 echo "==> Smoke MQTT (puerto ${PORT})"
 

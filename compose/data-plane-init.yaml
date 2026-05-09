@@ -14,8 +14,8 @@ services:
       influxdb:
         condition: service_healthy
     volumes:
-      - ./infra/influxdb/init:/scripts:ro
-      - ./infra/influxdb/tasks:/tasks:ro
+      - ../infra/influxdb/init:/scripts:ro
+      - ../infra/influxdb/tasks:/tasks:ro
     environment:
       - INFLUXDB_URL=${INFLUXDB_URL:-http://influxdb:8086}
       - INFLUXDB_TOKEN=${INFLUXDB_TOKEN:?required}
