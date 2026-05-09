@@ -1,0 +1,141 @@
+version: "3"
+
+vars:
+  COMPOSE: docker compose
+  GENERATOR_PORT: '{{default "8120" .GENERATOR_PORT}}'
+  INFLUXDB_PORT: '{{default "8087" .INFLUXDB_PORT}}'
+  GRAFANA_PORT: '{{default "3001" .GRAFANA_PORT}}'
+
+tasks:
+  default:
+    desc: "List all tasks"
+    cmds:
+      - task --list
+
+  install:
+    desc: "Sync dependencies via uv workspace"
+    cmds:
+      - uv sync
+
+  lint:
+    desc: "Ruff check + format check"
+    cmds:
+      - uv run ruff check .
+      - uv run ruff format --check .
+
+  format:
+    desc: "Auto-format with ruff"
+    cmds:
+      - uv run ruff format .
+
+  test:
+    desc: "Unit tests"
+    cmds:
+      - uv run pytest -m unit -v
+
+  test:integration:
+    desc: "Integration tests (in-process, no docker)"
+    cmds:
+      - uv run pytest -m integration -v
+
+  test:smoke:
+    desc: "Smoke tests post-deploy"
+    cmds:
+      - uv run pytest -m smoke -v
+
+  test:snapshot:
+    desc: "Snapshot determinism tests"
+    cmds:
+      - uv run pytest -m snapshot -v
+
+  test:all:
+    desc: "All test markers"
+    cmds:
+      - uv run pytest -v
+
+  preflight:
+    desc: "Validate prerequisites (docker, ports, .env)"
+    cmds:
+      - bash scripts/preflight.sh
+
+  up:
+    desc: "Start full stack (base + observability + generator + init)"
+    deps: [preflight]
+    cmds:
+      - "{{.COMPOSE}} up -d"
+      - echo "Stack starting. Run 'task wait:healthy' to wait for healthchecks."
+
+  wait:healthy:
+    desc: "Wait until all services are healthy (max 120s)"
+    cmds:
+      - bash scripts/wait_healthy.sh
+
+  down:
+    desc: "Stop services (volumes preserved)"
+    cmds:
+      - "{{.COMPOSE}} down"
+
+  clean:
+    desc: "Stop services and DELETE volumes"
+    cmds:
+      - "{{.COMPOSE}} down -v"
+
+  logs:
+    desc: "Tail logs (optionally pass SERVICE=<name>)"
+    cmds:
+      - '{{.COMPOSE}} logs -f --tail=100 {{.SERVICE | default ""}}'
+
+  ps:
+    desc: "Show container status"
+    cmds:
+      - "{{.COMPOSE}} ps"
+
+  smoke:mqtt:
+    cmds:
+      - bash scripts/smoke_mqtt.sh
+
+  smoke:influx:
+    cmds:
+      - bash scripts/smoke_influx.sh
+
+  smoke:grafana:
+    cmds:
+      - bash scripts/smoke_grafana.sh
+
+  smoke:schema:
+    desc: "Verify canonical CAPTIA schema in InfluxDB"
+    cmds:
+      - bash scripts/verify_canonical_schema.sh
+
+  smoke:
+    desc: "Run all smoke checks"
+    cmds:
+      - task: smoke:mqtt
+      - task: smoke:influx
+      - task: smoke:grafana
+      - task: smoke:schema
+
+  dump:caseB:
+    desc: "Generate Caso B dataset (12 months consumption)"
+    cmds:
+      - bash scripts/export_dump.sh caseB
+
+  dump:caseC:
+    desc: "Generate Caso C dataset (6 months with faults)"
+    cmds:
+      - bash scripts/export_dump.sh caseC
+
+  dump:caseD:
+    desc: "Generate Caso D dataset (3 months IAQ at 1min)"
+    cmds:
+      - bash scripts/export_dump.sh caseD
+
+  vendor:update:
+    desc: "Re-vendor synthetic-generator from CAPTIA-CONNECT"
+    cmds:
+      - bash scripts/update_vendor.sh
+
+  config:render:
+    desc: "Render the merged compose config"
+    cmds:
+      - "{{.COMPOSE}} config"
