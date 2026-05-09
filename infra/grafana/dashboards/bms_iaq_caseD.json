@@ -55,7 +55,7 @@
       "targets": [
         {
           "datasource": {"type": "influxdb", "uid": "influxdb"},
-          "query": "from(bucket: \"telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"captia_point\" and r.variable == \"relative_humidity_01\" and r.asset_id == \"${asset}\")\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)",
+          "query": "from(bucket: \"telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"captia_point\" and r.variable == \"relative-humidity\" and r.asset_id == \"${asset}\")\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)",
           "refId": "A"
         }
       ]
@@ -63,12 +63,12 @@
     {
       "id": 4,
       "type": "timeseries",
-      "title": "Ocupación + people_count",
+      "title": "Ocupación + people-count",
       "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
       "targets": [
         {
           "datasource": {"type": "influxdb", "uid": "influxdb"},
-          "query": "from(bucket: \"telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"captia_point\" and (r.variable == \"occupancy\" or r.variable == \"people_count\") and r.asset_id == \"${asset}\")\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)",
+          "query": "from(bucket: \"telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"captia_point\" and (r.variable == \"occupancy\" or r.variable == \"people-count\") and r.asset_id == \"${asset}\")\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)",
           "refId": "A"
         }
       ]
@@ -81,7 +81,7 @@
       "targets": [
         {
           "datasource": {"type": "influxdb", "uid": "influxdb"},
-          "query": "from(bucket: \"telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"captia_point\" and (r.variable == \"avg_sound_level\" or r.variable == \"luminosity\") and r.asset_id == \"${asset}\")\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)",
+          "query": "from(bucket: \"telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"captia_point\" and (r.variable == \"avg-sound-level\" or r.variable == \"luminosity\") and r.asset_id == \"${asset}\")\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)",
           "refId": "A"
         }
       ]

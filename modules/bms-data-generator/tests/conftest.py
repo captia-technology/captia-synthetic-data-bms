@@ -76,6 +76,36 @@ def reset_services():
     dumper.reset()
 
 
+@pytest.fixture(autouse=True)
+def isolate_bms_env_vars(monkeypatch: pytest.MonkeyPatch):
+    """Aísla env vars BMS_* entre tests para evitar contaminación cruzada.
+
+    Tests E2E que activan ``BMS_FAULTS_ENABLED`` o ``BMS_PRODUCTION_ALIAS_ENABLED``
+    podrían dejar el env modificado para tests subsequentes. Este fixture:
+      1. Snapshots los valores actuales antes del test.
+      2. Tras el test, restaura los originales y limpia los introducidos.
+      3. Resetea el cache de settings.
+    """
+    import os
+
+    from bms_data_generator.config import reset_settings_cache
+
+    # Snapshot env vars BMS_* actuales.
+    bms_keys = [k for k in os.environ if k.startswith("BMS_")]
+    snapshot = {k: os.environ[k] for k in bms_keys}
+
+    reset_settings_cache()
+    yield
+
+    # Restaurar snapshot.
+    for k in list(os.environ.keys()):
+        if k.startswith("BMS_") and k not in snapshot:
+            del os.environ[k]
+    for k, v in snapshot.items():
+        os.environ[k] = v
+    reset_settings_cache()
+
+
 @pytest.fixture
 def existing_yaml(tmp_path: Path) -> Path:
     """A minimal existing YAML so config-path validation in services succeeds."""

@@ -79,11 +79,7 @@ def _run_scenario(scenario_path: Path) -> int:
 
     result = _build_runner(scenario_path)
     runner = result[0]
-    if len(result) == 3:
-        # 3-tuple: invoke fault hook too.
-        sink, fault_hook = result[1], result[2]
-    else:
-        sink, fault_hook = result[1], None
+    fault_hook = result[2] if len(result) == 3 else None
 
     results = runner.run()
     total = sum(getattr(r, "points_emitted", 0) for r in results)

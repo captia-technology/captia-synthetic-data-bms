@@ -86,25 +86,36 @@ schedule:
       p_occupancy: 0.30
 
 physics:
+  # Llaves alineadas con las que el vendor REALMENTE lee en
+  # vendor/.../physics/{indoor,actuators,environment}.py.
+  # T-PV-50 (cierra L-PV-03): el override anterior usaba `base_ppm`,
+  # `per_person_ppm`, `decay_rate`, `thermal_mass`, etc. — claves que el código
+  # NO lee, así que el override era inerte. Aquí migramos a las claves canónicas.
   outdoor_temp:
-    mean_annual: 17.0      # zona climática Csa Valencia
-    amplitude: 9.5
+    mean_annual: 17.0      # zona climática Csa Valencia (AEMET 2024)
+    amplitude: 9.5         # swing anual ~19°C peak-to-peak
     daily_noise_std: 1.0
   indoor:
+    # Térmica primer orden (RC).
     initial_temp: 20.5
-    thermal_mass: 0.05
-    heating_power: 1.0
-    cooling_effect: 0.5
+    tau_minutes: 90        # tau de 90 min (EN ISO 13790 aula media)
+    occupancy_heat_gain_c_per_person: 0.02   # ASHRAE 55 sensible
+    setpoint_class: 21.0
+    setpoint_out_of_hours: 18.0
   co2:
-    base_ppm: 420
-    per_person_ppm: 18.5   # ~ASHRAE 62.1 / EN 16798
-    decay_rate: 0.03
+    # Well-mixed CO2 dynamics. Defaults vendor.
+    outdoor_ppm: 420                          # baseline outdoor
+    gen_ppm_per_min_per_person: 7.5           # vendor default (literatura ASHRAE = 4.5)
+    vent_k_per_min: 0.06                      # tau ventilación con HVAC ON ≈ 14 min
+    leak_k_per_min: 0.01                      # tau leak natural ≈ 100 min
   humidity:
-    base_rh: 50.0
-    outdoor_influence: 0.3
+    outdoor_mean: 55.0                        # %RH baseline outdoor (Valencia Csa)
+    occupancy_gain_per_person: 0.08           # %RH/persona (vapor exhalado)
   noise:
-    base_db: 35.0
-    per_person_db: 1.2
+    base_unoccupied: 33.0                     # dB(A) ambiente
+    base_occupied: 55.0                       # dB(A) base con ocupación
+    std: 4.0                                  # dB(A) ruido aleatorio
   light:
-    artificial_lux: 500
-    daylight_factor: 0.6
+    target_lux_on: 550                        # lux setpoint con luz artificial
+    target_lux_off: 70                        # lux indoor sin luz artificial
+    std: 40                                   # lux ruido medición
