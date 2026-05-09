@@ -1,56 +1,64 @@
 # STATUS — synthetic-bms
 
 **Última actualización**: 2026-05-09
-**Fase actual**: 10 (Tests E2E + validación) — COMPLETADA
+**Fase actual**: 11 (Polish para GitHub público) — COMPLETADA
 **Tarea en curso**: ninguna
-**Última tarea completada**: T-051 (validación final lint + tests)
-**Tests verdes**: 44 PASS (32 unit + 11 integration + 1 snapshot), 0 failed
+**Última tarea completada**: T-061 (README profesional)
+**Tests verdes**: 46 PASS (workspace) + 129 PASS (vendor unit), 0 failed
 **Bloqueos**: ninguno
-**Próxima tarea**: post-v1 — calibración real (L-01) + revisión cruzada por subagentes
+**Próxima tarea**: tag `v0.1.0` y push a GitHub público
 
 ## Histórico
 
 | Fecha | Hito |
 |-------|------|
 | 2026-05-09 | Inicio Fase 0. Bootstrap repo + `.claude` config (T-001..T-007) |
-| 2026-05-09 | Fin Fase 0. Inicio Fase 1 |
-| 2026-05-09 | Fin Fase 1 (research docs 00-*). Inicio Fase 2 |
-| 2026-05-09 | Fin Fase 2 (specs SDD 01-10). Inicio Fase 3 |
-| 2026-05-09 | Fin Fase 3 (vendoring synthetic-generator). Inicio Fase 4 |
-| 2026-05-09 | Fin Fase 4 (extensions bms_calibration). Inicio Fase 5 |
-| 2026-05-09 | Fin Fase 5 (microservicio FastAPI). Inicio Fase 6 |
-| 2026-05-09 | Fin Fase 6 (Docker infra). Inicio Fase 7 |
-| 2026-05-09 | Fin Fase 7 (4 configs scenario). Inicio Fase 8 |
-| 2026-05-09 | Fin Fase 8 (4 dashboards Grafana). Inicio Fase 9 |
-| 2026-05-09 | Fin Fase 9 (Taskfile + scripts). Inicio Fase 10 |
-| 2026-05-09 | Fin Fase 10. v1 lista para revisión cruzada |
+| 2026-05-09 | Fin Fase 1 (research docs 00-*) e inicio Fase 2 |
+| 2026-05-09 | Fin Fase 2 (specs SDD 01-10) e inicio Fase 3 |
+| 2026-05-09 | Fin Fase 3 (vendoring synthetic-generator) e inicio Fase 4 |
+| 2026-05-09 | Fin Fase 4 (extensions bms_calibration) e inicio Fase 5 |
+| 2026-05-09 | Fin Fase 5 (microservicio FastAPI) e inicio Fase 6 |
+| 2026-05-09 | Fin Fase 6 (Docker infra) e inicio Fase 7 |
+| 2026-05-09 | Fin Fase 7 (4 configs scenario) e inicio Fase 8 |
+| 2026-05-09 | Fin Fase 8 (4 dashboards Grafana) e inicio Fase 9 |
+| 2026-05-09 | Fin Fase 9 (Taskfile + scripts) e inicio Fase 10 |
+| 2026-05-09 | Fin Fase 10 — v1 lista (44 tests verdes, ruff limpio) |
+| 2026-05-09 | Fin Fase 11 — repo public-ready (vendor BMS-only, paths sanitizados, comunidad GitHub, CI/CD, wiring real, quickstart, Mermaid, README pro) |
 
-## Métricas v1
+## Métricas v1 (post-polish)
 
-- **Commits**: 18 (uno por tarea principal).
-- **Archivos creados**: ≈ 200 (incl. vendor).
-- **Líneas escritas (excl. vendor)**: ≈ 4500 (specs + código + configs).
-- **Tests verdes**: 44.
-- **Lint**: ruff check + format check PASS.
-- **Workspace `uv sync`**: OK (43 packages).
+- **Commits**: 25 (uno por paso semántico).
+- **Archivos rastreados**: ≈ 145 tras vendor slim (eliminados industrial / manufacturing).
+- **Líneas escritas (excl. vendor)**: ≈ 6 200.
+- **Tests verdes**: 46 (workspace) + 129 (vendor).
+- **Lint**: `ruff check .` y `ruff format --check .` PASS.
+- **Workspace `uv sync`**: 43 packages.
+- **Imágenes Docker**: 9, todas con tag fijo (no `latest`).
+- **Specs SDD**: 14 documentos en `docs/specs/synthetic-bms/` con diagramas Mermaid.
 
-## Decisiones nuevas (post-plan inicial)
+## Decisiones nuevas (Fase 11)
 
-- **2026-05-09**: añadido `[dependency-groups] dev` y `dependencies` explícitas al `pyproject.toml` raíz para que `uv sync` instale los miembros del workspace.
-- **2026-05-09**: `addopts="--import-mode=importlib"` en pytest config para evitar colisión de conftest entre paquetes del workspace.
-- **2026-05-09**: ignorar regla `UP042` (StrEnum) en ruff para mantener compatibilidad explícita.
+- **ADR-016 implícito** — Vendor slimmed to BMS-only (`vendor/synthetic-generator/PATCHES/001-bms-only.patch`). Removed `industrial_refrigeration` y `discrete_manufacturing`.
+- **Licencia** — Apache License 2.0 (en lugar de "Proprietary" inicial). `LICENSE` + `NOTICE` añadidos.
+- **Email contacto** — `jaime.sendra@captiatechnology.com` en pyproject, README, SECURITY, CODE_OF_CONDUCT.
+- **Sanitización paths** — Eliminadas todas las referencias absolutas `C:\CAPTIA\...` en docs, scripts y configs.
+- **Despliegue one-shot** — `task quickstart` y `scripts/init_env.sh` autogenera `.env` con secretos aleatorios.
+- **Wiring real** — `RunnerService` y `DumpService` ahora invocan a `vendor.synthetic_generator.core.runner.ScenarioRunner` en threads daemon, con factory inyectable para tests rápidos.
+- **CI/CD** — `.github/workflows/{ci,security,release}.yml` + `pre-commit` + `dependabot.yml`.
 
-## Pendientes post-v1
+## Pendientes post-publicación
 
-1. **Calibración real (L-01)**: cuando CAPTIA Technology proporcione parámetros calibrados, sobrescribir en `extensions/bms_calibration/physics_overrides.py` y registrar como ADR-016.
-2. **Wiring runner**: `RunnerService.start()` y `DumpService.export()` actualmente son esqueletos; integrar con `vendor.synthetic_generator.core.runner.ScenarioRunner` en thread/proceso.
-3. **Tests E2E con stack levantado**: ejecutar `task up && task smoke && pytest -m smoke` para validar pipeline completo end-to-end.
-4. **Revisión cruzada por subagentes**: lanzar `infra-reviewer`, `observability-reviewer`, `qa-reviewer`, `security-reviewer`, `spec-architect` en sesión separada.
-5. **`influxdb-simarro-buckets.pptx` y `captia-connect-partner-integration.pptx`**: parsear si aportan información adicional al schema.
+1. **Calibración real (L-01)** — sigue como hooks. Requiere parámetros calibrados con datos reales del IES Simarro.
+2. **Performance benchmarks** — `tests/performance/` como TODO; AC-03 (≥ 700 pts/aula·h) sin medir formalmente.
+3. **Smoke E2E con stack levantado** — los workflows CI no levantan docker. Validación completa requiere local o un job CI con `services:` adicional.
+4. **Hardening producción** — checklist en `SECURITY.md`. No abordado v0.1.0.
+5. **Dashboards extra** — actuales son base; añadir uno por aula y uno por job en futuras versiones.
 
 ## Próximos pasos recomendados
 
-1. Probar `task up` en máquina de desarrollo (Docker corriendo).
-2. Smoke test completo (`task smoke` post `task wait:healthy`).
-3. Revisión cruzada por subagentes en sesión separada.
-4. Tagging `v0.1.0`.
+1. `git tag v0.1.0` + `git push --tags` (esto dispara `release.yml` y publica imagen en GHCR).
+2. Crear repo público en GitHub: `gh repo create jaimesendra/captia-synthetic-data-bms --public`.
+3. Push: `git remote add origin git@github.com:jaimesendra/captia-synthetic-data-bms.git && git push -u origin master:main`.
+4. Configurar branch protection en `main` (requerir CI verde + 1 review).
+5. Habilitar `dependabot` y `Dependency graph` en Settings → Security.
+6. Ajustar `CODEOWNERS` si se incorporan más maintainers.
