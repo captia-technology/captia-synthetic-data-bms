@@ -80,10 +80,43 @@ nav:
   - Inicio: index.md
   - Empezar:
     - Introducción: getting-started/index.md
+    - Visión general: getting-started/overview.md
+    - Setup local: getting-started/local-setup.md
+    - Notebooks: getting-started/notebooks.md
     - Quickstart: QUICKSTART.md
     - Troubleshooting: TROUBLESHOOTING.md
   - Arquitectura:
     - Visión general: architecture/index.md
+    - Medallion: architecture/medallion.md
+    - CENTINELA+: architecture/centinela-overview.md
+    - Schema CAPTIA: architecture/captia-schema.md
+    - Flujo de datos: architecture/data-flow.md
+  - Casos de uso:
+    - Índice: use-cases/index.md
+    - A — Pipeline IoT: use-cases/case-a-pipeline-iot.md
+    - B — Forecast consumo: use-cases/case-b-energy-forecasting.md
+    - C — Anomalías HVAC: use-cases/case-c-hvac-anomaly.md
+    - D — IAQ + ocupación: use-cases/case-d-iaq-occupancy.md
+    - E — Meteo & solar: use-cases/case-e-weather-solar.md
+    - F — MLOps: use-cases/case-f-mlops.md
+    - G — Calidad con agentes: use-cases/case-g-data-quality-agents.md
+    - H — RAG + Chatbot: use-cases/case-h-rag-chatbot.md
+    - I — Spark vs Pandas: use-cases/case-i-spark-pandas.md
+    - J — Tráfico + YOLO: use-cases/case-j-traffic-yolo.md
+  - Notebooks:
+    - Índice: notebooks/index.md
+    - Cómo ejecutar: notebooks/how-to-run.md
+    - Mapa de notebooks: notebooks/notebook-map.md
+  - Contratos:
+    - Schema InfluxDB: contracts/influx-schema.md
+    - Topics MQTT: contracts/mqtt-topics.md
+    - Catálogo variables: contracts/variable-catalog.md
+    - Capas Medallion: contracts/medallion-layers.md
+  - Validación:
+    - End-to-end: validation/e2e.md
+    - Calidad de datos: validation/data-quality.md
+    - Realismo físico: validation/physical-realism.md
+    - Validación ML: validation/ml-validation.md
   - Modelo físico:
     - Resumen: physical-model/index.md
     - Realismo (auditoría): audit/PHYSICAL_REALISM_REPORT.md
@@ -96,12 +129,18 @@ nav:
     - Estado: audit/STATUS.md
     - Mapa repo: audit/00-repo-map.md
     - Consistencia BMS↔CAPTIA-connect: audit/CONSISTENCY_MATRIX.md
-    - Plan docs (este): audit/DOCS_RESTRUCTURE_PLAN.md
+    - Plan docs: audit/DOCS_RESTRUCTURE_PLAN.md
+    - Matriz de casos de uso: audit/USE_CASE_MATRIX.md
+    - Plan de notebooks: audit/NOTEBOOK_PLAN.md
+    - Reporte de docs: audit/DOCS_REPORT.md
     - Reporte top 20: audit/AUDIT_REPORT.md
     - Validación E2E: audit/E2E_VALIDATION_REPORT.md
     - Realismo físico: audit/PHYSICAL_REALISM_REPORT.md
     - Plan de acción: audit/ACTION_PLAN.md
   - Operaciones:
+    - Troubleshooting: operations/troubleshooting.md
+    - Variables de entorno: operations/environment.md
+    - Docker: operations/docker.md
     - Inicialización .env: operations/init-env.md
     - Healthchecks: operations/healthchecks.md
     - Dependabot: operations/dependabot.md

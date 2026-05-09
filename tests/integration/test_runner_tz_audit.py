@@ -10,7 +10,7 @@ Cierra el hallazgo H-21 documentado en
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -34,7 +34,7 @@ def test_tz_aware_datetime_madrid() -> None:
 @pytest.mark.integration
 def test_tz_aware_datetime_utc() -> None:
     """``timezone.utc`` produce datetime con offset 0."""
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     assert now.tzinfo is not None
     assert now.utcoffset() is not None
     assert int(now.utcoffset().total_seconds()) == 0
