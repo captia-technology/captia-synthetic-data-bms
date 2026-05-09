@@ -17,9 +17,10 @@ Cross-ref:
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import yaml
 
@@ -84,11 +85,14 @@ class AliasSinkAdapter:
         self.aliases = dict(aliases)
         self._renamed_count = 0
         self._passthrough_count = 0
-        LOG.info("AliasSinkAdapter wrapping %s with %d alias entries",
-                 type(real_sink).__name__, len(self.aliases))
+        LOG.info(
+            "AliasSinkAdapter wrapping %s with %d alias entries",
+            type(real_sink).__name__,
+            len(self.aliases),
+        )
 
     @classmethod
-    def from_yaml(cls, real_sink: Any, yaml_path: Path) -> "AliasSinkAdapter":
+    def from_yaml(cls, real_sink: Any, yaml_path: Path) -> AliasSinkAdapter:
         """Construye el adapter cargando el mapping desde un fichero YAML."""
         aliases = build_alias_map_from_yaml(yaml_path)
         return cls(real_sink, aliases)
@@ -142,6 +146,7 @@ class AliasSinkAdapter:
         except TypeError:
             # Not a dataclass — try attribute assignment on a copy.
             import copy
+
             clone = copy.copy(point)
             clone.variable = new_name
             return clone

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -92,7 +92,13 @@ def test_build_alias_map_handles_empty_yaml(tmp_path: Path) -> None:
 
 def test_build_alias_map_real_repo_yaml() -> None:
     """Smoke: verify that the production override in the repo loads correctly."""
-    repo_yaml = Path(__file__).resolve().parents[3] / "config" / "domains" / "bms_classrooms" / "variables.yaml"
+    repo_yaml = (
+        Path(__file__).resolve().parents[3]
+        / "config"
+        / "domains"
+        / "bms_classrooms"
+        / "variables.yaml"
+    )
     if not repo_yaml.exists():
         pytest.skip(f"Repo yaml not found at {repo_yaml}")
     aliases = build_alias_map_from_yaml(repo_yaml)
