@@ -12,10 +12,10 @@ Tipos soportados (ADR-010):
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Iterator
 
 import numpy as np
 

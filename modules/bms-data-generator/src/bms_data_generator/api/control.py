@@ -49,7 +49,9 @@ async def start(req: StartRequest) -> dict:
     try:
         job_id = _service.start(req.config_path, req.mode, req.aulas, req.faults)
     except RuntimeError as exc:
-        raise HTTPException(status_code=409, detail={"error": "conflict", "message": str(exc)}) from exc
+        raise HTTPException(
+            status_code=409, detail={"error": "conflict", "message": str(exc)}
+        ) from exc
     return {"job_id": job_id}
 
 

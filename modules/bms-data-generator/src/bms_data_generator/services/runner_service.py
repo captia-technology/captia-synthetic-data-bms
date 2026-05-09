@@ -9,7 +9,7 @@ from __future__ import annotations
 import threading
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 @dataclass
@@ -49,7 +49,7 @@ class RunnerService:
                 aulas=aulas,
                 faults=list(faults),
                 phase="pending",
-                started_at=datetime.now(tz=timezone.utc),
+                started_at=datetime.now(tz=UTC),
             )
             self._active_job_id = job_id
         # En esta versión esqueleto NO se ejecuta vendor.runner.

@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import threading
 import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -57,7 +57,7 @@ class DumpService:
                 include_faults=include_faults,
                 output_path=output_path,
                 status="in_progress",
-                started_at=datetime.now(tz=timezone.utc),
+                started_at=datetime.now(tz=UTC),
             )
         # Ejecución real del backfill se integra al cablear con vendor.runner.
         return job_id, output_path

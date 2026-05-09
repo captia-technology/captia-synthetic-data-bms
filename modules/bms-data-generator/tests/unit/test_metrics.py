@@ -26,7 +26,9 @@ def test_record_fault_appears_in_metrics() -> None:
 
 @pytest.mark.unit
 def test_record_publish_error_appears() -> None:
-    record_publish_error(topic="captia/dev/default/ies_simarro/AULA01/telemetry/co2", reason="timeout")
+    record_publish_error(
+        topic="captia/dev/default/ies_simarro/AULA01/telemetry/co2", reason="timeout"
+    )
     text = metrics_text().decode()
     assert "captia_bms_publish_errors_total" in text
 

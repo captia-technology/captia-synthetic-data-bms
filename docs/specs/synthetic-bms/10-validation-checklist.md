@@ -4,11 +4,11 @@
 
 ## Calidad
 
-- [ ] `task lint` (ruff check + format check) PASS sin warnings.
-- [ ] `task test` (unit) PASS.
-- [ ] `task test:integration` PASS.
+- [x] `task lint` (ruff check + format check) PASS sin warnings.
+- [x] `task test` (unit) PASS — 32 tests.
+- [x] `task test:integration` (in-process) PASS — 11 tests.
 - [ ] `task test:smoke` PASS post-up.
-- [ ] `task test:snapshot` PASS (seed=42 determinista).
+- [x] `task test:snapshot` PASS (seed=42 determinista — anchor `de6c4e49…b56ae66`).
 - [ ] Cobertura `bms_data_generator` ≥ 80% líneas (`pytest --cov`).
 
 ## Seguridad

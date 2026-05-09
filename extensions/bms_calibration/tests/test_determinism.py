@@ -17,15 +17,9 @@ def test_fault_injector_snapshot_seed_42() -> None:
     timestamps = [start + timedelta(seconds=5 * i) for i in range(2000)]
     events = list(injector.inject(timestamps, asset_id="AULA01"))
     payload = repr(
-        [
-            (e.fault_type.value, e.start.isoformat(), round(e.severity, 6))
-            for e in events
-        ]
+        [(e.fault_type.value, e.start.isoformat(), round(e.severity, 6)) for e in events]
     ).encode()
     digest = hashlib.sha256(payload).hexdigest()
-    # Anchor digest registrado tras primera ejecución; cualquier cambio rompe snapshot.
-    expected = "PENDING_FIRST_RUN"
-    if expected == "PENDING_FIRST_RUN":
-        # Imprimir digest para registrar y luego sustituir el placeholder.
-        pytest.skip(f"Snapshot anchor not set yet. Computed digest: {digest}")
+    # Anchor digest registrado en primera ejecución (seed=42 + cfg fija).
+    expected = "de6c4e491fa9c3745f67bb0e2d5f93945c654081f1ccb1b7d39cacc14b56ae66"
     assert digest == expected, f"snapshot drift: got {digest}"
