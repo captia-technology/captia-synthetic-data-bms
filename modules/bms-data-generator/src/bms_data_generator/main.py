@@ -11,6 +11,7 @@ from bms_data_generator import __version__
 from bms_data_generator.api.control import get_router as get_control_router
 from bms_data_generator.api.datasets import get_router as get_datasets_router
 from bms_data_generator.api.health import get_router as get_health_router
+from bms_data_generator.api.query import get_router as get_query_router
 from bms_data_generator.config import get_settings
 from bms_data_generator.logging_config import setup_logging
 
@@ -40,6 +41,7 @@ def create_app() -> FastAPI:
     app.include_router(get_health_router())
     app.include_router(get_control_router())
     app.include_router(get_datasets_router())
+    app.include_router(get_query_router())
     return app
 
 

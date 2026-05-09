@@ -87,6 +87,7 @@ source = { editable = "modules/bms-data-generator" }
 dependencies = [
     { name = "bms-calibration" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "prometheus-client" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
@@ -107,6 +108,7 @@ dev = [
 requires-dist = [
     { name = "bms-calibration", editable = "extensions/bms_calibration" },
     { name = "fastapi", specifier = ">=0.115.0" },
+    { name = "httpx", specifier = ">=0.27.0" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27.0" },
     { name = "prometheus-client", specifier = ">=0.21.0" },
     { name = "pydantic", specifier = ">=2.0.0" },

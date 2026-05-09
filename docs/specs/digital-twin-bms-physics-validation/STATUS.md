@@ -120,19 +120,52 @@ Plan de remediación priorizado en `10-implementation-readiness.md`. Tareas T-PV
 | Perturbations engine | Esfuerzo dev | T-PV-14 |
 | Anomalías adicionales (stuck, drift, offset) | Esfuerzo dev | T-PV-15 |
 
+## Estado de implementación (sprint 1, 2026-05-09)
+
+Tareas T-PV-NN completadas tras revisión PPTX y consistencia de data:
+
+| Task | Cierra | Cambios | Tests |
+|------|--------|---------|-------|
+| **T-PV-07** | L-PV-04 | `runner_service._build_runner` invoca `calibration_loader.load_faults_config` y `load_physics_overrides` | smoke + 33 unit/integ |
+| **T-PV-09** | L-PV-06 | `config/domains/bms_classrooms/domain.yaml`: holidays expandidos a 50 fechas (Valencia 2025-26) | yaml validate |
+| **T-PV-18** | L-PV-18 | bucket `telemetry_events` (90d) + 2º mqtt_consumer Telegraf + output #3 | TOML validate |
+| **T-PV-21** | L-PV-01 | `extensions/bms_signal_alias/` paquete + AliasSinkAdapter + wire en runner & dump (BMS_PRODUCTION_ALIAS_ENABLED=true) + override `config/domains/bms_classrooms/variables.yaml` con `production_name` por entry | 11 unit + 2 integ |
+| **T-PV-22** | L-PV-22 | extender Telegraf clone tagpass con `ac_control`, `aire_state` | TOML validate |
+| **T-PV-23** | L-PV-21 | `populate_metadata` parser awk robusto: lee `range:[a,b]` + `production_name`, escribe measurement `captia_point_meta` (no legacy `captia_metadata`), añade tag `asset_type`, deriva `storage_mode` desde `metric_kind`, idempotente con delete previo | manual smoke parser |
+| **T-PV-08** + **T-PV-30** | L-PV-02 | `extensions/bms_calibration/.../fault_event_sink.py` con `FaultEventEmitter` + wire post-run hook en `runner_service` cuando `BMS_FAULTS_ENABLED=true`. Cada FaultEvent → 2 DataPoints (start severity, end 0.0) con `variable=fault.<tipo>` que matchea Telegraf tagpass `fault.*` → state_events | 5 new tests + 2 integ |
+| L-PV-19 (parche) | (parcial) | `downsample_state_1m.flux` filtra `captia_point_state` (workaround hasta resolver Telegraf rename) | n/a |
+
+**Testing total post-sprint**:
+- 11 bms_signal_alias (NEW)
+- 18 bms_calibration (13 + 5 nuevos FaultEventEmitter)
+- 35 bms-data-generator (33 + 2 nuevos 3-tuple factory)
+- 129 vendor synthetic-generator
+- **Total: 193 PASS** (sin regresiones).
+
+**Lint**: `uv run ruff check .` → All checks passed.
+
+## Pendientes residuales
+
+| Task | Bloqueado por | Tracking |
+|------|---------------|----------|
+| **T-PV-01** — `bms_physics_validator` paquete completo | Esfuerzo dev (~2-3 sem) | `07-validator-design.md`, `04-physical-plausibility-rules.md` |
+| **T-PV-19** completo — Telegraf rename `captia_point_state → captia_point` con tags routing | Esfuerzo Telegraf (~0.5-1 día), riesgo regresión | Workaround temporal aplicado (filter en Flux task) |
+| **T-PV-03** — métricas Prometheus `captia_physics_*` | Esfuerzo dev (~1 día) | `09-physical-observability.md` |
+| **T-PV-04..06** — InfluxDB Flux tasks de validación + dashboard `bms_physics_validation.json` + alertas | Después de T-PV-01 | `09-physical-observability.md` |
+| **Calibración real** | L-01 (CAPTIA Tech) | Hooks listos en `physics_overrides.py` |
+| **Score externo** (RMSE/MAPE vs ground-truth) | L-01 | Diseño en `08-*` listo |
+
 ## Próximos pasos sugeridos
 
-Por orden de impacto/coste:
-
-1. **T-PV-09** — añadir todas las fechas de `_BREAKS_2025_2026` a `config/domains/bms_classrooms/domain.yaml` (~5 min de trabajo, alto impacto).
-2. **T-PV-07** — wire `calibration_loader` en `runner_service._build_runner` (~30 min, prepara terreno).
-3. **T-PV-08** — implementar `FaultEventSink` (~1-2 días, +0.10 al score).
-4. **T-PV-03** — añadir métricas `captia_physics_*` (~1 día, paralelo).
-5. **T-PV-01** — implementar `bms_physics_validator` paquete (~2-3 semanas, gran impacto).
-6. **T-PV-04, T-PV-05, T-PV-06** — bucket Influx + Flux tasks + dashboard + alertas (~1 semana).
-7. **T-PV-02** — `ValidatingSink` para live mode (~1 semana).
-
-Tras completar 1-7, el spec set se considera **implementado**. Cuando llegue L-01, la spec se complementa con `11-calibrated-validation.md` (futura).
+1. **Smoke E2E** post-implementación: levantar stack (`make up`), verificar:
+   - `/healthz`, `/readyz`, `/metrics` OK
+   - Bucket `telemetry_events` creado en InfluxDB
+   - Bucket `captia_metadata` poblado con 21 entries de `captia_point_meta`
+   - Caso A live: MQTT publica con nombres producción (`temperature_01`, `power_01`...)
+   - Caso C con `BMS_FAULTS_ENABLED=true`: state_events recibe `fault.<tipo>` series
+2. **Implementar `bms_physics_validator`** (T-PV-01) — el grueso restante del spec set.
+3. **Cerrar L-PV-19** completo con processor.rename Telegraf.
+4. **Quando llegue L-01**: añadir spec `12-calibrated-validation.md` y enable score externo.
 
 ## Cómo navegar el spec set
 
