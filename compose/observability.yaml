@@ -12,6 +12,11 @@ services:
     restart: unless-stopped
     ports:
       - "${PROMETHEUS_PORT_HOST:-9090}:9090"
+    # H-22 / PATCH 006: permitir scrape al generator cuando corre en host
+    # (modo demo sin build de imagen). En Windows/Mac host.docker.internal
+    # existe nativamente; en Linux se mapea a host-gateway.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ../infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ../infra/prometheus/rules:/etc/prometheus/rules:ro

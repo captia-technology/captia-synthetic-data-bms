@@ -10,8 +10,10 @@ import os
 import signal
 import time
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -192,8 +194,11 @@ class ScenarioRunner:
         # Main loop - publish by timestamp batch (same as mqtt_publisher_v2.run)
         try:
             while self._running:
-                # Generate from NOW (same as mqtt_publisher_v2._generate_dataset)
-                now = datetime.now()
+                # H-21 / PATCH 005: TZ-aware datetime.now en la zona del escenario
+                # (antes naive datetime.now() asumía wall-clock del host, que
+                # en contenedores UTC drifta 1-2 h respecto a sim.timezone="Europe/Madrid").
+                sim_tz = ZoneInfo(sim.timezone) if sim.timezone else timezone.utc
+                now = datetime.now(tz=sim_tz)
                 end = now + timedelta(hours=live.lookahead_hours)
                 time_index = pd.date_range(
                     start=now.strftime("%Y-%m-%d %H:%M:%S"),

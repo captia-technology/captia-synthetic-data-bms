@@ -52,6 +52,11 @@ install:  ## uv sync the workspace (Python 3.12 + workspace members)
 preflight:  ## Validate Docker, ports and .env
 	bash scripts/preflight.sh
 
+.PHONY: stream
+stream:  ## Mantiene el generator vivo en modo live (auto-reinicia si cae). CTRL+C para salir.
+	$(ENV_GUARD)
+	bash scripts/stream_live.sh
+
 .PHONY: quickstart
 quickstart: init-env install preflight up wait-healthy wait-init smoke urls  ## One-shot completo (incluye build de bms-data-generator)
 	@echo ""

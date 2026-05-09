@@ -28,6 +28,20 @@ scrape_configs:
       - targets: ['bms-data-generator:8120']
         labels:
           service: 'bms-data-generator'
+          mode: 'container'
+    metrics_path: '/metrics'
+
+  # H-22 / PATCH 006: scrape alternativo cuando el generador corre en host
+  # (modo demo: `make demo` solo arranca infra y el generator se inicia con
+  # `make stream` o `uv run python -m bms_data_generator`). Solo uno de los
+  # dos targets estará UP a la vez; Prometheus marcará el otro DOWN sin
+  # afectar a las queries (filtran por mode si es necesario).
+  - job_name: 'bms-data-generator-host'
+    static_configs:
+      - targets: ['host.docker.internal:8120']
+        labels:
+          service: 'bms-data-generator'
+          mode: 'host'
     metrics_path: '/metrics'
 
   - job_name: 'telegraf'

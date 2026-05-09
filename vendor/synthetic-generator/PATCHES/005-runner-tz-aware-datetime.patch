@@ -1,0 +1,96 @@
+# 005-runner-tz-aware-datetime.patch
+
+**Title**: TZ-aware `datetime.now()` en `ScenarioRunner._publisher_loop` (H-21).
+
+**Status**: Applied.
+
+**Applied on**: 2026-05-10.
+
+**Linked finding**: `docs/audit/E2E_VALIDATION_REPORT.md` H-21 (drift TZ runner vendor naive `datetime.now()`).
+
+**Linked open question**: `docs/audit/ACTION_PLAN.md` Must.
+
+## Problema
+
+`vendor/.../core/runner.py:196` antes del patch:
+
+```python
+now = datetime.now()       # naive — usa wall-clock del host
+```
+
+Cuando el generador corre en un contenedor con TZ=`UTC` pero el escenario
+configurado tiene `simulation.timezone: "Europe/Madrid"`, los timestamps
+generados estaban en UTC pero etiquetados como `Europe/Madrid`. Esto
+producía un drift de 1-2 h (DST) entre el wall-clock real y el reloj
+simulado.
+
+Síntoma observado en producción: `temperature-outdoor=8.10 °C` el 9 mayo
+a las 18:56 UTC en AULA01 (esperado ~17-19 °C para Valencia esa fecha).
+El modelo sinusoidal de outdoor temperature usa día-del-año derivado del
+timestamp; con el drift, el peak diurno se desplaza 1-2 h y los valores
+de outdoor temperatura quedan desfasados.
+
+## Cambio
+
+```python
+# H-21 / PATCH 005: TZ-aware datetime.now en la zona del escenario
+sim_tz = ZoneInfo(sim.timezone) if sim.timezone else timezone.utc
+now = datetime.now(tz=sim_tz)
+```
+
+Cambios complementarios (imports global ya existentes en módulo):
+
+```diff
++from datetime import datetime, timedelta, timezone
++from zoneinfo import ZoneInfo
+```
+
+(`zoneinfo` es stdlib desde Python 3.9; el repo declara Python 3.12 estricto.)
+
+`now.strftime("%Y-%m-%d %H:%M:%S")` sigue dando un string sin TZ (formato
+local), que `pd.date_range` interpreta correctamente con
+`tz=sim.timezone`. La diferencia es que ahora `now` está en la TZ del
+escenario, no del host, por lo que la cadena formateada coincide con la
+hora local esperada.
+
+## Diff
+
+```diff
+--- a/src/synthetic_generator/core/runner.py
++++ b/src/synthetic_generator/core/runner.py
+@@ -10,6 +10,8 @@ import os
+ import signal
+ import time
++from datetime import datetime, timedelta, timezone
+ from dataclasses import dataclass
+ from pathlib import Path
++from zoneinfo import ZoneInfo
+ from typing import Any
+
+@@ -191,9 +193,12 @@ class ScenarioRunner:
+         try:
+             while self._running:
+-                # Generate from NOW
+-                now = datetime.now()
++                # H-21 / PATCH 005: TZ-aware datetime.now
++                sim_tz = ZoneInfo(sim.timezone) if sim.timezone else timezone.utc
++                now = datetime.now(tz=sim_tz)
+                 end = now + timedelta(hours=live.lookahead_hours)
+```
+
+## Validación
+
+- `tests/integration/test_runner_tz_audit.py`:
+  1. `now` es TZ-aware (`tzinfo is not None`).
+  2. Con `sim.timezone = "Europe/Madrid"`, `now.utcoffset()` es +01:00 o +02:00 según DST.
+  3. Con `sim.timezone = ""` o `None`, fallback a UTC.
+
+(test estático del comportamiento de `ZoneInfo` y `datetime.now`; el
+runner completo se ejercita en `test_use_cases_e2e.py`.)
+
+## Reversibilidad
+
+Para revertir:
+- Cambiar `now = datetime.now(tz=sim_tz)` → `now = datetime.now()`.
+- Eliminar `from zoneinfo import ZoneInfo` y los imports añadidos en
+  línea 13 (si `timezone` no se usa en otro sitio).
