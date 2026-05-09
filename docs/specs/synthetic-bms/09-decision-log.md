@@ -163,6 +163,55 @@
   2026-05-10.
 - **Estado**: Aceptada.
 
+## ADR-019 — Event payload `ts_ns` (BMS standalone) vs ISO `ts` (upstream)
+
+- **Contexto**: la matriz de consistencia
+  (`docs/audit/CONSISTENCY_MATRIX.md` row 2 "Payload format") detectó que
+  CAPTIA-CONNECT upstream publica eventos con timestamp ISO 8601
+  (`"ts": "2026-05-09T18:30:00.123Z"`), mientras BMS publica eventos con
+  unix nanoseconds (`"ts_ns": 1715260800000000000`). El segundo
+  `[[inputs.mqtt_consumer]]` en `infra/telegraf/telegraf.conf:62-78` usa
+  `json_time_key = "ts_ns"` con `json_time_format = "unix_ns"` para AMBOS
+  streams (telemetry + event), por lo que un evento ISO de upstream caería
+  en el consumer pero no se parsearía y usaría `now()` (drift).
+- **Decisión**: **mantener `ts_ns` como contrato BMS-internal** y resolver
+  la integración cross-stack vía bridge Telegraf en futura fase de
+  integración con CAPTIA-CONNECT.
+  - **Por qué `ts_ns` en BMS**: consistente con el flujo telemetry (unix_ns
+    es nativo de InfluxDB line protocol), no requiere parsing de strings
+    en el publisher (microseconds más eficiente), y todos los tests del
+    repo asumen ese formato.
+  - **Plan de bridge** (post-v1, integración real): añadir un tercer
+    `[[inputs.mqtt_consumer]]` con namepass="captia_cmd_event" y
+    `json_time_key = "ts"` + `json_time_format = "2006-01-02T15:04:05.999Z07:00"`
+    para topics que vengan exclusivamente de upstream. Esto requiere:
+    1. Identificar el sub-namespace (ej: `captia/upstream/...` vs
+       `captia/local/...`) o usar `client_id` como discriminador.
+    2. Aplicar `processors.rename` para normalizar `ts` → `ts_ns` si fuera
+       deseable la convergencia (no requerido para storage en
+       InfluxDB — Telegraf interpreta el time field internamente).
+    3. ADR específico de integración en momento de hacer la conexión real.
+- **Alternativas**:
+  - Cambiar BMS a ISO `ts` para alinear con upstream (descartada — rompe
+    19+ tests + sinks vendor que producen `ts_ns`; sería un patch al
+    vendor con propagación masiva).
+  - Telegraf processor que detecte automáticamente formato (descartada —
+    `json_time_key` es estático en Telegraf 1.32; no hay auto-detect).
+  - Duplicar consumers ahora con namepass distinto (descartada — sin
+    integración real es config muerta).
+- **Consecuencias**:
+  - BMS standalone es 100 % funcional con `ts_ns` (verificado en E2E).
+  - Mensaje upstream con ISO `ts` que llegue por accidente al broker BMS
+    pierde fidelidad temporal (Telegraf usa `now()`). Esto es aceptable
+    para demo y no bloquea el roadmap ML porque BMS no consume eventos
+    de upstream en este alcance.
+  - Cuando llegue la integración real, este ADR es el punto de partida
+    para el bridge. Documentado que la decisión está tomada y los
+    detalles del bridge se resuelven en una sub-fase de integración.
+- **Estado**: Aceptada (con plan de bridge para integración futura).
+- **Cierra**: H-01 (`docs/audit/AUDIT_REPORT.md`), única alta restante
+  del ACTION_PLAN.
+
 ## ADR-018 — Sin `outputs.heartbeat` Telegraf en BMS standalone
 
 - **Contexto**: el upstream CAPTIA-CONNECT añade un output

@@ -31,13 +31,15 @@
 - **CI gate**: H-05 coverage 80 % `fail_under` (baseline 89.15 %).
 - **Operacional**: `make stream` (gap #27) mantiene el generator vivo con
   auto-restart + monitoreo `phase` cada 30 s.
-- **Hallazgos cerrados durante la auditoría + follow-up + Could**: **27**
-  (gap #5, #7, #9, #27; H-02, H-03, H-04, H-05, H-06, H-08, H-09, H-10,
-  H-12, H-13, H-14, H-19, H-21, H-22, H-23; F-1, F-2, F-3, F-4, F-5, F-6,
-  F-7, F-8, F-9, F-10; L-PV-02, L-PV-03, L-PV-07, L-PV-09).
-- **Hallazgos abiertos**: **2** (1 alta · 0 media · 1 baja).
-  - **H-01** (alta) event payload `ts_ns` vs ISO `ts` — requiere decisión spec con upstream.
-  - **H-11** (baja) Dependabot abierto — acción manual sin código.
+- **Hallazgos cerrados durante la auditoría + follow-up + Could + final**: **28**
+  (gap #5, #7, #9, #27; H-01, H-02, H-03, H-04, H-05, H-06, H-08, H-09,
+  H-10, H-12, H-13, H-14, H-19, H-21, H-22, H-23; F-1, F-2, F-3, F-4,
+  F-5, F-6, F-7, F-8, F-9, F-10; L-PV-02, L-PV-03, L-PV-07, L-PV-09).
+- **Hallazgos abiertos**: **1** (0 alta · 0 media · 1 baja).
+  - **H-11** (baja) Dependabot abierto — acción manual sin código,
+    fuera del alcance de la auditoría automatizada.
+- **Tasa de cierre**: **28/29 = 96.5 %**. El único pendiente requiere
+  intervención humana (review de PRs externos), no es bug del código.
 
 ## Patches físicos aplicados en esta auditoría
 
