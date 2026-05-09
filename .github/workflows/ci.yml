@@ -75,6 +75,30 @@ jobs:
           uv run pytest vendor/synthetic-generator/tests/unit \
             -q --no-header --override-ini="markers=" -p no:cacheprovider
 
+      # H-05 (AUDIT_REPORT): coverage gating del workspace BMS-specific.
+      # Umbral configurado en pyproject.toml [tool.coverage.report] fail_under=80.
+      - name: Coverage gating (>=80%)
+        run: |
+          uv run pytest \
+            modules/bms-data-generator/tests \
+            extensions/bms_calibration/tests \
+            tests/integration \
+            --cov \
+            --cov-report=term \
+            --cov-report=xml \
+            --no-header
+
+      - name: Upload coverage report (artifact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.python }}
+          path: |
+            coverage.xml
+            .coverage
+          retention-days: 14
+          if-no-files-found: ignore
+
   docker-build:
     name: Build Docker image (bms-data-generator)
     runs-on: ubuntu-latest
