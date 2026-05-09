@@ -140,5 +140,8 @@ physics:
     std: 4.0                                  # dB(A) ruido aleatorio
   light:
     target_lux_on: 550                        # lux setpoint con luz artificial
-    target_lux_off: 70                        # lux indoor sin luz artificial
+    # F-9 (PHYSICAL_REALISM_REPORT): vendor default era 70, irreal con
+    # persianas cerradas o noche. ~5 lux es ambient residual con monitor PC,
+    # luz indirecta o luz de pasillo filtrándose.
+    target_lux_off: 5
     std: 40                                   # lux ruido medición

@@ -101,6 +101,9 @@ nav:
     - Validación E2E: audit/E2E_VALIDATION_REPORT.md
     - Realismo físico: audit/PHYSICAL_REALISM_REPORT.md
     - Plan de acción: audit/ACTION_PLAN.md
+  - Operaciones:
+    - Inicialización .env: operations/init-env.md
+    - Healthchecks: operations/healthchecks.md
   - Decisiones:
     - Índice ADR: decisions/index.md
   - Archivo:

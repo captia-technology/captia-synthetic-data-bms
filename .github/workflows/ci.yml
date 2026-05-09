@@ -173,6 +173,14 @@ jobs:
       - name: make demo (init + up-infra + wait + smoke)
         run: make demo
 
+      # H-08 (AUDIT_REPORT): canonical schema verify run against the live stack
+      # so divergences detectables por CI (ej: tags faltantes, measurement
+      # renombrado, field name distinto). El script ya está integrado en
+      # `make smoke` pero lo invocamos también explícitamente aquí para que
+      # el step quede separado en el log de Actions.
+      - name: Verify canonical schema (post-up)
+        run: bash scripts/verify_canonical_schema.sh
+
       - name: Capture container logs on failure
         if: failure()
         run: |

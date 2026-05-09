@@ -146,3 +146,43 @@
 - **Alternativas**: tags `latest` (no permitido).
 - **Consecuencias**: `infra-reviewer` valida en CI.
 - **Estado**: Aceptada.
+
+## ADR-016 — Vendoring policy: parches en `PATCHES/NNN-titulo.patch`
+
+- **Contexto**: el código en `vendor/synthetic-generator/` es read-only por
+  política (ver `.claude/rules/003-vendoring-policy.md`), pero la auditoría
+  física descubrió 7 mejoras necesarias (PATCHES 002–008).
+- **Decisión**: cualquier modificación al vendor se registra como
+  `vendor/synthetic-generator/PATCHES/NNN-titulo.patch` con el formato
+  `Title / Status / Applied on / Linked finding / Diff / Validation /
+  Reversibility`. Los parches deben ser retrocompatibles (defaults legacy).
+- **Alternativas**: editar vendor sin trazabilidad (descartada por imposibilidad
+  de re-vendoring posterior); fork del vendor (descartada por overhead).
+- **Consecuencias**: `scripts/update_vendor.sh` reaplicará los patches
+  automáticamente al sincronizar con upstream. 8 patches aplicados a fecha
+  2026-05-10.
+- **Estado**: Aceptada.
+
+## ADR-017 — `telemetry_events` bucket mantenido pese a deprecated upstream
+
+- **Contexto**: la matriz de consistencia (`docs/audit/CONSISTENCY_MATRIX.md`
+  fila "Buckets") detectó que CAPTIA-CONNECT upstream deprecó
+  `telemetry_events` el 2026-04-02 mientras BMS lo mantiene operativo
+  (T-PV-18). Si en producción ambos stacks comparten InfluxDB, BMS escribe
+  a un bucket que upstream ya no consume.
+- **Decisión**: BMS mantiene `telemetry_events` (90 d retention) porque:
+  1. Es la convención del PPTX `influxdb-simarro-buckets.pptx` slide 8 que
+     sigue siendo source-of-truth para Simarro.
+  2. Telegraf en BMS escribe eventos como `captia_cmd_event` measurement
+     que sí necesita un bucket dedicado para retención distinta de
+     telemetry continuous.
+  3. Cuando upstream confirme path de migración, BMS adopta vía PR explícito
+     con migración de datos retenidos.
+- **Alternativas**: eliminar el bucket y unir eventos a `telemetry`
+  (descartada — distintas retenciones y consultas Flux); duplicar a ambos
+  buckets (descartada — doble write innecesario).
+- **Consecuencias**: divergencia documentada con upstream. Acción de
+  seguimiento: revisar tras próxima sincronización con CAPTIA-CONNECT
+  (ver `scripts/update_vendor.sh`).
+- **Estado**: Aceptada (con revisión periódica).
+- **Cierra**: H-04 (`docs/audit/AUDIT_REPORT.md`).
