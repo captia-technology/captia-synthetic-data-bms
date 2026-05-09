@@ -83,21 +83,40 @@ captia/{captia_env}/{captia_tenant}/{site_id}/{asset_id}/event/{variable}
 | `occupancy` | on-change | bool {0,1} | bool_presence |
 | `people_count` | continua | int 0-50 | analog_gauge |
 
-### Catálogo `captia_metadata`
+### Catálogo `captia_point_meta` (en bucket `captia_metadata`)
 
-Para cada variable se publica al bucket `captia_metadata` (retención infinita) un registro con:
+Conforme a `docs/influxdb-simarro-buckets.pptx` slide 9 (mapeo simarro-prod
+septiembre 2026), el catálogo de variables vive en el measurement
+**`captia_point_meta`** dentro del bucket `captia_metadata` (retención
+infinita). Cada registro:
 
 ```
-captia_metadata,captia_env=dev,domain_id=bms_classrooms,site_id=ies_simarro,variable=co2
-  unit="ppm",metric_kind="analog_gauge",range_min=300,range_max=5000
+captia_point_meta,captia_env=dev,domain_id=bms_classrooms,site_id=ies_simarro,asset_type=classroom,variable=co2
+  metric_kind="analog_gauge",storage_mode="continuous",data_type="float",
+  unit="ppm",point_type="sensor",category="ENVIRONMENTAL",
+  range_min=400,range_max=2200,vendor_name="co2"
 ```
 
-El catálogo es **a nivel de dominio** (no por `asset_id`): todas las aulas del
-mismo `domain_id` comparten el mismo perfil de variables. La carga la realiza
-`infra/influxdb/init/init_buckets_tasks.sh` durante `make demo`, leyendo
-`config/domains/<domain_id>/variables.yaml` y emitiendo line-protocol con
-`influx write`. Sin este registro, las tareas Flux de downsampling no
-escribirían a `telemetry_1m` (regla CENTINELA+ § 1.3).
+Tags: `captia_env`, `domain_id`, `site_id`, `asset_type`, `variable` (donde
+`variable` lleva el nombre **de producción**: `temperature_01`,
+`relative-humidity`, etc.).
+
+Fields: `metric_kind`, `storage_mode`, `data_type`, `unit`, `point_type`,
+`category`, `range_min`, `range_max`, `vendor_name` (cuando hay alias
+vendor → producción).
+
+El catálogo es **a nivel de dominio** (no por `asset_id`): todas las aulas
+del mismo `domain_id` comparten el mismo perfil de variables. La carga la
+realiza `infra/influxdb/init/init_buckets_tasks.sh` durante `make demo`,
+leyendo `config/domains/<domain_id>/variables.yaml` y emitiendo
+line-protocol con `influx write`. Sin estos registros, las tareas Flux de
+downsampling tier-1 no emiten a `telemetry_1m` (allowlist por
+`metric_kind`, regla CENTINELA+ § 1.3 / § 1.4).
+
+> Compatibilidad: durante un periodo transitorio (T-PV-23) el script init
+> también limpia el measurement legacy `captia_metadata` para que un
+> bucket existente con esquema antiguo no quede con registros huérfanos
+> tras un upgrade.
 
 ### Naming de variables — alias guion ↔ underscore
 

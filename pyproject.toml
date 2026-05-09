@@ -10,6 +10,7 @@ license = { text = "Apache-2.0" }
 dependencies = [
     "synthetic-generator",
     "bms-calibration",
+    "bms-signal-alias",
     "bms-data-generator",
 ]
 
@@ -26,18 +27,20 @@ dev = [
 members = [
     "modules/bms-data-generator",
     "extensions/bms_calibration",
+    "extensions/bms_signal_alias",
     "vendor/synthetic-generator",
 ]
 
 [tool.uv.sources]
 synthetic-generator = { workspace = true }
 bms-calibration = { workspace = true }
+bms-signal-alias = { workspace = true }
 bms-data-generator = { workspace = true }
 
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-src = ["modules/bms-data-generator/src", "extensions/bms_calibration/src", "vendor/synthetic-generator/src"]
+src = ["modules/bms-data-generator/src", "extensions/bms_calibration/src", "extensions/bms_signal_alias/src", "vendor/synthetic-generator/src"]
 extend-exclude = ["vendor/synthetic-generator"]
 
 [tool.ruff.lint]

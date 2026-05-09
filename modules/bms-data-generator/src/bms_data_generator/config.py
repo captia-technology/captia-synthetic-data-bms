@@ -41,6 +41,13 @@ class Settings(BaseSettings):
 
     cors_allow_origins: str = "http://localhost:3001,http://localhost:8120"
 
+    # T-PV-21: si True, envuelve cada sink con AliasSinkAdapter para emitir
+    # variables con nombres production (temperature_01, power_01, ...) en lugar
+    # de los nombres internos vendor (temperature, power, ...).
+    # Source of truth del mapping: config/domains/<domain_id>/variables.yaml
+    # campo `production_name`.
+    production_alias_enabled: bool = True
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
