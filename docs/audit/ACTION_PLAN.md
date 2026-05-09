@@ -61,7 +61,7 @@ Tests de regresión: **15 tests nuevos**, todos verdes.
 | L-PV-02 | FaultEventSink no emite a `state_events` | `extensions/.../fault_event_sink.py` cableado en `runner_service.py:347`. Tests `test_caseC_faults_enabled_emits_fault_events` + `test_caseC_fault_events_have_canonical_schema` PASS confirman emisión + schema canónico. Validación live (correr `bms_v1_caseC_faults.yaml` end-to-end y query `state_events` bucket) sigue pendiente | — | ✅ código + tests (live pendiente) |
 | H-21 | Drift TZ runner vendor (`datetime.now()` naive) | **PATCH 005** aplicado (`runner.py` usa `datetime.now(tz=ZoneInfo(sim.timezone))`); 4 tests `test_runner_tz_audit.py` PASS | S | ✅ cerrada |
 | H-22 | Prometheus target `bms-data-generator` down | **PATCH 006**: doble scrape `mode=container`/`mode=host`, `extra_hosts: host.docker.internal:host-gateway`. Verificado live: target host UP | S | ✅ cerrada |
-| H-01 | Event payload `ts_ns` vs `ts` ISO 8601 (CAPTIA-connect compat) | Decisión: ¿alinear con upstream o documentar divergencia? | S (1 d, tras decisión) | ⚪ pendiente |
+| H-01 | Event payload `ts_ns` vs `ts` ISO 8601 (CAPTIA-connect compat) | **ADR-019** documenta decisión: `ts_ns` BMS-internal + plan de bridge Telegraf para integración upstream futura | S | ✅ cerrada |
 | #27 | `make stream` (generator siempre vivo) | `scripts/stream_live.sh` con auto-restart si phase ≠ running; target `make stream` | S | ✅ cerrada |
 
 ### Should (importante, no bloqueante)
