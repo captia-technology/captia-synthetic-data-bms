@@ -1,0 +1,9 @@
+# Default owner for everything.
+*                                @jaimesendra
+
+# Specs require maintainer review.
+/docs/specs/synthetic-bms/        @jaimesendra
+/.claude/                         @jaimesendra
+
+# Vendor is read-only; only maintainers can touch it via patches.
+/vendor/synthetic-generator/      @jaimesendra

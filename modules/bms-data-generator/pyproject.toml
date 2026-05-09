@@ -5,7 +5,7 @@ description = "FastAPI control plane for BMS synthetic data generator"
 requires-python = ">=3.12"
 authors = [{ name = "Jaime Sendra (CAPTIA Technology)", email = "jaime.sendra@captiatechnology.com" }]
 readme = "README.md"
-license = { text = "Proprietary" }
+license = { text = "Apache-2.0" }
 
 dependencies = [
     "fastapi>=0.115.0",

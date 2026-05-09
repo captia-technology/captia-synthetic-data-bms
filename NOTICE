@@ -1,0 +1,32 @@
+CAPTIA-SYNTHETIC-DATA-BMS
+Copyright 2026 CAPTIA Technology
+
+This product includes software developed by CAPTIA Technology
+(https://captiatechnology.com).
+
+This product vendors a slimmed copy of `synthetic-generator` (proprietary
+upstream owned by CAPTIA Technology). The vendored snapshot is licensed under
+the same Apache License 2.0 as the rest of this repository for the purposes
+of public distribution. See `vendor/synthetic-generator/VENDOR.md` and
+`vendor/synthetic-generator/PATCHES/`.
+
+Third-party dependencies (Python packages, container images) keep their own
+licenses. Notable runtime images:
+  - eclipse-mosquitto:2.0.18    EPL-2.0 / EDL-1.0
+  - influxdb:2.7                MIT
+  - redis:7-alpine              BSD-3-Clause
+  - telegraf:1.32               MIT
+  - grafana/grafana:11.4.0      AGPL-3.0
+  - prom/prometheus:v2.49.1     Apache-2.0
+  - grafana/loki:2.9.4          AGPL-3.0
+  - grafana/promtail:2.9.4      AGPL-3.0
+
+Python runtime dependencies (FastAPI, Pydantic, NumPy, pandas, paho-mqtt,
+prometheus-client, python-json-logger, uvicorn, pytest, ruff, uv) keep their
+own permissive licenses (MIT / BSD / Apache-2.0). See pyproject.toml and
+uv.lock for exact versions.
+
+The educational documents under `docs/` (CAPTIA_Informe_CasosDeUso_DatosSinteticos.md,
+CENTINELA_Guia_Alumnos_v4.md, MEDALLION_Arquitectura_Guia_Referencia.md) are
+copyright CAPTIA Technology, redistributed here under the Apache License 2.0
+solely as reference for the synthetic data generator scope.

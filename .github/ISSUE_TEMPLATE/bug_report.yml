@@ -1,0 +1,80 @@
+name: Bug report
+description: Report something that is broken or behaves unexpectedly.
+title: "[bug] "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Please fill in as much
+        context as possible — it helps us reproduce and fix faster.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      description: Output of `git rev-parse --short HEAD` or release tag.
+      placeholder: "v0.1.0 or abcdef0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected component
+      multiple: true
+      options:
+        - bms-data-generator (FastAPI service)
+        - bms_calibration (extensions)
+        - vendor/synthetic-generator
+        - infra (compose, mosquitto, telegraf, influxdb, grafana, prometheus, loki, promtail)
+        - docs / specs
+        - scripts / Taskfile / Makefile
+        - other
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Expected vs actual behavior.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. `task up`
+        2. `curl -X POST ...`
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs / output
+      render: shell
+
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      placeholder: |
+        - OS: Windows 11 / Ubuntu 22.04 / macOS 14
+        - Docker: 24.x
+        - Python: 3.12.11
+        - uv: 0.5.x
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Confirmation
+      options:
+        - label: I have searched existing issues and this is not a duplicate.
+          required: true
+        - label: I have read CONTRIBUTING.md and SECURITY.md.
+          required: true

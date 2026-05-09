@@ -5,7 +5,7 @@ description = "BMS-specific calibration overrides and HVAC fault injection for s
 requires-python = ">=3.12"
 authors = [{ name = "Jaime Sendra (CAPTIA Technology)", email = "jaime.sendra@captiatechnology.com" }]
 readme = "README.md"
-license = { text = "Proprietary" }
+license = { text = "Apache-2.0" }
 
 dependencies = [
     "numpy>=1.24",

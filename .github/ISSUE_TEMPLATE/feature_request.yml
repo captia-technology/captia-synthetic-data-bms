@@ -1,0 +1,49 @@
+name: Feature request
+description: Propose a new feature or enhancement.
+title: "[feature] "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This project is **spec-driven**. Significant features should reference
+        or update a spec under `docs/specs/synthetic-bms/`.
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Problem / motivation
+      description: What real need does this solve? Which use case (A/B/C/D) or beyond?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: High-level description of the feature. API changes, new endpoints, new domain etc.
+    validations:
+      required: true
+
+  - type: input
+    id: spec
+    attributes:
+      label: Affected spec
+      description: Which spec under docs/specs/synthetic-bms/ does this touch?
+      placeholder: "01-product-spec.md / 02-domain-spec.md / 03-architecture-spec.md / ..."
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you considered and why they were rejected.
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - label: I have read CONTRIBUTING.md.
+          required: true
+        - label: This is not a security report (those go to jaime.sendra@captiatechnology.com).
+          required: true

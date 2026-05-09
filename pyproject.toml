@@ -5,7 +5,7 @@ description = "CAPTIA synthetic data generator for BMS (Building Management Syst
 requires-python = ">=3.12"
 authors = [{ name = "Jaime Sendra (CAPTIA Technology)", email = "jaime.sendra@captiatechnology.com" }]
 readme = "README.md"
-license = { text = "Proprietary" }
+license = { text = "Apache-2.0" }
 
 dependencies = [
     "synthetic-generator",
