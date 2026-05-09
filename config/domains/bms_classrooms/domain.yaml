@@ -7,14 +7,69 @@
 n_aulas: 10
 
 calendar:
+  # Calendario lectivo Comunidad Valenciana 2025-2026.
+  # Source of truth: extensions/bms_calibration/src/bms_calibration/school_calendar.py:22-27
+  # T-PV-09 (cierra L-PV-06): expandidas todas las fechas de los 4 períodos vacacionales
+  # oficiales para que el calendar generator del vendor (que solo soporta lista plana
+  # de holidays, no rangos `vacations`) las trate como no lectivas.
   school_start_month: 9
   school_end_month: 6
   holidays:
+    # Navidad 2025-26 (2025-12-22 -> 2026-01-07)
+    - "2025-12-22"
+    - "2025-12-23"
+    - "2025-12-24"
     - "2025-12-25"
+    - "2025-12-26"
+    - "2025-12-27"
+    - "2025-12-28"
+    - "2025-12-29"
+    - "2025-12-30"
+    - "2025-12-31"
     - "2026-01-01"
+    - "2026-01-02"
+    - "2026-01-03"
+    - "2026-01-04"
+    - "2026-01-05"
     - "2026-01-06"
+    - "2026-01-07"
+    # Fallas (2026-03-14 -> 2026-03-19)
+    - "2026-03-14"
+    - "2026-03-15"
+    - "2026-03-16"
+    - "2026-03-17"
+    - "2026-03-18"
     - "2026-03-19"
+    # Pascua (2026-04-04 -> 2026-04-12)
+    - "2026-04-04"
+    - "2026-04-05"
+    - "2026-04-06"
+    - "2026-04-07"
+    - "2026-04-08"
+    - "2026-04-09"
     - "2026-04-10"
+    - "2026-04-11"
+    - "2026-04-12"
+    # Junio fin curso (2026-06-20 -> 2026-06-30)
+    - "2026-06-20"
+    - "2026-06-21"
+    - "2026-06-22"
+    - "2026-06-23"
+    - "2026-06-24"
+    - "2026-06-25"
+    - "2026-06-26"
+    - "2026-06-27"
+    - "2026-06-28"
+    - "2026-06-29"
+    - "2026-06-30"
+    # Septiembre inicio curso (2026-09-01 -> 2026-09-07)
+    - "2026-09-01"
+    - "2026-09-02"
+    - "2026-09-03"
+    - "2026-09-04"
+    - "2026-09-05"
+    - "2026-09-06"
+    - "2026-09-07"
 
 schedule:
   aula_capacity_mean: 28

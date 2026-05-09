@@ -64,6 +64,11 @@ create_bucket_if_missing "telemetry_1m" "30d"
 create_bucket_if_missing "telemetry_15m" "90d"
 create_bucket_if_missing "telemetry_1h" "365d"
 create_bucket_if_missing "state_events" "90d"
+# T-PV-18 (cierra L-PV-18): 7º bucket operativo alineado con producción simarro-prod.
+# Almacena eventos de plataforma (cmd_authorized, cmd_rejected, sniper_error)
+# vía 2º mqtt_consumer + output #3 en infra/telegraf/telegraf.conf.
+# Source of truth: docs/influxdb-simarro-buckets.pptx slide 8.
+create_bucket_if_missing "telemetry_events" "90d"
 create_bucket_if_missing "captia_metadata" "0"
 
 existing_tasks=$(influx task list --org-id "${ORG_ID}" 2>/dev/null | awk 'NR>1 {print $4}')

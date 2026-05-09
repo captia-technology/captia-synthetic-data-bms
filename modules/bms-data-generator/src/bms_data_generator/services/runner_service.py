@@ -81,12 +81,35 @@ def _build_runner(config_path: Path) -> tuple[Any, Any]:
     )
     from synthetic_generator.sinks.stdout import StdoutSinkAdapter  # type: ignore[import-not-found]
 
+    from .calibration_loader import (
+        load_faults_config,
+        load_physics_overrides,
+    )
+
     auto_discover_domains()
 
     config = load_scenario_config(config_path)
     domain = get_domain(config.domain.id)
     if domain is None:
         raise ValueError(f"Unknown domain: {config.domain.id}")
+
+    # T-PV-07 (cierra L-PV-04): wire calibration_loader.
+    # Carga simbólica de faults_config y physics_overrides para que estén
+    # disponibles cuando se implemente FaultInjector wiring (T-PV-08).
+    # Por ahora se loggean para verificar cableado; no afectan al runner aún.
+    # Path: config_path es config/projects/<scenario>.yaml → faults.yaml está en
+    # config/domains/<domain_id>/faults.yaml (sibling directory).
+    faults_yaml = config_path.parent.parent / "domains" / config.domain.id / "faults.yaml"
+    faults_config = load_faults_config(faults_yaml)
+    physics_overrides = load_physics_overrides()
+    LOG.info(
+        "calibration_loader wired: faults_yaml=%s exists=%s "
+        "faults_config=%d types physics_overrides=%d active",
+        faults_yaml,
+        faults_yaml.exists(),
+        len(faults_config),
+        len(physics_overrides),
+    )
 
     sinks: list = []
     for sink_cfg in config.sinks:

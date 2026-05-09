@@ -8,16 +8,20 @@ Inventario de ambigüedades, divergencias y deudas técnicas detectadas durante 
 
 ## Lagunas críticas (bloquean validación robusta)
 
-### L-PV-01 — Catálogo de variables vendor ↔ spec divergente
+### L-PV-01 — Catálogo de variables vendor ↔ producción divergente [BLOCKER]
 
-- **Hallazgo**: `vendor/synthetic-generator/config/domains/bms_classrooms/variables.yaml:24-202` define 21 variables con nombres `temperature`, `humidity`, `co2`, `power`, `energy`, `presence_pir`, `outdoor_temp`, `daylight_lux`, `thermostat_setpoint`, `hvac_mode`, `hvac_enable`, `heating_valve_pos`, `scene_mode`, `relay_1..relay_4`, `iaq_index`, `noise`, `illuminance`, `occupancy`. La spec `docs/specs/synthetic-bms/02-domain-spec.md:60-85` lista nombres distintos (`temperature_01`, `relative_humidity_01`, `power_01`, `temperature_supply`, `temperature_return`, `solar_irradiance`, `temperature_outdoor`, `ac_state`, `ac_control`, `fan_speed_01..03_state`, `light_01..02_state`, `valve_control`, `valve_state`, `people_count`, `t_voc`).
-- **Impacto**: cualquier regla de validación basada en los nombres de la spec **no encontraría señales en MQTT/Influx**. Las variables `temperature_supply`, `temperature_return`, `solar_irradiance`, `t_voc`, `fan_speed_*_state` **no existen** en el generador actual.
+- **Hallazgo (actualizado tras revisar PPTX)**: `vendor/synthetic-generator/config/domains/bms_classrooms/variables.yaml:24-202` define 21 variables con nombres `temperature`, `humidity`, `co2`, `power`, `energy`, `presence_pir`, `outdoor_temp`, `daylight_lux`, `thermostat_setpoint`, `hvac_mode`, `hvac_enable`, `heating_valve_pos`, `scene_mode`, `relay_1..relay_4`, `iaq_index`, `noise`, `illuminance`, `occupancy`.
+  
+  La **producción real en `simarro-prod`** (ground truth `docs/influxdb-simarro-buckets.pptx` slide 14, snapshot 2026-03-28) usa nombres **completamente distintos**: `temperature_01`, `temperature_01_sp`, `temperature-indoor`, `relative-humidity`, `t-voc`, `iaq-index`, `avg-sound-level`, `max-sound-level`, `luminosity`, `occupancy` (bool), `people-count`, `power_01`, `ac_state`, `ac_control`, `aire`, `aire_state`, `fan_speed_01..03` + `_state`, `light_01..02` + `_state`, `valve_control`, `valve_state`.
+
+  La spec `docs/specs/synthetic-bms/02-domain-spec.md:60-85` parcialmente alinea con producción (usa `temperature_01`, `power_01`, etc.) pero también lista variables que **no existen ni en vendor ni en producción** (`temperature_supply`, `temperature_return`, `solar_irradiance`).
+- **Impacto severo**: el generador sintético **NO es drop-in replacement** de telemetría real. Cualquier dashboard, alerta, query Flux, modelo ML entrenado contra producción **no funciona** contra datos sintéticos.
 - **Propuesta**:
-  - La spec de validación se ancla al catálogo **vendor real** (`variables.yaml`).
-  - Documentar en `10-implementation-readiness.md` que `synthetic-bms/02-domain-spec.md` requiere **rectificación** (renombrar variables, eliminar las inexistentes, añadir nota de ámbito si los nombres `_NN` corresponden a un upgrade futuro multi-canal por aula).
-  - Validador no asume `_NN` salvo que esté presente.
-- **Confidence**: alto (verificado por inspección directa de ambos ficheros).
-- **Severity**: blocker para reglas concretas en `04-physical-plausibility-rules.md`.
+  - Crear nueva spec `11-production-signal-mapping.md` con tabla canónica vendor → producción (entregada).
+  - Implementar override de `config/domains/bms_classrooms/variables.yaml` con nombres alineados a producción + AliasSink wrapper (T-PV-21..23 en `10-*`).
+  - Rectificar `synthetic-bms/02-domain-spec.md` eliminando `temperature_supply`, `temperature_return`, `solar_irradiance`, `t_voc` (con underscore — el real es `t-voc`).
+- **Confidence**: alto.
+- **Severity**: **BLOCKER** (elevado de "blocker para reglas" a "blocker estructural para todo el caso de uso").
 
 ### L-PV-02 — Avería física no se materializa en `state_events`
 
@@ -172,6 +176,110 @@ Inventario de ambigüedades, divergencias y deudas técnicas detectadas durante 
 - **Propuesta**: spec `09-physical-observability.md` propone `physics_validation_hourly.flux` que escribe a nuevo bucket `physics_metrics`.
 - **Severity**: medio.
 
+## Lagunas detectadas en revisión PPTX (canonical signal mapping)
+
+### L-PV-18 — Bucket `telemetry_events` faltante
+
+- **Hallazgo**: `docs/influxdb-simarro-buckets.pptx` slide 8 documenta el **7º bucket operativo** en producción:
+  - `telemetry_events` (90d retention)
+  - measurement: `captia_cmd_event`
+  - tags: 5 canónicos + `event_type ∈ {cmd_authorized, cmd_rejected, sniper_error}`
+  - 7 fields string: `cmd_id, metric, target, reason, error, source, detail`
+  - producer: Telegraf output #3 + 2º mqtt_consumer con topics `captia/+/+/+/+/event/+`, `captia/sniper/event`
+- **Estado actual local**:
+  - `infra/influxdb/init/init_buckets_tasks.sh:62-67` solo crea 6 buckets (falta `telemetry_events`).
+  - `infra/telegraf/telegraf.conf:35-50` solo tiene 1 `mqtt_consumer` (telemetry).
+- **Impacto**: el generador sintético no puede emitir auditoría de comandos ni eventos de plataforma. Caso C (faults) no puede usar este canal canónico — actualmente el spec set propone marcar faults en `state_events` con `variable=fault.<tipo>`, lo cual es válido pero distinto del patrón producción.
+- **Propuesta**:
+  - Añadir línea en `init_buckets_tasks.sh:67` → `create_bucket_if_missing "telemetry_events" "90d"`.
+  - Añadir 2º `mqtt_consumer` en `telegraf.conf` con `name_override = "captia_cmd_event"` y output #3 al bucket `telemetry_events`.
+  - Documentar measurement `captia_cmd_event` (distinto de `captia_point`) en `09-physical-observability.md`.
+  - **Para FaultEvents**: decidir si materializar como `captia_point` en `state_events` (mi propuesta inicial) o como `captia_cmd_event` en `telemetry_events` con `event_type=fault_<tipo>` (más alineado con producción).
+- **Severity**: **High** (gap estructural de pipeline producción).
+- **Confidence**: alto.
+
+### L-PV-19 — Measurement `state_events` divergente con producción
+
+- **Hallazgo**: `docs/influxdb-simarro-buckets.pptx` slide 8 dice **explícitamente**:
+  > Measurement: `captia_point` (NO captia_point_state)
+  
+  Pero `infra/telegraf/telegraf.conf:101` hace:
+  ```toml
+  [[processors.clone]]
+    namepass = ["captia_point"]
+    name_override = "captia_point_state"   # ← divergente con producción
+  ```
+- **Implicación**: en producción, `state_events` y `telemetry` usan el **mismo measurement** (`captia_point`); solo difieren en bucket. Las queries Flux son más simples (un solo `from(bucket:"state_events").filter(_measurement=="captia_point")`).
+  
+  En nuestro stack local, las queries deben filtrar por measurement distinto si quieren acceder a `state_events`.
+- **Impacto**: query inconsistency. Dashboards y alertas de producción no funcionan en local sin reescribir.
+- **Propuesta**: eliminar `name_override = "captia_point_state"` en `telegraf.conf:101`. Dejar que el clone preserve el measurement original `captia_point`. La diferenciación sigue funcionando porque van a buckets distintos (`telemetry` vs `state_events`).
+- **Severity**: **Medium** (compatibilidad query path).
+- **Confidence**: alto.
+
+### L-PV-20 — Streams MQTT canónicos no implementados
+
+- **Hallazgo**: `docs/captia-connect-partner-integration.pptx` slide 5 define **5 valores canónicos** del segmento `stream` del topic 7-segment:
+  - `telemetry` — sensor readings (✓ implementado)
+  - `cmd` — comandos del adapter (NO implementado)
+  - `ack` — ack del device (NO implementado)
+  - `state` — device state updates (NO implementado — podría ser overlap con bucket state_events)
+  - `event` — platform events (NO implementado — bloqueado por L-PV-18)
+- **Impacto**: el generador sintético solo simula la dirección **inbound** (device → broker). No puede simular escenarios de comandos remotos, ack timing, o eventos de plataforma. Limita Caso C realista (averías deberían producir `event` con `event_type=fault_*`).
+- **Propuesta**:
+  - Caso A live: opcional añadir un mock de comandos (`cmd` topics) que el generador pueda recibir y respondiera con `ack`. Fuera de v1.
+  - Caso C faults: emitir `event` con `event_type=fault_<tipo>` cuando se cablee L-PV-02.
+- **Severity**: **Medium** (afecta cobertura de pipeline producción).
+- **Confidence**: alto.
+
+### L-PV-21 — `captia_metadata` bucket vacío
+
+- **Hallazgo**: `docs/influxdb-simarro-buckets.pptx` slide 9 documenta que `captia_metadata` (retention infinita) contiene **3 measurements**:
+  - `captia_point_meta` (catálogo de variables, **21 fields**: metric_kind, storage_mode, data_type, unit, range_min, range_max, display_name, is_actuator, _deleted tombstone, ...)
+  - `captia_domain_meta` (config dominio, 10 fields)
+  - `captia_device_registry` (devices físicos)
+  
+  Es el **SSOT** del catálogo, leído por las 6 Flux tasks (allowlists), el adapter y las UIs de configuración.
+- **Estado actual**: `infra/influxdb/init/init_buckets_tasks.sh:67` crea el bucket pero **vacío**. No hay `metadata-bootstrap` que lo pueble.
+- **Impacto**:
+  - Las Flux tasks de downsampling **terminan en success sin escribir nada** (per slide 12: "si captia_metadata está vacío (post-wipe), las tasks tier-1 terminan en success sin escribir nada. NO genera error").
+  - Es decir: nuestros downsamples de `telemetry → telemetry_1m`, `_15m`, `_1h` **probablemente no escriben datos**.
+  - El adapter no puede listar variables disponibles para dashboards.
+- **Propuesta**:
+  - Añadir script `infra/influxdb/init/bootstrap_metadata.sh` (o extender `init_buckets_tasks.sh`) que poblé `captia_point_meta` desde `config/domains/bms_classrooms/variables.yaml` (alineado con producción tras T-PV-21).
+  - Definir tags y fields exactos según slide 9 (`captia_env`, `domain_id`, `site_id`, `asset_id`, `asset_type`, `variable` + 21 fields).
+- **Severity**: **High** (rollups no funcionan sin esto).
+- **Confidence**: alto.
+
+### L-PV-22 — Convención routing on-change incompleta
+
+- **Hallazgo**: `docs/captia-connect-partner-integration.pptx` slide 7 dice que el routing on-change es por **suffix glob**:
+  ```
+  *_cmd  *_ack  *_status  *_state  *_st  *_active
+  *_enable  *_in_progress  relay_*  *_setpoint  *_sp  *_mode
+  ```
+  
+  Pero slide 8 dice que también se decide por **`metric_kind`** (`bool_state`, `setpoint_step` → on_change).
+  
+  Variables como `ac_control` (setpoint_step) **NO matchean ningún glob** de los listados. Producción debe decidir por catálogo.
+- **Impacto**: si el routing en nuestro Telegraf solo usa glob (`infra/telegraf/telegraf.conf:103-117`), variables como `ac_control` se enrutan **incorrectamente** a `telemetry` cuando deberían ir a `state_events`.
+- **Propuesta**:
+  - Añadir tagpass específico para `ac_control`, `valve_control`, `aire`, etc. (si vamos a producir esos nombres tras T-PV-21).
+  - O: implementar un processor más inteligente que consulte `captia_metadata` para decidir routing (más complejo, pero alineado con producción).
+- **Severity**: **Medium**.
+- **Confidence**: medium (la convención exacta no está al 100% clara — los PPTX se contradicen levemente entre slide 7 y slide 8).
+
+### L-PV-23 — `OUTDOOR` asset y meteo separada
+
+- **Hallazgo**: producción tiene `outdoor_temp` (vendor) emitido por **cada aula** (heredado de generación per-asset), pero en producción real `temperature-outdoor` (kebab) viene de un asset separado tipo `OUTDOOR` o estación meteo. Ver `02-domain-spec.md:72-73` que lista `temperature_outdoor` y `solar_irradiance` como "continua (sitio)" — sugiere asset separado.
+- **Impacto**: cardinality InfluxDB inflada (10 aulas × N_meteo_vars vs 1 OUTDOOR × N_meteo_vars). Coupling artificial entre meteo y aula.
+- **Propuesta**:
+  - Crear asset_id sintético `OUTDOOR` que emite `temperature-outdoor`, `daylight-lux` (kebab), opcional `solar_irradiance` (sin modelo aún).
+  - Las aulas **no** emiten outdoor_temp; consumen del asset OUTDOOR via Influx en queries downstream.
+  - Eliminar `outdoor_temp` del catálogo per-aula tras T-PV-21.
+- **Severity**: **Medium** (afecta cardinality y semántica producción).
+- **Confidence**: medium (no confirmado al 100% qué asset emite meteo en producción real).
+
 ## Lagunas heredadas (de `synthetic-bms/00-open-questions.md`)
 
 | Hereda | Estado | Tratamiento en este spec set |
@@ -185,7 +293,7 @@ Inventario de ambigüedades, divergencias y deudas técnicas detectadas durante 
 
 | ID | Severity | Implementable ya | Bloquea validación crítica |
 |----|----------|------------------|---------------------------|
-| L-PV-01 | blocker (reglas concretas) | Sí (rectificar spec) | Sí |
+| L-PV-01 | **BLOCKER** (drop-in replacement) | Sí (override variables.yaml + AliasSink) | **Sí** |
 | L-PV-02 | blocker (Caso C real) | Sí (FaultEventSink) | Sí |
 | L-PV-03 | medio | Sí (cambio en vendor PATCH o renombrado) | Parcial |
 | L-PV-04 | medio | Sí (wiring trivial) | No |
@@ -202,3 +310,9 @@ Inventario de ambigüedades, divergencias y deudas técnicas detectadas durante 
 | L-PV-15 | medio | Parcial (stuck/drift fáciles) | No |
 | L-PV-16 | medio | Sí (métricas en `metrics.py`) | No |
 | L-PV-17 | medio | Sí (Flux task) | No |
+| L-PV-18 | **High** (telemetry_events bucket) | Sí (1 línea init + 2º mqtt_consumer) | Parcial (cobertura producción) |
+| L-PV-19 | medium (state_events measurement) | Sí (eliminar name_override) | No |
+| L-PV-20 | medium (streams cmd/ack/event) | Parcial (event para faults) | No |
+| L-PV-21 | **High** (captia_metadata vacío) | Sí (bootstrap script) | **Sí (rollups no funcionan)** |
+| L-PV-22 | medium (routing on-change) | Sí (extender tagpass) | No |
+| L-PV-23 | medium (OUTDOOR asset) | Sí (configuración) | No |
