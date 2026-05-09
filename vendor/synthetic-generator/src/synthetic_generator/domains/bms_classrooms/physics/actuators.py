@@ -73,13 +73,17 @@ def thermostat_setpoint(
     """
     sp_class = float(cfg_indoor.get("setpoint_class", 21.0))
     sp_ooh = float(cfg_indoor.get("setpoint_out_of_hours", 18.0))
-    jitter = rng.normal(0, 0.3, size=len(scene))
+    # H-23 / PATCH 002: jitter configurable. Default 0.3 mantiene comportamiento previo.
+    # Reducir a 0.05 vía domain.yaml limpia state_events (setpoint cambia con escena, no por sample).
+    jitter_std = float(cfg_indoor.get("setpoint_jitter_std", 0.3))
+    manual_jitter_std = float(cfg_indoor.get("setpoint_manual_jitter_std", 0.8))
+    jitter = rng.normal(0, jitter_std, size=len(scene))
 
     base = np.where(scene.values == "class", sp_class, sp_ooh)
     # Manual: user may set higher or lower
     base = np.where(
         scene.values == "manual",
-        base + rng.normal(0, 0.8, size=len(scene)),
+        base + rng.normal(0, manual_jitter_std, size=len(scene)),
         base
     )
 

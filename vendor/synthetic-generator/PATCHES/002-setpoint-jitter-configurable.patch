@@ -1,0 +1,83 @@
+# 002-setpoint-jitter-configurable.patch
+
+**Title**: Hacer configurable el jitter del setpoint del termostato (H-23).
+
+**Status**: Applied.
+
+**Applied on**: 2026-05-10.
+
+**Linked finding**: `docs/audit/PHYSICAL_REALISM_REPORT.md` H-23 (jitter setpoint).
+
+**Linked ADR**: `docs/specs/synthetic-bms/09-decision-log.md` ADR-016 (vendoring policy autoriza patches mínimos trazables).
+
+## Problema
+
+`vendor/.../physics/actuators.py:thermostat_setpoint` usaba un jitter
+hardcoded `rng.normal(0, 0.3, size=len(scene))` por sample. Con frecuencia
+de 5 segundos esto disparaba on-change continuamente: medidos **10 762
+eventos en 6 h sobre 24 aulas** en el bucket `state_events`, equivalente a
+**~75 cambios/h por aula** — un orden de magnitud por encima del comportamiento
+real de un termostato (cambia al cambiar escena u override manual, esto es
+~pocas veces por día).
+
+Esto contamina:
+- el bucket `state_events` (R-INF-04 cumple por suerte, pero el ratio
+  señal/ruido es pobre).
+- el dataset de entrenamiento ML para detección de averías HVAC.
+- el dashboard `bms_overview` con líneas oscilantes.
+
+## Cambio
+
+`thermostat_setpoint` ahora lee dos claves opcionales desde `cfg_indoor`:
+
+- `setpoint_jitter_std`: desviación estándar del jitter por sample en escena
+  no manual. **Default 0.3** (preserva comportamiento previo si no se
+  configura; máxima retrocompatibilidad).
+- `setpoint_manual_jitter_std`: desviación estándar adicional cuando
+  `scene == "manual"`. **Default 0.8** (preserva comportamiento previo).
+
+`config/domains/bms_classrooms/domain.yaml` setea `setpoint_jitter_std: 0.05`
+para producir el comportamiento físicamente realista. Cualquier consumidor
+externo del vendor que no proporcione esta clave conserva el jitter previo.
+
+## Diff
+
+```diff
+--- a/src/synthetic_generator/domains/bms_classrooms/physics/actuators.py
++++ b/src/synthetic_generator/domains/bms_classrooms/physics/actuators.py
+@@ -73,15 +73,18 @@ def thermostat_setpoint(
+     """
+     sp_class = float(cfg_indoor.get("setpoint_class", 21.0))
+     sp_ooh = float(cfg_indoor.get("setpoint_out_of_hours", 18.0))
+-    jitter = rng.normal(0, 0.3, size=len(scene))
++    # H-23 / PATCH 002: jitter configurable. Default 0.3 mantiene comportamiento previo.
++    jitter_std = float(cfg_indoor.get("setpoint_jitter_std", 0.3))
++    manual_jitter_std = float(cfg_indoor.get("setpoint_manual_jitter_std", 0.8))
++    jitter = rng.normal(0, jitter_std, size=len(scene))
+
+     base = np.where(scene.values == "class", sp_class, sp_ooh)
+     # Manual: user may set higher or lower
+     base = np.where(
+         scene.values == "manual",
+-        base + rng.normal(0, 0.8, size=len(scene)),
++        base + rng.normal(0, manual_jitter_std, size=len(scene)),
+         base
+     )
+```
+
+## Validación
+
+- `tests/integration/test_setpoint_jitter_audit.py` verifica:
+  1. Default `0.3` se preserva si la clave no está en `cfg_indoor`.
+  2. `setpoint_jitter_std=0.0` produce setpoint exacto (`sp_class` o `sp_ooh`).
+  3. Con `setpoint_jitter_std=0.05`, p99 de la diferencia entre samples
+     consecutivos en escena estable es ≤ 0.2 °C (vs 1.2 °C con default).
+- Test snapshot de `bms_calibration` sigue verde (los snapshots usan
+  `np.random.default_rng(42)` y semillas independientes; cambio de jitter
+  std no afecta a los hashes anclados en `tests/test_determinism.py`).
+
+## Reversibilidad
+
+Si el patch causa problemas en consumidores externos, basta con eliminar
+`setpoint_jitter_std` y `setpoint_manual_jitter_std` de `domain.yaml`. El
+código del vendor degrada al default 0.3 / 0.8 = comportamiento original.

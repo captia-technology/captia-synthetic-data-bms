@@ -102,6 +102,11 @@ physics:
     occupancy_heat_gain_c_per_person: 0.02   # ASHRAE 55 sensible
     setpoint_class: 21.0
     setpoint_out_of_hours: 18.0
+    # H-23 (PHYSICAL_REALISM_REPORT.md): default vendor 0.3 dispara 75 cambios/h por aula
+    # en state_events. 0.05 °C basta para microruido de termostato y reduce el flujo
+    # on-change a un orden de magnitud realista (~5 ev/h por aula).
+    setpoint_jitter_std: 0.05
+    setpoint_manual_jitter_std: 0.8
   co2:
     # Well-mixed CO2 dynamics. Defaults vendor.
     outdoor_ppm: 420                          # baseline outdoor
