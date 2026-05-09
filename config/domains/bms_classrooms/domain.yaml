@@ -98,7 +98,11 @@ physics:
   indoor:
     # Térmica primer orden (RC).
     initial_temp: 20.5
-    tau_minutes: 90        # tau de 90 min (EN ISO 13790 aula media)
+    tau_minutes: 90        # tau de 90 min (EN ISO 13790 aula media, heating)
+    # F-5 (PATCH 008): cooling es 30-50 % más rápido que heating en aulas
+    # (split/cassette con convección de aire frío vs radiador hidráulico).
+    # 60 min es ~33 % más rápido que 90 min — coherente con literatura HVAC.
+    tau_cool_minutes: 60
     occupancy_heat_gain_c_per_person: 0.02   # ASHRAE 55 sensible
     setpoint_class: 21.0
     setpoint_out_of_hours: 18.0
@@ -111,10 +115,17 @@ physics:
     # Compresores reales se dañan con cycles < 3 min; 5 min es práctica estándar HVAC.
     hvac_min_on_minutes: 5.0
     hvac_min_off_minutes: 5.0
+    # F-7 (PATCH 007): rate limiter actuador válvula. Real ~2-5 %/s = 120-300 %/min.
+    # Usamos 60 %/min como compromiso (1 %/s, válvulas térmicas lentas tipo TRV).
+    valve_max_rate_per_min: 60.0
   co2:
-    # Well-mixed CO2 dynamics. Defaults vendor.
+    # Well-mixed CO2 dynamics.
     outdoor_ppm: 420                          # baseline outdoor
-    gen_ppm_per_min_per_person: 7.5           # vendor default (literatura ASHRAE = 4.5)
+    # F-8 (PHYSICAL_REALISM_REPORT): vendor default era 7.5 ppm/p/min, 1.7×
+    # superior al estándar literatura. Alineamos con ASHRAE 62.1 / EN 16798:
+    # adultos sedentarios ≈ 4.5 ppm/p/min (rango 3-7). Override visible para
+    # post-L-01 (calibración real con datos IES Simarro).
+    gen_ppm_per_min_per_person: 4.5
     vent_k_per_min: 0.06                      # tau ventilación con HVAC ON ≈ 14 min
     leak_k_per_min: 0.01                      # tau leak natural ≈ 100 min
   humidity:

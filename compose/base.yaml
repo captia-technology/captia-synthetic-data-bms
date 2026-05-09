@@ -95,8 +95,11 @@ services:
       - INFLUXDB_BUCKET_STATE_EVENTS=${INFLUXDB_BUCKET_STATE_EVENTS:-state_events}
       - MQTT_HOST=${MQTT_HOST:-mosquitto}
       - MQTT_PORT=${MQTT_PORT:-1883}
+    # H-02 / AUDIT_REPORT.md: pgrep solo verifica proceso vivo; no detecta
+    # ingest stalls ni outputs caídos. Cambio a curl /metrics (telegraf 1.32
+    # lleva curl en imagen, [[outputs.prometheus_client]] expuesto en :9273).
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f telegraf || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9273/metrics | head -1 | grep -q '^# HELP' || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
