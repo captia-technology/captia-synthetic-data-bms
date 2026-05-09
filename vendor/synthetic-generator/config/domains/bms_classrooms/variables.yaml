@@ -1,0 +1,201 @@
+# BMS Classrooms — Variable Catalog
+# Source of truth for metric_kind (downsampling policy per signal type)
+#
+# metric_kind values:
+#   analog_gauge    → rollup: mean, min, max
+#   bool_presence   → rollup: duty, count_rise, last
+#   bool_state      → rollup: last, duty
+#   setpoint_step   → event bucket: changes_only
+#   counter         → rollup: sum (via difference(nonNegative:true))
+#   skip            → no rollup (string/context)
+#
+# storage_mode (controls Telegraf dedup + output routing):
+#   continuous (default)  → write every sample to `telemetry` bucket
+#   on_change             → Telegraf dedup, write only value changes to `state_events` bucket
+#   Derived automatically from metric_kind when omitted:
+#     setpoint_step → on_change
+#     bool_state    → on_change
+#     everything else → continuous
+#
+# counter_wire (only for counter):
+#   cumulative_monotonic  → value grows monotonically, need difference() first
+#   delta_already         → value already represents delta per sample
+
+asset_types:
+  classroom:
+    variables:
+      # ── Sensors: Environmental ──────────────────────────────────
+      - name: temperature
+        data_type: float
+        unit: "°C"
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: ENVIRONMENTAL
+        range: [10.0, 35.0]
+
+      - name: humidity
+        data_type: float
+        unit: "%RH"
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: ENVIRONMENTAL
+        range: [10.0, 90.0]
+
+      - name: co2
+        data_type: float
+        unit: ppm
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: ENVIRONMENTAL
+        range: [400.0, 2200.0]
+
+      - name: iaq_index
+        data_type: float
+        unit: index
+        point_type: calculated
+        metric_kind: analog_gauge
+        category: ENVIRONMENTAL
+        range: [0.0, 500.0]
+
+      - name: noise
+        data_type: float
+        unit: "dB(A)"
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: ENVIRONMENTAL
+        range: [25.0, 90.0]
+
+      - name: illuminance
+        data_type: float
+        unit: lux
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: ENVIRONMENTAL
+        range: [0.0, 2500.0]
+
+      # ── Sensors: Occupancy ──────────────────────────────────────
+      - name: occupancy
+        data_type: integer
+        unit: persons
+        point_type: sensor
+        metric_kind: analog_gauge        # person count → mean/min/max
+        category: OCCUPANCY
+        range: [0.0, 100.0]
+
+      - name: presence_pir
+        data_type: boolean
+        unit: bool
+        point_type: sensor
+        metric_kind: bool_presence       # duty + count_rise (transitions)
+        category: OCCUPANCY
+
+      # ── Sensors: External ───────────────────────────────────────
+      - name: outdoor_temp
+        data_type: float
+        unit: "°C"
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: EXTERNAL
+        range: [-10.0, 45.0]
+
+      - name: daylight_lux
+        data_type: float
+        unit: lux
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: EXTERNAL
+        range: [0.0, 1000.0]
+
+      # ── Actuators: HVAC ─────────────────────────────────────────
+      - name: thermostat_setpoint
+        data_type: float
+        unit: "°C"
+        point_type: setpoint
+        metric_kind: setpoint_step       # only store changes
+        storage_mode: on_change
+        category: HVAC
+        range: [14.0, 30.0]
+
+      - name: hvac_mode
+        data_type: enum
+        unit: enum
+        point_type: actuator
+        metric_kind: setpoint_step       # only store changes
+        storage_mode: on_change
+        category: HVAC
+        enum_values: [off, heat, cool, auto]
+
+      - name: hvac_enable
+        data_type: boolean
+        unit: bool
+        point_type: actuator
+        metric_kind: bool_state          # last + duty
+        storage_mode: on_change
+        category: HVAC
+
+      - name: heating_valve_pos
+        data_type: float
+        unit: "%"
+        point_type: actuator
+        metric_kind: analog_gauge        # 0-100% continuous
+        category: HVAC
+        range: [0.0, 100.0]
+
+      # ── Actuators: Control ──────────────────────────────────────
+      - name: scene_mode                  # renamed from "scene" for on_change suffix convention
+        data_type: enum
+        unit: enum
+        point_type: actuator
+        metric_kind: setpoint_step       # only store changes
+        storage_mode: on_change
+        category: CONTROL
+        enum_values: [out_of_hours, class, manual]
+
+      - name: relay_1
+        data_type: boolean
+        unit: bool
+        point_type: actuator
+        metric_kind: bool_state
+        storage_mode: on_change
+        category: CONTROL
+
+      - name: relay_2
+        data_type: boolean
+        unit: bool
+        point_type: actuator
+        metric_kind: bool_state
+        storage_mode: on_change
+        category: CONTROL
+
+      - name: relay_3
+        data_type: boolean
+        unit: bool
+        point_type: actuator
+        metric_kind: bool_state
+        storage_mode: on_change
+        category: CONTROL
+
+      - name: relay_4
+        data_type: boolean
+        unit: bool
+        point_type: actuator
+        metric_kind: bool_state
+        storage_mode: on_change
+        category: CONTROL
+
+      # ── Sensors: Energy ─────────────────────────────────────────
+      - name: power
+        data_type: float
+        unit: W
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: ENERGY
+        range: [0.0, 6000.0]
+
+      - name: energy
+        data_type: float
+        unit: kWh
+        point_type: sensor
+        metric_kind: counter
+        counter_wire: cumulative_monotonic
+        category: ENERGY

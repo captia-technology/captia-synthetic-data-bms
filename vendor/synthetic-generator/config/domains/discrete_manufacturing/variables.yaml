@@ -1,0 +1,191 @@
+# Discrete Manufacturing — Variable Catalog
+# Source of truth for metric_kind (downsampling policy per signal type)
+#
+# storage_mode (controls Telegraf dedup + output routing):
+#   continuous (default)  → write every sample to `telemetry` bucket
+#   on_change             → Telegraf dedup, write only value changes to `state_events` bucket
+
+asset_types:
+  machine:
+    variables:
+      # ── WISE 6DI: Digital Inputs (all boolean) ──────────────────
+      - name: machine_state
+        data_type: boolean
+        point_type: sensor
+        metric_kind: bool_state          # DI1: RUN/STOP → last + duty
+        storage_mode: on_change
+        category: DI
+
+      - name: fault_active
+        data_type: boolean
+        point_type: sensor
+        metric_kind: bool_state          # DI2: alarm → last + duty
+        storage_mode: on_change
+        category: DI
+
+      - name: estop_active
+        data_type: boolean
+        point_type: sensor
+        metric_kind: bool_state          # DI3: e-stop → last + duty
+        storage_mode: on_change
+        category: DI
+
+      - name: cycle_in_progress
+        data_type: boolean
+        point_type: sensor
+        metric_kind: bool_state          # DI4: cycle active → last + duty
+        storage_mode: on_change
+        category: DI
+
+      - name: material_present
+        data_type: boolean
+        point_type: sensor
+        metric_kind: bool_presence       # DI5: piece present → duty + count_rise
+        category: DI
+
+      - name: operator_present
+        data_type: boolean
+        point_type: sensor
+        metric_kind: bool_presence       # DI6: operator → duty + count_rise
+        category: DI
+
+      - name: setup_active
+        data_type: boolean
+        point_type: sensor
+        metric_kind: bool_state          # setup/changeover → last + duty
+        storage_mode: on_change
+        category: DI
+
+      # ── Production Counters (monotonic) ─────────────────────────
+      - name: cycle_count_total
+        data_type: integer
+        unit: cycles
+        point_type: sensor
+        metric_kind: counter
+        counter_wire: cumulative_monotonic
+        category: PRODUCTION
+
+      - name: good_count_total
+        data_type: integer
+        unit: pcs
+        point_type: sensor
+        metric_kind: counter
+        counter_wire: cumulative_monotonic
+        category: PRODUCTION
+
+      - name: scrap_count_total
+        data_type: integer
+        unit: pcs
+        point_type: sensor
+        metric_kind: counter
+        counter_wire: cumulative_monotonic
+        category: PRODUCTION
+
+      - name: rework_count_total
+        data_type: integer
+        unit: pcs
+        point_type: sensor
+        metric_kind: counter
+        counter_wire: cumulative_monotonic
+        category: PRODUCTION
+
+      # ── Production Analog ───────────────────────────────────────
+      - name: last_cycle_time_s
+        data_type: float
+        unit: s
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: PRODUCTION
+        range: [0.0, 600.0]
+
+      - name: ideal_cycle_time_sp         # renamed from "ideal_cycle_time_s" for on_change suffix convention
+        data_type: float
+        unit: s
+        point_type: setpoint
+        metric_kind: setpoint_step       # changes when product changes
+        storage_mode: on_change
+        category: PRODUCTION
+        range: [0.0, 600.0]
+
+      # ── Energy ──────────────────────────────────────────────────
+      - name: power_kw
+        data_type: float
+        unit: kW
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: ENERGY
+        range: [0.0, 100.0]
+
+      - name: energy_kwh_total
+        data_type: float
+        unit: kWh
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: ENERGY
+
+      - name: voltage_v
+        data_type: float
+        unit: V
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: ENERGY
+        range: [0.0, 500.0]
+
+      - name: power_factor
+        data_type: float
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: ENERGY
+        range: [0.0, 1.0]
+
+      # ── Condition Monitoring ────────────────────────────────────
+      - name: motor_temp_c
+        data_type: float
+        unit: "°C"
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: CONDITION
+        range: [0.0, 200.0]
+
+      - name: vibration_rms_mm_s
+        data_type: float
+        unit: mm/s
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: CONDITION
+        range: [0.0, 30.0]
+
+      - name: load_factor
+        data_type: float
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: CONDITION
+        range: [0.0, 1.0]
+
+      - name: air_pressure_bar
+        data_type: float
+        unit: bar
+        point_type: sensor
+        metric_kind: analog_gauge
+        category: CONDITION
+        range: [0.0, 12.0]
+        optional: true                   # solo si has_pneumatics=true
+
+      # ── Context (string — no rollup) ────────────────────────────
+      - name: product_code
+        data_type: string
+        point_type: sensor
+        metric_kind: skip
+        category: CONTEXT
+
+      - name: order_id
+        data_type: string
+        point_type: sensor
+        metric_kind: skip
+        category: CONTEXT
+
+      - name: data_quality
+        data_type: string
+        point_type: sensor
+        metric_kind: skip
+        category: QUALITY

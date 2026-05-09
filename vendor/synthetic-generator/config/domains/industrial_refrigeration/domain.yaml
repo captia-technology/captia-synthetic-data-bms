@@ -1,0 +1,62 @@
+# Industrial Refrigeration Domain Configuration
+# Ref: docs/specs/domain-adapters.md Section 3
+
+domain:
+  id: "industrial_refrigeration"
+  name: "Frigorificos Sebastia - Grasso plant"
+  version: "1.0.0"
+
+meteo_source: "synthetic"
+
+inventory:
+  assets:
+    - asset_type: cold_room
+      asset_ids:
+        - CAMARA1
+        - CAMARA2
+        - CAMARA3
+        - CAMARA4
+        - CAMARA5
+        - CAMARA6
+        - CAMARA7
+        - CAMARA8
+        - CAMARA9
+        - CAMARA10
+
+physics:
+  global:
+    latitude: 38.99
+    longitude: -0.53
+    mean_annual_temp: 17.0
+    amplitude: 9.5
+
+  cameras:
+    thermal_mass_kwh_per_k: 50.0
+    u_value_kw_per_k: 0.15
+    door_opening_per_hour: 2
+    door_loss_kw: 5.0
+    defrost_interval_hours: 8
+    defrost_duration_minutes: 30
+
+  compressor_rack:
+    n_compressors: 6
+    nominal_power_kw: 30.0
+    cop_base: 2.5
+
+  condenser:
+    nominal_capacity_kw: 200.0
+    vfd_min_hz: 15.0
+    vfd_max_hz: 50.0
+
+  separators:
+    high_side:
+      nominal_pressure: 12.0
+    low_side:
+      nominal_pressure: 2.5
+
+  separator_pumps:
+    n_pumps: 2
+    power_per_pump_kw: 7.5
+
+  energy:
+    power_factor_base: 0.85

@@ -1,0 +1,86 @@
+# =============================================================================
+# Manufacturing E2E — FARAONE Ibérica Discrete Manufacturing
+# Source: captia.ai/backend/config/projects/faraone_iberica.yaml
+# Purpose: End-to-end validation of Generator -> MQTT -> Telegraf -> InfluxDB
+#          -> Dashboard Adapter (Redis cache) -> Observability
+# Usage: GENERATOR_CONFIG=/app/config/projects/manufacturing_e2e.yaml
+#
+# Machines (8): M01-M08 (real Faraone plant layout)
+#   M01: Corte manual (CUTTING_MANUAL)
+#   M02: CNC fresadora (CNC_MILL) — has_coolant
+#   M03: Embutidora (PRESS_EMBUTIDORA) — has_pneumatics
+#   M04: Soldadura FANUC (WELDING_ROBOT) — 11 pcs/cycle
+#   M05: Curvadora (BENDER) — has_pneumatics
+#   M06: Wrapper (WRAPPER_PACKAGING) — has_pneumatics
+#   M07: Cortadora láser (LASER_CUTTER) — has_coolant
+#   M08: Corte automático (CUTTING_AUTO)
+#
+# Signals per machine (24-25):
+#   DI (7): machine_state, fault_active, estop_active, cycle_in_progress,
+#           material_present, operator_present, setup_active
+#   PRODUCTION (6): cycle_count_total, good_count_total, scrap_count_total,
+#                   rework_count_total, last_cycle_time_s, ideal_cycle_time_s
+#   ENERGY (4): power_kw, energy_kwh_total, voltage_v, power_factor
+#   CONDITION (3-4): motor_temp_c, vibration_rms_mm_s, load_factor,
+#                    air_pressure_bar (only if has_pneumatics)
+#   CONTEXT (2): product_code, order_id
+#   QUALITY (1): data_quality
+# =============================================================================
+
+project:
+  namespace: "captia"
+  site_id: "PLANT_001"
+  modo: "synthetic"
+  schema_version: "v0.1"
+
+simulation:
+  timezone: "Europe/Madrid"
+  seed: 42
+  start: "2026-02-06T12:00:00"
+  end: "2026-02-06T19:00:00"   # Short backfill, then live mode kicks in
+  freq: "5s"
+  n_machines: 8                 # Full Faraone plant: M01-M08
+
+domain:
+  id: "discrete_manufacturing"
+  config_path: "/app/config/domains/discrete_manufacturing/domain.yaml"
+
+phases:
+  backfill:
+    enabled: true               # Generate 7d historical data
+  live:
+    enabled: true               # Also generate real-time data
+    rate_points_per_sec: 10.0
+    lookahead_hours: 1
+    regenerate_on_exhaustion: true
+
+perturbations:
+  jitter_ms: 50.0               # Slight timestamp jitter (realistic WISE latency)
+  duplicate_probability: 0.0
+  out_of_order_probability: 0.001
+  gap_probability: 0.0
+  gap_duration_points: [1, 3]
+
+anomalies:
+  p_missing: 0.001              # 0.1% missing values
+  p_outlier: 0.002              # 0.2% outliers
+  burst_missing_prob_per_day: 0.0
+  burst_duration_range: [2, 10]
+
+sinks:
+  - type: mqtt
+    config:
+      broker_url: "tcp://mosquitto:1883"    # Override via MQTT_BROKER env
+      captia_env: "dev"                     # Override via CAPTIA_ENV env
+      # captia_tenant and captia_site come from DataPoint.domain_id / site_id
+      # (set by the discrete_manufacturing domain adapter), NOT from this config.
+      qos: 0
+      payload_format: "json"
+  - type: stdout
+    config:
+      enabled: false                        # Set to true for debug
+
+output:
+  format: "long"
+  include_quality: true
+  include_mqtt: true

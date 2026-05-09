@@ -1,0 +1,37 @@
+# =============================================================================
+# BMS Classrooms — Baseline Scenario
+# Ref: docs/specs/config-schema.md Section 4.1
+# =============================================================================
+
+project:
+  namespace: "captia"
+  site_id: "ies_simarro"
+  modo: "synthetic"
+  schema_version: "v0.1"
+
+simulation:
+  timezone: "Europe/Madrid"
+  seed: 42
+  start: "2026-01-01"
+  end: "2026-01-07"
+  freq: "5min"
+
+domain:
+  id: "bms_classrooms"
+  config_path: "../config/domains/bms_classrooms/domain.yaml"
+
+phases:
+  backfill:
+    enabled: true
+  live:
+    enabled: false
+
+anomalies:
+  p_missing: 0.002
+  p_outlier: 0.0005
+
+sinks:
+  - type: file
+    config:
+      path: "outputs/bms_baseline.csv"
+      format: csv_long
