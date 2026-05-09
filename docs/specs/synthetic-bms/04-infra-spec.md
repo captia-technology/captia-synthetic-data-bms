@@ -2,7 +2,7 @@
 
 ## Context
 
-El stack Docker debe ser autocontenido (decisión usuario) y replicar las convenciones de `C:\CAPTIA\CAPTIA-CONNECT\captia-connect\compose\base.yaml`. Reutiliza configuraciones literales de Mosquitto, Telegraf y data-plane (Flux tasks).
+El stack Docker debe ser autocontenido (decisión usuario) y replicar las convenciones de `captia-connect/compose/base.yaml (upstream)`. Reutiliza configuraciones literales de Mosquitto, Telegraf y data-plane (Flux tasks).
 
 ## Compose layout
 
@@ -23,7 +23,7 @@ Merge vía `COMPOSE_FILE` env (Windows separador `;`, Linux `:`).
 - **Puertos**: `${MQTT_PORT_HOST:-1884}:1883`, `${MQTT_WS_PORT_HOST:-9002}:9001`.
 - **Volúmenes**: `mosquitto_data`, `mosquitto_log`, config bind `./infra/mosquitto/mosquitto.conf:ro`.
 - **Healthcheck**: `mosquitto_sub -h localhost -t '$$SYS/broker/uptime' -C 1 -W 5`.
-- **Config**: copia literal de `C:\CAPTIA\CAPTIA-CONNECT\captia-connect\modules\ingest\mosquitto\mosquitto.conf`.
+- **Config**: copia literal de `captia-connect/modules/ingest/mosquitto/mosquitto.conf` (upstream).
 
 ### InfluxDB 2.7
 
@@ -45,7 +45,7 @@ Merge vía `COMPOSE_FILE` env (Windows separador `;`, Linux `:`).
 - **Volumen config**: `./infra/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro`, `telegraf_state` para statefile dedup.
 - **Healthcheck**: `pgrep -f telegraf`.
 - **`depends_on`**: mosquitto + influxdb (`condition: service_healthy`).
-- **Config**: copia literal de `C:\CAPTIA\CAPTIA-CONNECT\captia-connect\modules\ingest\telegraf\telegraf.conf` con regex tags y schema canónico exactos.
+- **Config**: copia literal de `captia-connect/modules/ingest/telegraf/telegraf.conf` (upstream) con regex tags y schema canónico exactos.
 
 ### Grafana 11.4
 

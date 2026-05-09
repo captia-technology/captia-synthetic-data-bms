@@ -1,6 +1,6 @@
 # 00 — Informe de investigación (read-only, congelado)
 
-> **Fecha**: 2026-05-09. Fuentes: documentos en `docs/`, módulo `C:\CAPTIA\CAPTIA-CONNECT\captia-connect\tools\synthetic-generator`, infraestructura `C:\CAPTIA\CAPTIA-CONNECT\captia-connect\compose\*` y `modules\*`.
+> **Fecha**: 2026-05-09. Fuentes: documentos en `docs/`, módulo `captia-connect/tools/synthetic-generator` (upstream interno), infraestructura `captia-connect/compose/*` y `captia-connect/modules/*`.
 > Este documento congela el estado de la investigación realizada durante la fase de planificación. No se modifica salvo errores fácticos.
 
 ## 1. Mapa de documentos `docs/`
@@ -54,7 +54,7 @@ Es el dispositivo IoT que recopila telemetría de aulas educativas (edificios in
 | RNF-08 | Escalabilidad | Soportar mínimo 5-10 edificios educativos | `docs/CENTINELA_Guia_Alumnos_v4.md:436` |
 | RNF-09 | Completitud | Registros esperados vs reales verificados | `docs/CENTINELA_Guia_Alumnos_v4.md:536` |
 | RNF-10 | Consistencia | 5 tags presentes y consistentes en todos los datos | `docs/CENTINELA_Guia_Alumnos_v4.md:548` |
-| RNF-11 | Operabilidad | Healthchecks, tags fijos Docker, `${VAR:-default}` | Patrón `C:\CAPTIA\CAPTIA-CONNECT\captia-connect\compose\base.yaml` |
+| RNF-11 | Operabilidad | Healthchecks, tags fijos Docker, `${VAR:-default}` | Patrón `captia-connect/compose/base.yaml` (upstream) |
 | RNF-12 | Calidad | Sin secretos hardcodeados, ruff/pytest CI-ready | `pyproject.toml` raíz CAPTIA-CONNECT |
 
 ## 5. Decisiones técnicas declaradas en docs
@@ -104,7 +104,7 @@ Es el dispositivo IoT que recopila telemetría de aulas educativas (edificios in
 ### 7.1 Identidad
 
 - Paquete: `synthetic-generator` v0.1.0.
-- Ruta: `C:\CAPTIA\CAPTIA-CONNECT\captia-connect\tools\synthetic-generator`.
+- Ruta upstream: `captia-connect/tools/synthetic-generator` (interno).
 - Comandos CLI: `run`, `generate`, `stream`, `list-domains`, `validate`.
 
 ### 7.2 Stack

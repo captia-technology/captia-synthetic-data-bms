@@ -4,12 +4,17 @@
 # =============================================================================
 set -euo pipefail
 
-UPSTREAM="${CAPTIA_CONNECT_PATH:-C:/CAPTIA/CAPTIA-CONNECT/captia-connect}"
+UPSTREAM="${CAPTIA_CONNECT_PATH:-}"
 SRC="${UPSTREAM}/tools/synthetic-generator"
 DST="vendor/synthetic-generator"
 
+if [ -z "${UPSTREAM}" ]; then
+    echo "ERROR: set CAPTIA_CONNECT_PATH to a checkout of the upstream repo"
+    echo "       export CAPTIA_CONNECT_PATH=/path/to/captia-connect"
+    exit 1
+fi
 if [ ! -d "${SRC}" ]; then
-    echo "ERROR: source no encontrado: ${SRC}"
+    echo "ERROR: source not found: ${SRC}"
     exit 1
 fi
 

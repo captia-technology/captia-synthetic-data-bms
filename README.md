@@ -135,4 +135,4 @@ Proprietary — CAPTIA Technology.
 ## Soporte
 
 - Issues: en este repo.
-- Contacto: tech@captiatechnology.com.
+- Contacto: jaime.sendra@captiatechnology.com.

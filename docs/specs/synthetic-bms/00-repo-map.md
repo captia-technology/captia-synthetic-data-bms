@@ -1,6 +1,6 @@
 # 00 — Mapa de repositorios
 
-## 1. Mapa target — `C:\CAPTIA\CAPTIA-SYNTHETIC-DATA-BMS\`
+## 1. Mapa target — `captia-synthetic-data-bms/` (raíz del repo)
 
 ```
 .
@@ -137,7 +137,7 @@
     └── test_iaq_caseD.py
 ```
 
-## 2. Mapa repo de referencia — `C:\CAPTIA\CAPTIA-CONNECT\captia-connect\`
+## 2. Mapa repo de referencia — `captia-connect/` (upstream interno, vendorizado)
 
 ```
 captia-connect/

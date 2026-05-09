@@ -3,7 +3,7 @@ name = "bms-calibration"
 version = "0.1.0"
 description = "BMS-specific calibration overrides and HVAC fault injection for synthetic data"
 requires-python = ">=3.12"
-authors = [{ name = "CAPTIA Technology", email = "tech@captiatechnology.com" }]
+authors = [{ name = "Jaime Sendra (CAPTIA Technology)", email = "jaime.sendra@captiatechnology.com" }]
 readme = "README.md"
 license = { text = "Proprietary" }
 

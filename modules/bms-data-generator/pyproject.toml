@@ -3,7 +3,7 @@ name = "bms-data-generator"
 version = "0.1.0"
 description = "FastAPI control plane for BMS synthetic data generator"
 requires-python = ">=3.12"
-authors = [{ name = "CAPTIA Technology", email = "tech@captiatechnology.com" }]
+authors = [{ name = "Jaime Sendra (CAPTIA Technology)", email = "jaime.sendra@captiatechnology.com" }]
 readme = "README.md"
 license = { text = "Proprietary" }
 
