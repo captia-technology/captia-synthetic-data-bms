@@ -30,14 +30,13 @@
 - **CI gate**: H-05 coverage 80 % `fail_under` (baseline 89.15 %).
 - **Operacional**: `make stream` (gap #27) mantiene el generator vivo con
   auto-restart + monitoreo `phase` cada 30 s.
-- **Hallazgos cerrados durante la auditoría + follow-up + Could**: **25**
+- **Hallazgos cerrados durante la auditoría + follow-up + Could**: **26**
   (gap #5, #7, #9, #27; H-02, H-03, H-04, H-05, H-06, H-08, H-09, H-10,
-  H-12, H-14, H-19, H-21, H-22, H-23; F-1, F-2, F-3, F-4, F-5, F-6, F-7,
-  F-8, F-9; L-PV-02, L-PV-03, L-PV-07, L-PV-09).
-- **Hallazgos abiertos**: **4** (1 alta · 0 media · 3 baja).
+  H-12, H-13, H-14, H-19, H-21, H-22, H-23; F-1, F-2, F-3, F-4, F-5, F-6,
+  F-7, F-8, F-9; L-PV-02, L-PV-03, L-PV-07, L-PV-09).
+- **Hallazgos abiertos**: **3** (1 alta · 0 media · 2 baja).
   - **H-01** (alta) event payload `ts_ns` vs ISO `ts` — requiere decisión spec con upstream.
   - **H-11** (baja) Dependabot abierto — acción manual sin código.
-  - **H-13** (baja) Telegraf controller heartbeat — documentar o añadir output.
   - **F-10** (baja) Ocupación rampa lineal 5 min — PATCH futuro.
 
 ## Patches físicos aplicados en esta auditoría
@@ -85,7 +84,7 @@ Tests de regresión: **15 tests nuevos**, todos verdes.
 | H-09 | `init_env.sh` no documentado | `docs/operations/init-env.md` (flujo, secretos, troubleshooting, CI) | S | ✅ cerrada |
 | H-10 | `bms_signal_alias` con 1 test | 15/15 tests (la base ya tenía 11; +4 edge cases nuevos) | S | ✅ cerrada |
 | H-11 | Dependabot abierto | Revisar PRs pendientes (acción manual sin código) | S | ⚪ pendiente (manual) |
-| H-13 | Telegraf controller heartbeat omitido | Añadir output o documentar | S | ⚪ pendiente |
+| H-13 | Telegraf controller heartbeat omitido | ADR-018 documentando decisión consciente (no Controller en BMS standalone) | S | ✅ cerrada |
 | H-14 | `tagexclude` no aplicado en `captia_cmd_event` | `omit_hostname=true` + `processors.tag_limit` | S | ✅ cerrada |
 | H-19 | Healthchecks no estandarizados | `docs/operations/healthchecks.md` con convención + tabla 9 servicios | S | ✅ cerrada |
 | H-20 | Contratos sin doc unificado | **Cubierto por este sitio** (`docs/architecture/`, `docs/specs/`) | ✅ done |

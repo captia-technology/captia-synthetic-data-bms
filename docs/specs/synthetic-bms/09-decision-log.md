@@ -163,6 +163,34 @@
   2026-05-10.
 - **Estado**: Aceptada.
 
+## ADR-018 — Sin `outputs.heartbeat` Telegraf en BMS standalone
+
+- **Contexto**: el upstream CAPTIA-CONNECT añade un output
+  `[[outputs.heartbeat]]` en su `telegraf.conf` que reporta cada N segundos
+  el estado del agente a un Telegraf Controller central. La auditoría
+  (`docs/audit/CONSISTENCY_MATRIX.md` fila "Variables de entorno") detectó
+  que BMS no replica ese output (ver `infra/telegraf/telegraf.conf:6`).
+- **Decisión**: BMS standalone **no** incluye `outputs.heartbeat`. Por dos
+  razones:
+  1. **No hay Telegraf Controller** en el stack BMS — se diseñó como demo
+     autónoma (ADR-002). El heartbeat sin destinatario es ruido sin valor.
+  2. **El healthcheck del contenedor** (`compose/base.yaml:98-102`,
+     `curl /metrics | grep '^# HELP'` desde H-02) ya cubre la observabilidad
+     de Telegraf vivo + sirviendo métricas en Prometheus :9273.
+- **Alternativas**:
+  - Replicar `outputs.heartbeat` apuntando a un Controller dummy
+    (descartada — adds dead config, sin valor en demo).
+  - Apuntar el heartbeat a un Controller externo (CAPTIA-CONNECT) en modo
+    integración (post-v1, requiere ADR específico para flujo cross-stack).
+- **Consecuencias**:
+  - Si BMS se integra en una instalación con CAPTIA-CONNECT real, hay que
+    añadir el output explícitamente (referencia: `modules/ingest/telegraf/telegraf.conf`
+    en captia-connect repo).
+  - El contenedor `captia-bms-telegraf` se considera healthy si responde
+    `/metrics` (cobertura local), no si el Controller central lo ve.
+- **Estado**: Aceptada (decisión consciente para demo standalone).
+- **Cierra**: H-13 (`docs/audit/AUDIT_REPORT.md`).
+
 ## ADR-017 — `telemetry_events` bucket mantenido pese a deprecated upstream
 
 - **Contexto**: la matriz de consistencia (`docs/audit/CONSISTENCY_MATRIX.md`
