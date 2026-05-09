@@ -11,7 +11,18 @@ from bms_data_generator.config import get_settings
 from bms_data_generator.services.dump_service import DumpService
 
 _router = APIRouter(prefix="/v1/datasets", tags=["datasets"])
-_service = DumpService(output_dir=get_settings().output_dir)
+
+# Lazy singleton: evita ejecutar mkdir(output_dir) en import time. Crítico
+# en tests: defaults Linux (/app/output) fallan en Windows con PermissionError
+# antes incluso de poder ejecutar conftest fixtures.
+_service: DumpService | None = None
+
+
+def _ensure_service() -> DumpService:
+    global _service
+    if _service is None:
+        _service = DumpService(output_dir=get_settings().output_dir)
+    return _service
 
 
 def _verify_token(authorization: Annotated[str | None, Header()] = None) -> None:
@@ -37,7 +48,7 @@ class ExportRequest(BaseModel):
 )
 async def export(req: ExportRequest) -> dict:
     try:
-        job_id, output_path = _service.export(
+        job_id, output_path = _ensure_service().export(
             months=req.months,
             format=req.format,
             include_faults=req.include_faults,
@@ -54,7 +65,7 @@ async def export(req: ExportRequest) -> dict:
 @_router.get("/jobs/{job_id}", dependencies=[Depends(_verify_token)])
 async def get_job(job_id: str) -> dict:
     try:
-        return _service.get(job_id)
+        return _ensure_service().get(job_id)
     except KeyError as exc:
         raise HTTPException(
             status_code=404,
@@ -67,4 +78,10 @@ def get_router() -> APIRouter:
 
 
 def get_service() -> DumpService:
-    return _service
+    return _ensure_service()
+
+
+def reset_service_cache() -> None:
+    """Test helper: dispara re-creación del servicio en próximo get_service()."""
+    global _service
+    _service = None

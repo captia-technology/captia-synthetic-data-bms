@@ -103,7 +103,7 @@ def test_dashboard_caseB_uses_production_naming() -> None:
     # Debe estar power_01 (sufijo _NN canónico).
     assert "power_01" in refs, f"caseB no usa power_01: {refs}"
     # NO debe estar el nombre vendor crudo "power"
-    assert "power" not in refs, f"caseB referencia vendor name 'power' en lugar de 'power_01'"
+    assert "power" not in refs, "caseB referencia vendor name 'power' en lugar de 'power_01'"
 
 
 @pytest.mark.integration

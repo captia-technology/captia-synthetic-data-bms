@@ -48,9 +48,17 @@ class DumpService:
         self._lock = threading.Lock()
         self._jobs: dict[str, _DumpJob] = {}
         self._output_dir = Path(output_dir)
-        self._output_dir.mkdir(parents=True, exist_ok=True)
+        # Defer mkdir to first export() — evita ejecutar mkdir(/app/output)
+        # al instanciar el servicio en import time, lo que falla en Windows
+        # (default Linux/Docker /app/output → C:\Program Files\Git\app\output).
+        self._output_dir_created = False
         self._runner_factory = runner_factory or self._default_runner_factory
         self._run_threads = True
+
+    def _ensure_output_dir(self) -> None:
+        if not self._output_dir_created:
+            self._output_dir.mkdir(parents=True, exist_ok=True)
+            self._output_dir_created = True
 
     def set_runner_factory(self, factory: DumpRunnerFactory) -> None:
         self._runner_factory = factory
@@ -69,6 +77,9 @@ class DumpService:
             raise ValueError(f"Unsupported format: {format}")
         if not (1 <= months <= 24):
             raise ValueError(f"months out of range: {months}")
+
+        # Crear output_dir solo cuando realmente se va a exportar (no en init).
+        self._ensure_output_dir()
 
         with self._lock:
             job_id = uuid.uuid4().hex[:12]

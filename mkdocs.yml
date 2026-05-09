@@ -1,0 +1,121 @@
+site_name: CAPTIA Synthetic Data BMS
+site_description: Generador de datos sintéticos para Building Management Systems (CAPTIA)
+site_url: https://captiatechnology.github.io/CAPTIA-SYNTHETIC-DATA-BMS/
+repo_url: https://github.com/captiatechnology/CAPTIA-SYNTHETIC-DATA-BMS
+repo_name: captiatechnology/CAPTIA-SYNTHETIC-DATA-BMS
+edit_uri: edit/main/docs/
+copyright: "Copyright &copy; 2026 CAPTIA Technology — Apache 2.0"
+
+theme:
+  name: material
+  language: es
+  font:
+    text: Inter
+    code: JetBrains Mono
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Cambiar a modo oscuro
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Cambiar a modo claro
+  features:
+    - navigation.instant
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - toc.follow
+
+extra_css:
+  - assets/stylesheets/extra.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+plugins:
+  - search:
+      lang:
+        - es
+        - en
+
+nav:
+  - Inicio: index.md
+  - Empezar:
+    - Introducción: getting-started/index.md
+    - Quickstart: QUICKSTART.md
+    - Troubleshooting: TROUBLESHOOTING.md
+  - Arquitectura:
+    - Visión general: architecture/index.md
+  - Modelo físico:
+    - Resumen: physical-model/index.md
+    - Realismo (auditoría): audit/PHYSICAL_REALISM_REPORT.md
+  - Especificaciones:
+    - Inicio: specs/index.md
+    - SDD synthetic-bms: specs/synthetic-bms/STATUS.md
+    - Physics validation: specs/digital-twin-bms-physics-validation/STATUS.md
+  - Auditoría:
+    - Índice: audit/index.md
+    - Estado: audit/STATUS.md
+    - Mapa repo: audit/00-repo-map.md
+    - Consistencia BMS↔CAPTIA-connect: audit/CONSISTENCY_MATRIX.md
+    - Plan docs (este): audit/DOCS_RESTRUCTURE_PLAN.md
+    - Reporte top 20: audit/AUDIT_REPORT.md
+    - Validación E2E: audit/E2E_VALIDATION_REPORT.md
+    - Realismo físico: audit/PHYSICAL_REALISM_REPORT.md
+    - Plan de acción: audit/ACTION_PLAN.md
+  - Decisiones:
+    - Índice ADR: decisions/index.md
+  - Archivo:
+    - Índice: archive/index.md
+    - CENTINELA Guía Alumnos v4: archive/CENTINELA_Guia_Alumnos_v4.md
+    - Casos de uso (informe): archive/CAPTIA_Informe_CasosDeUso_DatosSinteticos.md
+    - Arquitectura Medallion: archive/MEDALLION_Arquitectura_Guia_Referencia.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/captiatechnology/CAPTIA-SYNTHETIC-DATA-BMS
+  generator: false
+
+# strict deshabilitado por ahora: hay enlaces relativos a code paths
+# (vendor/, modules/, etc.) que mkdocs trata como archivos rotos.
+# El workflow de GitHub Pages compila sin --strict para esa razón.
+strict: false

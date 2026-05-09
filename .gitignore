@@ -41,3 +41,4 @@ vendor/synthetic-generator/.venv/
 vendor/synthetic-generator/.pytest_cache/
 vendor/synthetic-generator/.ruff_cache/
 vendor/synthetic-generator/__pycache__/
+site/

@@ -57,8 +57,24 @@ async def client() -> AsyncIterator[AsyncClient]:
 
 
 @pytest.fixture(autouse=True)
-def reset_services():
-    """Reset singletons and inject lightweight factories before every test."""
+def reset_services(tmp_path_factory: pytest.TempPathFactory):
+    """Reset singletons and inject lightweight factories before every test.
+
+    También fuerza ``BMS_OUTPUT_DIR`` a un tmp dir único antes de instanciar
+    el DumpService — evita que el default Linux ``/app/output`` se use en
+    Windows (mkdir falla con PermissionError en C:\\Program Files\\Git\\app).
+    """
+    import os
+
+    from bms_data_generator.api.datasets import reset_service_cache as reset_dump_cache
+    from bms_data_generator.config import reset_settings_cache
+
+    # Override output dir to safe tmp path BEFORE any service instantiation.
+    tmp_output = tmp_path_factory.mktemp("bms_output")
+    os.environ["BMS_OUTPUT_DIR"] = str(tmp_output)
+    reset_settings_cache()
+    reset_dump_cache()  # discard previously cached DumpService (with stale output_dir)
+
     runner = get_control_service()
     dumper = get_dump_service()
 
