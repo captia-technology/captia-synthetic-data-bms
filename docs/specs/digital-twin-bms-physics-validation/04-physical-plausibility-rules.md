@@ -1,5 +1,11 @@
 # 04 — Reglas de plausibilidad física (Fase 4)
 
+> **Trazabilidad spec ↔ test (H-12 cerrada):** la matriz completa de qué
+> test cubre cada regla `R-*` está en
+> [`docs/audit/SPEC_TEST_TRACEABILITY.md`](../../audit/SPEC_TEST_TRACEABILITY.md).
+> El test `tests/integration/test_spec_test_traceability_audit.py` valida
+> en CI que todas las rutas de test citadas en esa matriz existen.
+
 ## Contexto
 
 Reglas concretas que el validador (`07-validator-design.md`) puede ejecutar mecánicamente. Cada regla es **falseable** (tiene patrón de violación claro) y tiene **confidence_level** explícito.
