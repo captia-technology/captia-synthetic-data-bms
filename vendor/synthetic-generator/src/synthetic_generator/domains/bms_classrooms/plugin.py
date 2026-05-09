@@ -143,9 +143,11 @@ class BMSClassroomsPlugin(DomainPlugin):
             # HVAC control
             mode = hvac_mode(ctx.outdoor_temp, aula_rng)
             enable0 = ((scene.values == "class") & (occ.values > 0)).astype(int)
+            # F-5 / PATCH 008: pasar hvac_mode para que cooling use tau_cool_minutes.
             indoor_temp = simulate_indoor_temperature(
                 time_index, ctx.outdoor_temp, occ, setp,
-                pd.Series(enable0, index=time_index), cfg_indoor, aula_rng
+                pd.Series(enable0, index=time_index), cfg_indoor, aula_rng,
+                hvac_mode=mode,
             )
             # L-PV-07 / PATCH 004: pasar cfg_indoor para activar anti short-cycle
             # (hvac_min_on_minutes / hvac_min_off_minutes en domain.yaml).
@@ -153,10 +155,13 @@ class BMSClassroomsPlugin(DomainPlugin):
 
             # Re-simulate with actual enable
             indoor_temp = simulate_indoor_temperature(
-                time_index, ctx.outdoor_temp, occ, setp, enable, cfg_indoor, aula_rng
+                time_index, ctx.outdoor_temp, occ, setp, enable, cfg_indoor, aula_rng,
+                hvac_mode=mode,
             )
 
-            valve = heating_valve_position(indoor_temp, setp, mode)
+            # F-7 / PATCH 007: pasar cfg_indoor para activar rate limiter
+            # (valve_max_rate_per_min en domain.yaml).
+            valve = heating_valve_position(indoor_temp, setp, mode, cfg_indoor)
             light = light_state(occ, ctx.daylight_lux, aula_rng)
 
             # Indoor environment

@@ -1,0 +1,109 @@
+# 007-valve-rate-limiter.patch
+
+**Title**: Rate limiter en `heating_valve_position` (F-7).
+
+**Status**: Applied.
+
+**Applied on**: 2026-05-10.
+
+**Linked finding**: `docs/audit/PHYSICAL_REALISM_REPORT.md` F-7 (válvula sin
+rate limiter — symptom of L-PV-08).
+
+**Linked rule**: `docs/specs/digital-twin-bms-physics-validation/04-physical-plausibility-rules.md` R-VLV-02.
+
+## Problema
+
+`vendor/.../physics/actuators.py:heating_valve_position` calculaba la
+posición de la válvula como un controlador proporcional puro, vectorial:
+
+```python
+pos = where(mode=="heat", clip(err*35.0, 0, 100), 0.0)
+```
+
+Sin memoria entre samples. Cuando `err` cambia rápidamente entre 0 y
+~3 °C (jitter de setpoint, ruido térmico, cambios de escena), la salida
+puede saltar **0 → 100 %** en un único sample (5 s por defecto), que es
+físicamente imposible para una válvula real:
+
+- Válvulas térmicas TRV (típicas en calefacción de aulas): ~1-2 %/s.
+- Servoválvulas más rápidas: ~5 %/s.
+
+R-VLV-02 documentaba este comportamiento como esperado FAIL hasta que
+se modelara el actuador real.
+
+## Cambio
+
+Se introduce un nuevo helper privado `_enforce_rate_limit(pos, dt_min,
+max_rate_per_min)` que recorre la serie aplicando un slew rate clamp:
+en cada paso, `|pos[i] - pos[i-1]| ≤ max_step = max_rate · dt_min`.
+
+`heating_valve_position` recibe ahora un parámetro opcional `cfg_indoor`
+que, si está presente con `valve_max_rate_per_min > 0`, dispara el
+post-process. Defaults preservan comportamiento legacy si la clave no
+está o es 0.
+
+`plugin.py:157` pasa `cfg_indoor` (ya disponible localmente) al llamar.
+
+`domain.yaml` setea `valve_max_rate_per_min: 60.0` (= 1 %/s; compromiso
+TRV-realista). Cualquier consumidor externo sin esa clave conserva el
+comportamiento previo.
+
+## Diff
+
+```diff
+--- a/src/synthetic_generator/domains/bms_classrooms/physics/actuators.py
++++ b/src/synthetic_generator/domains/bms_classrooms/physics/actuators.py
+@@ -149,11 +149,33 @@ def hvac_enable(
++def _enforce_rate_limit(pos, dt_min, max_rate_per_min):
++    if max_rate_per_min <= 0 or len(pos) <= 1:
++        return pos
++    out = pos.copy()
++    max_step = max_rate_per_min * dt_min
++    for i in range(1, len(out)):
++        delta = out[i] - out[i-1]
++        if delta > max_step:
++            out[i] = out[i-1] + max_step
++        elif delta < -max_step:
++            out[i] = out[i-1] - max_step
++    return out
++
+ def heating_valve_position(
+     indoor_temp: pd.Series,
+     setpoint: pd.Series,
+-    mode: pd.Series
++    mode: pd.Series,
++    cfg_indoor: Dict[str, Any] | None = None,
+ ) -> pd.Series:
+     err = setpoint.values - indoor_temp.values
+     pos = np.where(mode.values == "heat", np.clip(err * 35.0, 0, 100), 0.0)
++    if cfg_indoor is not None and len(indoor_temp) > 1:
++        max_rate = float(cfg_indoor.get("valve_max_rate_per_min", 0.0))
++        if max_rate > 0:
++            dt_min = (indoor_temp.index[1] - indoor_temp.index[0]).total_seconds() / 60.0
++            pos = _enforce_rate_limit(pos, dt_min, max_rate)
+     return pd.Series(pos, index=indoor_temp.index, name="heating_valve_pos")
+
+--- a/src/synthetic_generator/domains/bms_classrooms/plugin.py
++++ b/src/synthetic_generator/domains/bms_classrooms/plugin.py
+@@ -157,1 +157,3 @@
+-            valve = heating_valve_position(indoor_temp, setp, mode)
++            # F-7 / PATCH 007: pasar cfg_indoor para activar rate limiter.
++            valve = heating_valve_position(indoor_temp, setp, mode, cfg_indoor)
+```
+
+## Validación
+
+- `tests/integration/test_valve_rate_limiter_audit.py`:
+  1. Sin `cfg_indoor` → comportamiento legacy preservado.
+  2. Con `valve_max_rate_per_min=0` → escape hatch (sin limit).
+  3. Con `valve_max_rate_per_min=60` y serie con error grande → |Δpos|
+     consecutivo ≤ 60·dt_min en p99.
+  4. Edge cases: serie 1 sample, serie con todos 0.
+  5. `_enforce_rate_limit` clip simétrico (sube y baja).
+
+## Reversibilidad
+
+- Eliminar `valve_max_rate_per_min` de `domain.yaml` o ponerlo a `0` →
+  defaults desactivan el limiter.
+- Si se quiere quitar la firma cambiada, eliminar el `cfg_indoor` de
+  la llamada en `plugin.py`.

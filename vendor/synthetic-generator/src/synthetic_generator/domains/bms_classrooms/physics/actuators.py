@@ -193,25 +193,60 @@ def hvac_enable(
     return pd.Series(raw, index=indoor_temp.index, name="hvac_enable")
 
 
+def _enforce_rate_limit(
+    pos: np.ndarray,
+    dt_min: float,
+    max_rate_per_min: float,
+) -> np.ndarray:
+    """Limit per-sample variation of ``pos`` (% units).
+
+    F-7 / PATCH 007: real heating valves move at ~2-5 %/s (= 120-300 %/min).
+    Without this limiter, the proportional output could jump 0→100 % in a
+    single sample (5 s by default), which is physically impossible.
+    """
+    if max_rate_per_min <= 0 or len(pos) <= 1:
+        return pos
+    out = pos.copy()
+    max_step = max_rate_per_min * dt_min
+    for i in range(1, len(out)):
+        delta = out[i] - out[i - 1]
+        if delta > max_step:
+            out[i] = out[i - 1] + max_step
+        elif delta < -max_step:
+            out[i] = out[i - 1] - max_step
+    return out
+
+
 def heating_valve_position(
     indoor_temp: pd.Series,
     setpoint: pd.Series,
-    mode: pd.Series
+    mode: pd.Series,
+    cfg_indoor: Dict[str, Any] | None = None,
 ) -> pd.Series:
     """Calculate heating valve position.
 
-    Proportional control in heating mode only.
+    Proportional control in heating mode only. When ``cfg_indoor`` provides
+    ``valve_max_rate_per_min`` > 0, an actuator rate limiter is applied
+    post-process (F-7 / PATCH 007).
 
     Args:
         indoor_temp: Indoor temperature series
         setpoint: Temperature setpoint series
         mode: HVAC mode series
+        cfg_indoor: Optional indoor physics configuration. If None, no rate
+            limiter is applied (legacy).
 
     Returns:
         Series of valve positions (0-100%)
     """
     err = setpoint.values - indoor_temp.values
     pos = np.where(mode.values == "heat", np.clip(err * 35.0, 0, 100), 0.0)
+
+    if cfg_indoor is not None and len(indoor_temp) > 1:
+        max_rate = float(cfg_indoor.get("valve_max_rate_per_min", 0.0))
+        if max_rate > 0:
+            dt_min = (indoor_temp.index[1] - indoor_temp.index[0]).total_seconds() / 60.0
+            pos = _enforce_rate_limit(pos, dt_min, max_rate)
 
     return pd.Series(pos, index=indoor_temp.index, name="heating_valve_pos")
 
