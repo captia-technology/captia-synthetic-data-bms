@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Env
+.env
+.env.local
+*.env.local
+
+# Build
+dist/
+build/
+*.whl
+*.tar.gz
+
+# Output
+output/
+backups/
+*.lp
+*.lp.gz
+*.csv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Vendor caches (vendor source is tracked, but local caches are not)
+vendor/synthetic-generator/.venv/
+vendor/synthetic-generator/.pytest_cache/
+vendor/synthetic-generator/.ruff_cache/
+vendor/synthetic-generator/__pycache__/
