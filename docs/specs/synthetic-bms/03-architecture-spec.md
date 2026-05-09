@@ -6,30 +6,53 @@ El microservicio BMS es un wrapper FastAPI sobre el generador hexagonal vendoriz
 
 ## High-level diagram
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ CAPTIA-SYNTHETIC-DATA-BMS (red Docker: captia-network)          │
-│                                                                 │
-│  USER ───HTTP(8120)───▶ bms-data-generator                      │
-│                          │                                      │
-│         ┌────────────────┼─────────────┬─────────────┐          │
-│         │                │             │             │          │
-│         ▼                ▼             ▼             ▼          │
-│   FastAPI app      Runner service   Dump service   Metrics      │
-│         │                │             │             │          │
-│         └────┬───────────┴─────────────┘             │          │
-│              ▼                                        │          │
-│       vendor.synthetic_generator (hexagonal)          │          │
-│         core ─ ports ─ domains.bms_classrooms ─ sinks │          │
-│              │                                        │          │
-│              ▼ (paho-mqtt)                            │          │
-│         mosquitto :1883 ──▶ telegraf ──▶ influxdb     │          │
-│                                            │          │          │
-│                                            ▼          ▼          │
-│                                          grafana ◀── prometheus  │
-│                                            ▲                     │
-│                                            └── loki ◀── promtail │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    USER[Usuario]
+    subgraph captia_bms["captia-network (Docker)"]
+        subgraph svc["bms-data-generator (FastAPI)"]
+            API["api/{health,control,datasets}"]
+            RUN["RunnerService"]
+            DUMP["DumpService"]
+            MET["metrics.py"]
+        end
+        subgraph engine["vendor.synthetic_generator (hexagonal)"]
+            CORE["core/ runner / config / validator"]
+            PORTS["ports/ DomainAdapter / SinkAdapter"]
+            DOM["domains/ bms_classrooms"]
+            SINK["sinks/ mqtt | file | composite"]
+        end
+        EXT["extensions.bms_calibration<br/>(faults, school_calendar)"]
+        MOS[(Mosquitto)]
+        TEL[Telegraf]
+        INF[(InfluxDB 2.7)]
+        REDIS[(Redis)]
+        GRAF[Grafana 11.4]
+        PROM[Prometheus]
+        LOKI[(Loki)]
+        PT[Promtail]
+    end
+
+    USER -- HTTP 8120 --> API
+    API --> RUN
+    API --> DUMP
+    API --> MET
+    RUN --> CORE
+    DUMP --> CORE
+    CORE --> PORTS
+    PORTS --> DOM
+    PORTS --> SINK
+    EXT --> PORTS
+    SINK -- paho-mqtt --> MOS
+    SINK -. file dump .-> DUMP
+    MOS --> TEL
+    TEL --> INF
+    GRAF --> INF
+    GRAF --> REDIS
+    GRAF --> PROM
+    GRAF --> LOKI
+    PROM -- scrape :8120/metrics --> svc
+    PT -- docker socket --> LOKI
 ```
 
 ## Module layout (interno)
@@ -80,6 +103,50 @@ vendor/synthetic-generator/    # Read-only, snapshot from CAPTIA-CONNECT
    - `vendor.synthetic_generator.sinks.{mqtt,file,composite}`
    - `bms_calibration.{faults, school_calendar, physics_overrides}`
 
+## Diagrama de componentes internos
+
+```mermaid
+flowchart TB
+    subgraph generator["modules/bms-data-generator"]
+        main["main.py<br/>FastAPI + lifespan"]
+        config["config.py<br/>Pydantic Settings"]
+        api_h["api/health.py<br/>/healthz /readyz /metrics"]
+        api_c["api/control.py<br/>/v1/control/*"]
+        api_d["api/datasets.py<br/>/v1/datasets/*"]
+        svc_r["services/runner_service.py"]
+        svc_d["services/dump_service.py"]
+        svc_cl["services/calibration_loader.py"]
+        log["logging_config.py<br/>JSON logs"]
+        met["metrics.py<br/>Prometheus counters"]
+    end
+    subgraph vendor["vendor/synthetic-generator (read-only)"]
+        v_core["core/ runner, config, validator, anomalies"]
+        v_dom["domains/bms_classrooms<br/>physics: env / indoor / occupancy / actuators / energy"]
+        v_sinks["sinks/ mqtt, file, stdout, composite, null"]
+    end
+    subgraph extensions["extensions/bms_calibration"]
+        ext_f["faults.py<br/>FaultInjector"]
+        ext_c["school_calendar.py<br/>Valencia 2025-26"]
+        ext_p["physics_overrides.py"]
+    end
+
+    main --> api_h
+    main --> api_c
+    main --> api_d
+    api_c --> svc_r
+    api_d --> svc_d
+    svc_r --> svc_cl
+    svc_d --> svc_cl
+    svc_cl --> ext_p
+    svc_r --> v_core
+    svc_d --> v_core
+    v_core --> v_dom
+    v_core --> v_sinks
+    ext_f -. wraps simulate() .-> v_dom
+    ext_c -. used by .-> v_dom
+    api_h --> met
+```
+
 ## Flujo de datos — Caso A (Pipeline IoT en vivo)
 
 ```
@@ -102,6 +169,36 @@ vendor/synthetic-generator/    # Read-only, snapshot from CAPTIA-CONNECT
 5. Telegraf parsea, extrae 5 tags vía regex, escribe captia_point a influxdb
 6. Tareas Flux: telemetry → telemetry_1m → _15m → _1h
 7. Grafana queries → dashboards
+```
+
+### Secuencia Caso A
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as Usuario
+    participant API as bms-data-generator API
+    participant SVC as RunnerService
+    participant V as vendor.runner.ScenarioRunner
+    participant M as Mosquitto
+    participant T as Telegraf
+    participant I as InfluxDB
+    participant G as Grafana
+
+    U->>API: POST /v1/control/start { mode:"live", aulas:10 }
+    API->>SVC: start(config_path, mode, aulas, faults)
+    SVC->>SVC: lock + register job_id
+    SVC-->>API: 202 { job_id }
+    API-->>U: 202 { job_id }
+    SVC->>V: ScenarioRunner.run() (in daemon thread)
+    loop every 5s
+        V->>V: simulate() yields DataPoint
+        V->>M: publish captia/{env}/{tenant}/{site}/{asset}/telemetry/{var}
+        M->>T: deliver
+        T->>I: write captia_point + 5 tags
+    end
+    G->>I: Flux query
+    G-->>U: dashboards refresh
 ```
 
 ## Flujo de datos — Caso B/C (Backfill + dump)

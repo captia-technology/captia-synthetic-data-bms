@@ -15,6 +15,46 @@ El stack Docker debe ser autocontenido (decisión usuario) y replicar las conven
 
 Merge vía `COMPOSE_FILE` env (Windows separador `;`, Linux `:`).
 
+### Topología de servicios y dependencias
+
+```mermaid
+flowchart TB
+    classDef oneshot stroke-dasharray: 5 5
+    classDef obs fill:#fff5e6,stroke:#d99a3a
+
+    influx-init["influx-init<br/>(one-shot)"]:::oneshot
+
+    mos["mosquitto<br/>:1883/:9001"]
+    inf["influxdb 2.7<br/>:8086"]
+    red["redis 7"]
+    tel["telegraf 1.32"]
+    gen["bms-data-generator<br/>:8120"]
+    graf["grafana 11.4<br/>:3000"]
+
+    prom["prometheus :9090"]:::obs
+    loki["loki :3100"]:::obs
+    pt["promtail"]:::obs
+
+    inf --> influx-init
+    mos --> tel
+    inf --> tel
+    mos --> gen
+    inf --> gen
+    red --> gen
+    tel --> gen
+    inf --> graf
+    red --> graf
+    prom --> graf
+    loki --> graf
+    pt --> loki
+    gen -. /metrics .-> prom
+    tel -. :9273/metrics .-> prom
+    inf -. /metrics .-> prom
+```
+
+> Ejes verdes (sólidos) representan `depends_on: condition: service_healthy`.
+> Ejes punteados representan scrapes Prometheus o salidas Loki.
+
 ## Servicios
 
 ### Mosquitto 2.0.18

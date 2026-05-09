@@ -4,6 +4,37 @@
 
 La observabilidad replica el patrón CAPTIA-CONNECT (`modules/observability/{prometheus,loki,promtail,grafana}/`). Combina métricas Prometheus del propio generador con logs estructurados JSON y dashboards Grafana provisionados.
 
+### Pipeline de observabilidad
+
+```mermaid
+flowchart LR
+    subgraph svc["Servicios captia-bms"]
+        gen["bms-data-generator<br/>/metrics + stdout JSON"]
+        tel["telegraf :9273"]
+        inf["influxdb"]
+        graf["grafana"]
+    end
+
+    prom["Prometheus :9090<br/>scrape 15s"]
+    loki["Loki :3100<br/>retention 30d"]
+    pt["Promtail<br/>docker socket"]
+    dash["Grafana dashboards<br/>(provisioned)"]
+    alert["Alertas:<br/>BMSGeneratorDown<br/>BMSPublishErrorRateHigh<br/>BMSDumpExportStuck"]
+
+    gen -- "GET /metrics" --> prom
+    tel -- "GET /metrics" --> prom
+    inf -- "GET /metrics" --> prom
+    gen -- "stdout JSON" --> pt
+    tel -- "stdout text" --> pt
+    inf -- "stdout text" --> pt
+    pt -- "push" --> loki
+
+    prom --> dash
+    loki --> dash
+    inf --> dash
+    prom --> alert
+```
+
 ## Métricas Prometheus
 
 ### Existentes en vendor (`vendor/synthetic-generator/health.py`)

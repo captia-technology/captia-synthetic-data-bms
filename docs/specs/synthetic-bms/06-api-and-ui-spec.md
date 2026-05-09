@@ -4,6 +4,32 @@
 
 El microservicio expone un control plane HTTP minimalista vía FastAPI y delega la UI de monitorización a Grafana provisionado (ADR-011). La API debe ser autenticada (Bearer token) en endpoints `/v1/*` y abierta en endpoints health/metrics.
 
+### Estado del job (RunnerService / DumpService)
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending: start() / export()
+    pending --> running: thread acquires job
+    running --> completed: ScenarioRunner.run() returns
+    running --> stopped: POST /stop
+    running --> error: exception (config, sink, runner)
+    pending --> error: validation failed (eager)
+    completed --> [*]
+    stopped --> [*]
+    error --> [*]
+```
+
+### Decisión de auth
+
+```mermaid
+flowchart TD
+    req[Request a /v1/*] --> tk{BMS_API_TOKEN<br/>configurado?}
+    tk -- no --> ok1[202/200 sin auth]
+    tk -- yes --> hdr{Authorization:<br/>Bearer matches?}
+    hdr -- no --> _401[401 Unauthorized]
+    hdr -- yes --> ok2[202/200]
+```
+
 ## Health endpoints (públicos)
 
 ### `GET /healthz`
