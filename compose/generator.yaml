@@ -8,7 +8,7 @@ name: captia-bms
 services:
   bms-data-generator:
     build:
-      context: .
+      context: ..
       dockerfile: modules/bms-data-generator/Dockerfile
     image: captia-bms-data-generator:0.1.0
     container_name: captia-bms-generator
@@ -39,7 +39,7 @@ services:
       - BMS_DEFAULT_CONFIG=/app/config/projects/bms_v1_demo.yaml
       - BMS_OUTPUT_DIR=/app/output
     volumes:
-      - ./config:/app/config:ro
+      - ../config:/app/config:ro
       - bms_output:/app/output
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8120/healthz"]

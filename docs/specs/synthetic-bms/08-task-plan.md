@@ -2,7 +2,7 @@
 
 ## Context
 
-Plan de tareas con trazabilidad spec→tarea→test. Espejo del plan ejecutable en `C:\Users\jaime\.claude\plans\captia-connect-spec-driven-crystalline-cascade.md`.
+Plan de tareas con trazabilidad spec→tarea→test. Generado a partir del plan de implementación inicial (mantenido por los maintainers fuera del repo).
 
 ## Tabla maestra
 
