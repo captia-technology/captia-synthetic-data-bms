@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 from bms_data_generator.config import get_settings
+from bms_data_generator.rate_limit import limiter
 from bms_data_generator.services.dump_service import DumpService
 
 _router = APIRouter(prefix="/v1/datasets", tags=["datasets"])
@@ -46,7 +47,8 @@ class ExportRequest(BaseModel):
     status_code=status.HTTP_202_ACCEPTED,
     dependencies=[Depends(_verify_token)],
 )
-async def export(req: ExportRequest) -> dict:
+@limiter.limit("5/minute")
+async def export(request: Request, req: ExportRequest) -> dict:
     try:
         job_id, output_path = _ensure_service().export(
             months=req.months,

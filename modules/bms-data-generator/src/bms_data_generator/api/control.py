@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 from bms_data_generator.config import get_settings
+from bms_data_generator.rate_limit import limiter
 from bms_data_generator.services.runner_service import RunnerService
 
 _router = APIRouter(prefix="/v1/control", tags=["control"])
@@ -35,7 +36,8 @@ class StartRequest(BaseModel):
     status_code=status.HTTP_202_ACCEPTED,
     dependencies=[Depends(_verify_token)],
 )
-async def start(req: StartRequest) -> dict:
+@limiter.limit("10/minute")
+async def start(request: Request, req: StartRequest) -> dict:
     valid_faults = {"sensor_drift", "valve_stuck", "fan_failure", "refrigerant_low"}
     invalid = [f for f in req.faults if f not in valid_faults]
     if invalid:

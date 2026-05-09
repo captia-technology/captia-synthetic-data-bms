@@ -10,10 +10,11 @@ from __future__ import annotations
 import os
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from bms_data_generator.config import get_settings
+from bms_data_generator.rate_limit import limiter
 from bms_data_generator.services.query_service import (
     InfluxQueryClient,
     QueryRequest,
@@ -64,7 +65,8 @@ def _build_client() -> InfluxQueryClient:
 
 
 @_router.post("/query", response_model=QueryResponse, dependencies=[Depends(_verify_token)])
-async def query(body: QueryBody) -> QueryResponse:
+@limiter.limit("60/minute")
+async def query(request: Request, body: QueryBody) -> QueryResponse:
     """Resolver una serie temporal canónica.
 
     El bucket lo elige la lógica de :func:`select_bucket` siguiendo el
