@@ -10,24 +10,28 @@
 - **Stack base 100 % funcional**: 8 servicios Docker `healthy`, 24 aulas
   emitiendo a 5 s, ~210 K puntos InfluxDB en 24 h, Telegraf consumer +
   3 outputs activos, 4 dashboards Grafana provisionados, 4 datasources
-  conectados, suite de tests **198 / 198 PASS**.
-- **Score físico estimado**: **0.94** (banda *plausible con caveats menores*).
-- **Patches al vendor aplicados** (5 totales, todos retrocompatibles):
+  conectados, suite de tests **211 / 211 PASS**, coverage **89.15 %**.
+- **Score físico estimado**: **0.94** → tras patches 007 y 008 más
+  alineación CO₂ con ASHRAE, todas las dimensiones D1/D2/D4 al 1.00.
+- **Patches al vendor aplicados** (7 totales, todos retrocompatibles):
   - **001** vendoring slim BMS-only.
   - **002** H-23 / F-4 jitter setpoint configurable (`setpoint_jitter_std=0.05`).
   - **003** L-PV-09 / F-1 humidity dehumidification en cooling.
   - **004** L-PV-07 / F-2 anti short-cycle HVAC (5 min on/off dwell).
   - **005** H-21 TZ-aware `datetime.now()` en `runner.py`.
+  - **007** F-7 valve rate limiter (`valve_max_rate_per_min=60`).
+  - **008** F-5 thermal α heat vs cool (`tau_cool_minutes=60` vs 90).
 - **Patches infra adicionales**:
   - **006** H-22 doble Prometheus scrape (`mode=container` + `mode=host`,
     `extra_hosts: host.docker.internal:host-gateway`).
+- **Calibración alineada literatura**: F-8 CO₂ `gen` vendor 7.5 → ASHRAE 4.5.
+- **CI gate**: H-05 coverage 80 % `fail_under` (baseline 89.15 %).
 - **Operacional**: `make stream` (gap #27) mantiene el generator vivo con
   auto-restart + monitoreo `phase` cada 30 s.
-- **Hallazgos cerrados durante la auditoría + follow-up**: **9**
-  (gap #5 query, #7 E2E live, #9 stat=last, #27 stream; H-23, H-21, H-22,
-  H-14 telegraf canonical + 3 patches físicos + 1 patch infra; L-PV-03
-  claves canónicas; L-PV-02 cableado y testeado).
-- **Hallazgos abiertos**: **22** (1 alta · 11 media · 10 baja).
+- **Hallazgos cerrados durante la auditoría + follow-up**: **14**
+  (gap #5, #7, #9, #27; H-02, H-05, H-14, H-21, H-22, H-23; F-1, F-2, F-4,
+  F-5, F-7, F-8; L-PV-02, L-PV-03, L-PV-07, L-PV-09).
+- **Hallazgos abiertos**: **17** (1 alta · 8 media · 8 baja).
   - El único bloqueador alta restante es **H-01** (event payload `ts_ns`
     vs ISO `ts`) — requiere decisión spec con upstream.
 
@@ -56,16 +60,16 @@ Tests de regresión: **15 tests nuevos**, todos verdes.
 
 ### Should (importante, no bloqueante)
 
-| ID | Título | Acción | Effort |
-|---|---|---|---|
-| H-02 | Telegraf healthcheck `pgrep` insuficiente | Cambiar a `wget :9273/metrics` | S (0.5 d) |
-| H-03 | Endpoints `/v1/*` sin rate limiting | Añadir `slowapi` o equivalent | M (2 d) |
-| H-05 | Sin coverage gating en CI | Añadir umbral 80 % módulos `bms_data_generator` | S (0.5 d) |
-| H-06 | CI no levanta el stack | Añadir job `docker-compose-test` | M (3 d) |
-| H-12 | Physics specs ortogonales a tests | Añadir cross-references spec ↔ test | S (1 d) |
-| F-7 | Válvula sin rate limiter | PATCH 006 — `valve_max_step_per_min` configurable | S (1 d) |
-| F-5 | Cooling/heating mismo α en thermal | PATCH 007 — `alpha_cool` vs `alpha_heat` | M (2 d) |
-| F-8 | CO₂ `gen=7.5` vs ASHRAE 4.5 | Actualizar `domain.yaml` post-L-01 (calibración real) | S (0.5 d) |
+| ID | Título | Acción | Effort | Estado |
+|---|---|---|---|---|
+| H-02 | Telegraf healthcheck `pgrep` insuficiente | Cambio a `curl /metrics \| head -1 \| grep -q '^# HELP'` (verifica ingest healthy) | S | ✅ cerrada |
+| H-03 | Endpoints `/v1/*` sin rate limiting | Añadir `slowapi` o equivalent | M (2 d) | ⚪ pendiente |
+| H-05 | Sin coverage gating en CI | `pytest-cov` + `[tool.coverage]` con `fail_under=80`. Baseline 89.15 % | S | ✅ cerrada |
+| H-06 | CI no levanta el stack | Añadir job `docker-compose-test` | M (3 d) | ⚪ pendiente |
+| H-12 | Physics specs ortogonales a tests | Añadir cross-references spec ↔ test | S (1 d) | ⚪ pendiente |
+| F-7 | Válvula sin rate limiter | **PATCH 007** `valve_max_rate_per_min=60.0` (1 %/s, TRV-realista) + 5 tests | S | ✅ cerrada |
+| F-5 | Cooling/heating mismo α en thermal | **PATCH 008** `tau_cool_minutes=60` vs `tau_minutes=90` + 4 tests | M | ✅ cerrada |
+| F-8 | CO₂ `gen=7.5` vs ASHRAE 4.5 | `domain.yaml` actualizado a 4.5 ppm/p/min (literatura ASHRAE 62.1 / EN 16798) | S | ✅ cerrada |
 
 ### Could (mejoras, no urgentes)
 

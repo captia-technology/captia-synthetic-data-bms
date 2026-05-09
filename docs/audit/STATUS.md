@@ -69,3 +69,49 @@ Grafana                          : 4 datasources + 4 dashboards
 - **2026-05-10 01:00** — fase 10 cerrada — `ACTION_PLAN.md` consolida 27 hallazgos abiertos (3 alta · 11 media · 13 baja) con priorización MoSCoW, esfuerzo estimado y roadmap Gantt 4 semanas. Auditoría extrema completa.
 - **2026-05-10 01:15** — follow-up Must — H-21 cerrada (PATCH 005 TZ-aware `datetime.now`), H-22 cerrada (PATCH 006 doble scrape Prometheus mode=container/host, verificado live), gap #27 cerrado (`make stream` + `scripts/stream_live.sh`). Suite 194 → **198/198 PASS**. L-PV-02 confirmada cableada vía tests Caso C (live E2E pendiente).
 - **2026-05-10 01:20** — Hallazgos abiertos del ACTION_PLAN: **22** (1 alta · 11 media · 10 baja). Único alta restante: **H-01** event payload `ts_ns` vs ISO `ts` — requiere decisión arquitectónica con upstream CAPTIA-connect.
+- **2026-05-10 16:30** — bloque Should del ACTION_PLAN — 5 hallazgos cerrados: **H-02** (Telegraf healthcheck `curl /metrics`), **F-8** (CO₂ gen ASHRAE 4.5), **F-7** (PATCH 007 valve rate limiter), **F-5** (PATCH 008 thermal α heat vs cool), **H-05** (coverage gating CI 80 %, baseline 89.15 %). Suite 198 → **211/211 PASS**. Hallazgos abiertos: **17** (1 alta · 8 media · 8 baja).
+
+## Fase 11 — Notebooks didácticos y casos de uso explícitos
+
+Tras cerrar la auditoría extrema (fases 1–10), se incorpora una capa docente
+explícita: notebooks por caso de uso + documentación web por caso de uso +
+contratos extraídos para integradores.
+
+| Sub-fase | Entregable | Estado |
+|---|---|---|
+| 11.0 | `docs/audit/USE_CASE_MATRIX.md` (10 casos + extra, capas Medallion) | ✅ |
+| 11.1 | `docs/audit/NOTEBOOK_PLAN.md` (42 notebooks, niveles, deps) | ✅ |
+| 11.2 | `docs/audit/DOCS_REPORT.md` (mapa de la nueva docs/) | ✅ |
+| 11.3 | `notebooks/_common/` helpers + `notebooks/_data/` mocks | ✅ |
+| 11.4 | 42 notebooks didácticos (3 overview + 39 casos A-J) | ✅ |
+| 11.5 | `docs/use-cases/`, `docs/contracts/`, `docs/validation/`, `docs/operations/`, `docs/notebooks/` | ✅ |
+| 11.6 | Actualización `mkdocs.yml` con la nueva navegación | ✅ |
+| 11.7 | Validación notebooks (JSON, sin secretos, paths relativos) | ✅ |
+
+### Histórico fase 11
+
+- **2026-05-10 09:00** — fase 11 iniciada — exploración de fuentes
+  (`docs/archive/CAPTIA_Informe_CasosDeUso_DatosSinteticos.md`,
+  `CENTINELA_Guia_Alumnos_v4.md`, `MEDALLION_Arquitectura_Guia_Referencia.md`,
+  `docs/specs/synthetic-bms/01-product-spec.md`,
+  `02-domain-spec.md`).
+- **2026-05-10 09:30** — sub-fase 11.0–11.2 cerradas (auditoría docente).
+- **2026-05-10 11:30** — sub-fase 11.3 cerrada (helpers + mocks deterministas).
+- **2026-05-10 14:00** — sub-fase 11.4 cerrada (42 notebooks generados con
+  18-section template, mocks etiquetados, `seed=42`).
+- **2026-05-10 15:00** — sub-fase 11.5 cerrada (28 markdowns nuevos en
+  `docs/use-cases/`, `docs/contracts/`, `docs/validation/`, `docs/operations/`,
+  `docs/notebooks/`, todos cruzados con specs).
+- **2026-05-10 15:30** — sub-fase 11.6 cerrada (`mkdocs.yml` con nueva
+  navegación; mantenido `strict: false` por enlaces a código).
+- **2026-05-10 16:00** — sub-fase 11.7 cerrada — validación notebooks (JSON
+  válido, sin secretos, schema canónico citado, mocks etiquetados).
+
+## Resumen de cobertura final
+
+- **42 notebooks** repartidos en 11 directorios (overview + 10 casos).
+- **28 documentos web nuevos** en 5 secciones (`use-cases`, `contracts`,
+  `validation`, `operations`, `notebooks`).
+- **3 documentos de auditoría docente** (`USE_CASE_MATRIX.md`,
+  `NOTEBOOK_PLAN.md`, `DOCS_REPORT.md`).
+- Auditoría extrema y auditoría docente cierran 11/11 fases.
