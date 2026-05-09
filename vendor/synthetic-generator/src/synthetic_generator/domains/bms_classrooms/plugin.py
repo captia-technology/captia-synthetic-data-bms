@@ -132,8 +132,12 @@ class BMSClassroomsPlugin(DomainPlugin):
             )
 
             # Generate occupancy
+            # F-10 / PATCH 010: ramp_minutes desde schedule cfg para suavizar
+            # entrada/salida (rampa real ~5-10 min vs salto instantáneo legacy).
+            occ_ramp_min = float(sched_cfg.get("ramp_minutes", 0.0))
             occ = generate_occupancy_count(
-                time_index, ctx.occupancy_probability, capacity, util, day_var, aula_rng
+                time_index, ctx.occupancy_probability, capacity, util, day_var, aula_rng,
+                ramp_minutes=occ_ramp_min,
             )
 
             # Generate scene and setpoint

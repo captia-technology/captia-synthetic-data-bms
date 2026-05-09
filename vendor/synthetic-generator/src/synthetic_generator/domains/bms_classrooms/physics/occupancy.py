@@ -42,12 +42,18 @@ def generate_occupancy_count(
     capacity: int,
     util: float,
     day_variability: float,
-    rng: np.random.Generator
+    rng: np.random.Generator,
+    ramp_minutes: float = 0.0,
 ) -> pd.Series:
     """Generate occupancy count time series.
 
     Converts occupancy probability schedule to actual counts using
     Poisson sampling with daily variation.
+
+    F-10 / PATCH 010: when ``ramp_minutes`` > 0, applies a first-order
+    EWMA over the integer Poisson output to mimic the gradual entry/exit
+    of people (real classrooms take 5-10 min to fill or empty; the legacy
+    behavior was an instantaneous step between consecutive samples).
 
     Args:
         index: Time index
@@ -56,6 +62,8 @@ def generate_occupancy_count(
         util: Utilization factor
         day_variability: Day-to-day variation factor
         rng: NumPy random generator
+        ramp_minutes: Optional EWMA tau in minutes for entry/exit smoothing.
+            ``0`` (default) preserves legacy step behavior.
 
     Returns:
         Series of occupancy counts (integer)
@@ -77,5 +85,14 @@ def generate_occupancy_count(
         # Sample around expected; cap at capacity
         val = rng.poisson(lam=max(0.1, expected))
         occ[i] = int(np.clip(val, 0, capacity))
+
+    if ramp_minutes > 0 and len(index) > 1:
+        dt_min = (index[1] - index[0]).total_seconds() / 60.0
+        alpha = dt_min / max(1.0, ramp_minutes)
+        smoothed = np.empty(len(occ), dtype=float)
+        smoothed[0] = float(occ[0])
+        for i in range(1, len(occ)):
+            smoothed[i] = smoothed[i - 1] + alpha * (float(occ[i]) - smoothed[i - 1])
+        occ = np.clip(np.round(smoothed).astype(int), 0, capacity)
 
     return pd.Series(occ, index=index, name="occupancy")

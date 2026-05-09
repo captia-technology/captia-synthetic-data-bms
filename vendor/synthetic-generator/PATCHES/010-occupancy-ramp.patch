@@ -1,0 +1,96 @@
+# 010-occupancy-ramp.patch
+
+**Title**: Rampa entrada/salida en `generate_occupancy_count` (F-10).
+
+**Status**: Applied.
+
+**Applied on**: 2026-05-10.
+
+**Linked finding**: `docs/audit/PHYSICAL_REALISM_REPORT.md` F-10 (ocupación
+entrada/salida instantánea entre samples).
+
+## Problema
+
+`vendor/.../physics/occupancy.py:generate_occupancy_count` muestreaba el
+conteo de ocupantes con `rng.poisson(lam=expected)` por sample. El
+resultado: el conteo podía pasar de 0 a 28 entre dos samples consecutivos
+(5 s) — físicamente imposible. La gente no aparece o desaparece de golpe;
+una clase tarda 5-10 min en llenarse (entrada) o vaciarse (timbre + bag
++ pasillo).
+
+Este step instantáneo:
+- Genera transiciones falsas en CO₂ (R-CO2-01) que se compensan luego con
+  ventilación.
+- Sesga el modelo de ruido aún con PATCH 009 (el target salta).
+- Rompe correlaciones esperadas en datasets ML (people-count vs
+  CO₂ vs power).
+
+## Cambio
+
+`generate_occupancy_count` añade un parámetro opcional `ramp_minutes`. El
+muestreo Poisson sigue produciendo el target (que sí puede ser step), pero
+si `ramp_minutes > 0` se aplica EWMA y se redondea al integer más cercano.
+
+```python
+if ramp_minutes > 0 and len(index) > 1:
+    alpha = dt_min / max(1.0, ramp_minutes)
+    smoothed[0] = float(occ[0])
+    for i in range(1, len(occ)):
+        smoothed[i] = smoothed[i-1] + alpha * (float(occ[i]) - smoothed[i-1])
+    occ = clip(round(smoothed), 0, capacity)
+```
+
+`plugin.py` pasa `ramp_minutes` desde `sched_cfg.ramp_minutes`.
+
+`domain.yaml::schedule.ramp_minutes = 5.0` produce rampa visible en escena
+de 5 s sample. Con `ramp_minutes = 0` (o ausente), comportamiento legacy.
+
+## Diff
+
+```diff
+--- a/src/synthetic_generator/domains/bms_classrooms/physics/occupancy.py
++++ b/src/synthetic_generator/domains/bms_classrooms/physics/occupancy.py
+@@ -39,6 +39,7 @@ def generate_occupancy_count(
+     util: float,
+     day_variability: float,
+     rng: np.random.Generator
++    ramp_minutes: float = 0.0,
+ ) -> pd.Series:
+@@ -78,6 +80,15 @@
+     occ[i] = int(np.clip(val, 0, capacity))
++    if ramp_minutes > 0 and len(index) > 1:
++        dt_min = (index[1] - index[0]).total_seconds() / 60.0
++        alpha = dt_min / max(1.0, ramp_minutes)
++        smoothed = np.empty(len(occ), dtype=float)
++        smoothed[0] = float(occ[0])
++        for i in range(1, len(occ)):
++            smoothed[i] = smoothed[i-1] + alpha * (float(occ[i]) - smoothed[i-1])
++        occ = np.clip(np.round(smoothed).astype(int), 0, capacity)
+     return pd.Series(occ, index=index, name="occupancy")
+
+--- a/src/synthetic_generator/domains/bms_classrooms/plugin.py
++++ b/src/synthetic_generator/domains/bms_classrooms/plugin.py
+@@ -135,3 +135,7 @@
+-            occ = generate_occupancy_count(
+-                time_index, ctx.occupancy_probability, capacity, util, day_var, aula_rng
+-            )
++            occ_ramp_min = float(sched_cfg.get("ramp_minutes", 0.0))
++            occ = generate_occupancy_count(
++                time_index, ctx.occupancy_probability, capacity, util, day_var,
++                aula_rng, ramp_minutes=occ_ramp_min,
++            )
+```
+
+## Validación
+
+- `tests/integration/test_occupancy_ramp_audit.py`:
+  1. Sin `ramp_minutes` (legacy) → mantiene saltos del Poisson.
+  2. `ramp_minutes=0` → escape hatch idempotente.
+  3. `ramp_minutes=5` y serie con step en `p_occ` → max |Δocc| consecutivo
+     limitado.
+  4. Rango respetado [0, capacity].
+
+## Reversibilidad
+
+- Eliminar `ramp_minutes` de `domain.yaml::schedule` o ponerlo a `0` →
+  defaults legacy.

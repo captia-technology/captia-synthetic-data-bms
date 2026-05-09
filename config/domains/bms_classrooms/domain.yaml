@@ -77,6 +77,9 @@ schedule:
   aula_utilization_mean: 0.75
   aula_utilization_std: 0.10
   day_to_day_variability: 0.12
+  # F-10 (PATCH 010): rampa entrada/salida ocupación con EWMA. tau=5 min cubre
+  # transición realista; con freq 5 s = 60 samples para una transición visible.
+  ramp_minutes: 5.0
   slots:
     - start: "08:00"
       end: "15:00"

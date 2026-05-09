@@ -14,7 +14,7 @@
 - **Score físico estimado**: **0.94** → tras patches 007/008/009 más
   alineación CO₂ con ASHRAE, todas las dimensiones D1/D2/D4 al 1.00 y
   D6 (humedad) con dinámica realista.
-- **Patches al vendor aplicados** (8 totales, todos retrocompatibles):
+- **Patches al vendor aplicados** (9 totales, todos retrocompatibles):
   - **001** vendoring slim BMS-only.
   - **002** H-23 / F-4 jitter setpoint configurable (`setpoint_jitter_std=0.05`).
   - **003** L-PV-09 / F-1 humidity dehumidification en cooling.
@@ -23,6 +23,7 @@
   - **007** F-7 valve rate limiter (`valve_max_rate_per_min=60`).
   - **008** F-5 thermal α heat vs cool (`tau_cool_minutes=60` vs 90).
   - **009** F-6 noise EWMA en transiciones (`noise.tau_minutes=3.0`).
+  - **010** F-10 occupancy ramp EWMA (`schedule.ramp_minutes=5.0`).
 - **Patches infra adicionales**:
   - **006** H-22 doble Prometheus scrape (`mode=container` + `mode=host`,
     `extra_hosts: host.docker.internal:host-gateway`).
@@ -30,14 +31,13 @@
 - **CI gate**: H-05 coverage 80 % `fail_under` (baseline 89.15 %).
 - **Operacional**: `make stream` (gap #27) mantiene el generator vivo con
   auto-restart + monitoreo `phase` cada 30 s.
-- **Hallazgos cerrados durante la auditoría + follow-up + Could**: **26**
+- **Hallazgos cerrados durante la auditoría + follow-up + Could**: **27**
   (gap #5, #7, #9, #27; H-02, H-03, H-04, H-05, H-06, H-08, H-09, H-10,
   H-12, H-13, H-14, H-19, H-21, H-22, H-23; F-1, F-2, F-3, F-4, F-5, F-6,
-  F-7, F-8, F-9; L-PV-02, L-PV-03, L-PV-07, L-PV-09).
-- **Hallazgos abiertos**: **3** (1 alta · 0 media · 2 baja).
+  F-7, F-8, F-9, F-10; L-PV-02, L-PV-03, L-PV-07, L-PV-09).
+- **Hallazgos abiertos**: **2** (1 alta · 0 media · 1 baja).
   - **H-01** (alta) event payload `ts_ns` vs ISO `ts` — requiere decisión spec con upstream.
   - **H-11** (baja) Dependabot abierto — acción manual sin código.
-  - **F-10** (baja) Ocupación rampa lineal 5 min — PATCH futuro.
 
 ## Patches físicos aplicados en esta auditoría
 
@@ -89,7 +89,7 @@ Tests de regresión: **15 tests nuevos**, todos verdes.
 | H-19 | Healthchecks no estandarizados | `docs/operations/healthchecks.md` con convención + tabla 9 servicios | S | ✅ cerrada |
 | H-20 | Contratos sin doc unificado | **Cubierto por este sitio** (`docs/architecture/`, `docs/specs/`) | ✅ done |
 | F-9 | Iluminancia `target_off=70` lux | `target_lux_off: 5` (oscuro real con persianas) | S | ✅ cerrada |
-| F-10 | Ocupación entrada/salida instantánea | PATCH (futuro) — rampa lineal 5 min | M (2 d) | ⚪ pendiente |
+| F-10 | Ocupación entrada/salida instantánea | **PATCH 010** EWMA `ramp_minutes=5.0` sobre Poisson + 5 tests | M | ✅ cerrada |
 | F-3 | `relay_1..4` no emitidas como variables | **Verificado**: ya emitidas vía AliasSinkAdapter como `light_01_state`, `light_02_state`, `fan_speed_01_state`, `fan_speed_02_state` | S | ✅ cerrada (no-gap) |
 | F-6 | Discontinuidad ruido `occ=0 → 1` | **PATCH 009** EWMA en `simulate_noise` (`noise.tau_minutes=3.0`) + 5 tests | S | ✅ cerrada |
 
