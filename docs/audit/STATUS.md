@@ -67,3 +67,5 @@ Grafana                          : 4 datasources + 4 dashboards
 - **2026-05-10 00:56** — fase 9 cerrada — `.github/workflows/deploy-docs.yml` con build + deploy a GitHub Pages (path-based trigger sobre `docs/**`, `mkdocs.yml`, workflow propio).
 - **2026-05-10 00:57** — fase 10 iniciada — `ACTION_PLAN.md` con priorización final.
 - **2026-05-10 01:00** — fase 10 cerrada — `ACTION_PLAN.md` consolida 27 hallazgos abiertos (3 alta · 11 media · 13 baja) con priorización MoSCoW, esfuerzo estimado y roadmap Gantt 4 semanas. Auditoría extrema completa.
+- **2026-05-10 01:15** — follow-up Must — H-21 cerrada (PATCH 005 TZ-aware `datetime.now`), H-22 cerrada (PATCH 006 doble scrape Prometheus mode=container/host, verificado live), gap #27 cerrado (`make stream` + `scripts/stream_live.sh`). Suite 194 → **198/198 PASS**. L-PV-02 confirmada cableada vía tests Caso C (live E2E pendiente).
+- **2026-05-10 01:20** — Hallazgos abiertos del ACTION_PLAN: **22** (1 alta · 11 media · 10 baja). Único alta restante: **H-01** event payload `ts_ns` vs ISO `ts` — requiere decisión arquitectónica con upstream CAPTIA-connect.

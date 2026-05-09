@@ -10,14 +10,26 @@
 - **Stack base 100 % funcional**: 8 servicios Docker `healthy`, 24 aulas
   emitiendo a 5 s, ~210 K puntos InfluxDB en 24 h, Telegraf consumer +
   3 outputs activos, 4 dashboards Grafana provisionados, 4 datasources
-  conectados, suite de tests **194 / 194 PASS**.
+  conectados, suite de tests **198 / 198 PASS**.
 - **Score físico estimado**: **0.94** (banda *plausible con caveats menores*).
-- **Hallazgos cerrados durante la auditoría**: 5
-  (gap #5 query, gap #7 E2E live, gap #9 stat=last, H-23 jitter setpoint,
-  L-PV-03 claves canónicas + 3 patches físicos al vendor).
-- **Hallazgos abiertos**: 27 (3 alta · 11 media · 13 baja).
-- **Bloqueador único de banda altamente realista**: L-PV-02 (FaultEventSink
-  emitiendo a `state_events`).
+- **Patches al vendor aplicados** (5 totales, todos retrocompatibles):
+  - **001** vendoring slim BMS-only.
+  - **002** H-23 / F-4 jitter setpoint configurable (`setpoint_jitter_std=0.05`).
+  - **003** L-PV-09 / F-1 humidity dehumidification en cooling.
+  - **004** L-PV-07 / F-2 anti short-cycle HVAC (5 min on/off dwell).
+  - **005** H-21 TZ-aware `datetime.now()` en `runner.py`.
+- **Patches infra adicionales**:
+  - **006** H-22 doble Prometheus scrape (`mode=container` + `mode=host`,
+    `extra_hosts: host.docker.internal:host-gateway`).
+- **Operacional**: `make stream` (gap #27) mantiene el generator vivo con
+  auto-restart + monitoreo `phase` cada 30 s.
+- **Hallazgos cerrados durante la auditoría + follow-up**: **9**
+  (gap #5 query, #7 E2E live, #9 stat=last, #27 stream; H-23, H-21, H-22,
+  H-14 telegraf canonical + 3 patches físicos + 1 patch infra; L-PV-03
+  claves canónicas; L-PV-02 cableado y testeado).
+- **Hallazgos abiertos**: **22** (1 alta · 11 media · 10 baja).
+  - El único bloqueador alta restante es **H-01** (event payload `ts_ns`
+    vs ISO `ts`) — requiere decisión spec con upstream.
 
 ## Patches físicos aplicados en esta auditoría
 
@@ -34,12 +46,13 @@ Tests de regresión: **15 tests nuevos**, todos verdes.
 
 ### Must (crítico para producción ML / dataset confiable)
 
-| ID | Título | Acción | Effort | Owner |
+| ID | Título | Acción | Effort | Estado |
 |---|---|---|---|---|
-| L-PV-02 | FaultEventSink no emite a `state_events` | Implementar `T-PV-22` (emisión + tests + dashboard) | M (5–8 d) | backend |
-| H-21 | Drift TZ runner vendor (`datetime.now()` naive) | Patch vendor → `datetime.now(tz=UTC)` (PATCH 005) + tests calendario | S (1–2 d) | backend |
-| H-22 | Prometheus target `bms-data-generator` down | Mover scrape a labels Docker o exponer servicio en compose | S (1–2 d) | infra |
-| H-01 | Event payload `ts_ns` vs `ts` ISO 8601 (CAPTIA-connect compat) | Decisión: ¿alinear con upstream o documentar divergencia? | S (1 d, tras decisión) | spec |
+| L-PV-02 | FaultEventSink no emite a `state_events` | `extensions/.../fault_event_sink.py` cableado en `runner_service.py:347`. Tests `test_caseC_faults_enabled_emits_fault_events` + `test_caseC_fault_events_have_canonical_schema` PASS confirman emisión + schema canónico. Validación live (correr `bms_v1_caseC_faults.yaml` end-to-end y query `state_events` bucket) sigue pendiente | — | ✅ código + tests (live pendiente) |
+| H-21 | Drift TZ runner vendor (`datetime.now()` naive) | **PATCH 005** aplicado (`runner.py` usa `datetime.now(tz=ZoneInfo(sim.timezone))`); 4 tests `test_runner_tz_audit.py` PASS | S | ✅ cerrada |
+| H-22 | Prometheus target `bms-data-generator` down | **PATCH 006**: doble scrape `mode=container`/`mode=host`, `extra_hosts: host.docker.internal:host-gateway`. Verificado live: target host UP | S | ✅ cerrada |
+| H-01 | Event payload `ts_ns` vs `ts` ISO 8601 (CAPTIA-connect compat) | Decisión: ¿alinear con upstream o documentar divergencia? | S (1 d, tras decisión) | ⚪ pendiente |
+| #27 | `make stream` (generator siempre vivo) | `scripts/stream_live.sh` con auto-restart si phase ≠ running; target `make stream` | S | ✅ cerrada |
 
 ### Should (importante, no bloqueante)
 
