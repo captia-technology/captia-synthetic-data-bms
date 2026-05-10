@@ -29,6 +29,20 @@ run_query() {
 
 OUTPUT=$(run_query "${QUERY}" 2>&1 || true)
 
+# Detect empty bucket: si no hay measurement captia_point todavía (demo mode
+# sin generador corriendo), sólo aparecen las columnas default _start/_stop.
+# El verify se considera SKIP — no es error, es estado válido pre-ingesta.
+if echo "${OUTPUT}" | grep -qE "^[[:space:]]+_start$" && \
+   echo "${OUTPUT}" | grep -qE "^[[:space:]]+_stop$" && \
+   ! echo "${OUTPUT}" | grep -wq "captia_env"; then
+    echo "  - bucket telemetry vacío (sin datos captia_point todavía)"
+    echo "  - SKIP: no hay datos para verificar tags. Test estático en"
+    echo "          tests/integration/test_telegraf_canonical_schema.py cubre"
+    echo "          el schema en config (omit_hostname + processors.tag_limit)."
+    echo "==> Schema canónico CAPTIA: SKIP (bucket vacío) — OK pre-ingesta"
+    exit 0
+fi
+
 REQUIRED_TAGS=("captia_env" "domain_id" "site_id" "asset_id" "variable")
 missing=()
 for tag in "${REQUIRED_TAGS[@]}"; do
