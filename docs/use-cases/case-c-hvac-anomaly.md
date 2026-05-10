@@ -88,3 +88,87 @@ re-entrena mensualmente con los datos del último mes (drift control).
   en MLflow.
 - **Caso G** (G2/G4) audita el balance de clases y la calidad del
   etiquetado.
+
+## Marco teórico (nivel doctoral)
+
+### Isolation Forest (Liu et al. 2008)
+
+Algoritmo de detección de anomalías basado en aislamiento mediante árboles
+binarios construidos por particiones aleatorias. Cada punto $x$ recibe una
+puntuación de anomalía:
+
+\[
+s(x, n) = 2^{-\frac{E[h(x)]}{c(n)}}
+\]
+
+donde:
+- $h(x)$ es la profundidad media del path al aislar $x$ en un árbol.
+- $E[h(x)]$ es la esperanza sobre el ensemble de árboles.
+- $c(n) = 2 H(n-1) - 2(n-1)/n$ con $H(i)$ harmonic number.
+- $s(x) \to 1$ indica anomalía; $s(x) \to 0.5$ indica normal.
+
+Hiper-parámetros calibrados:
+- `n_estimators = 100`.
+- `max_samples = 256`.
+- `contamination` = $\sim 0.02$ (fracción esperada de fallos en BMS, según LBNL FDD).
+
+### Autoencoder (Hinton & Salakhutdinov 2006)
+
+Red neuronal que aprende una función de identidad a través de un cuello de
+botella:
+
+\[
+\hat{x} = D(E(x)), \quad E: \mathbb{R}^d \to \mathbb{R}^k, \quad D: \mathbb{R}^k \to \mathbb{R}^d, \quad k \ll d
+\]
+
+con $k = 8$ neuronas en el bottleneck para $d = 24$ features (lags + meteo + horarios).
+
+La señal de anomalía es el error de reconstrucción:
+
+\[
+e(x) = \| x - \hat{x} \|_2^2
+\]
+
+con umbral $\theta = \mu_e + 3 \sigma_e$ calculado sobre el conjunto de
+entrenamiento (puro normal, sin fallos).
+
+### Modelo de fallos HVAC (ADR-010)
+
+Los 4 tipos de fallo simulados con sus signature observables:
+
+| Tipo | Variable afectada | Signature | Duración típica |
+|---|---|---|---|
+| `sensor_drift` | `temperature_01` | drift lineal $+0.5$ °C/h | $\sim 60$ min |
+| `valve_stuck` | `valve_state`, `temperature_01` | $\Delta T \to 0$ tras setpoint change | $\sim 60$ min |
+| `fan_failure` | `fan_speed_01_state`, `temperature_supply` | $\dot V \to 0$, $T_{supply}$ converge a $T_{coil}$ | $\sim 240$ min |
+| `refrigerant_low` | `temperature_supply` − `temperature_return` | $\Delta T_{cool}$ cae $50 \%$ | $\sim 12$ h |
+
+### Métricas de evaluación
+
+\[
+\begin{aligned}
+\text{Precision} &= \frac{TP}{TP + FP} \\
+\text{Recall} &= \frac{TP}{TP + FN} \\
+\text{F1} &= 2 \cdot \frac{\text{Precision} \cdot \text{Recall}}{\text{Precision} + \text{Recall}} \\
+\text{TPR}@1\%FPR &= \text{Recall sujeto a FPR} \leq 0.01
+\end{aligned}
+\]
+
+Objetivos: $\text{F1} \geq 0.85$ por tipo de fallo, $\text{TPR}@1\%\text{FPR} \geq 0.7$.
+
+## ROI del Caso C
+
+| Concepto | Valor anual |
+|---|---|
+| Detección temprana evita avería catastrófica | $\sim$ 2 incidentes/año × 3 500 € |
+| Reducción downtime aulas (2 h × 200 días lectivos) | $\sim$ 800 € productividad |
+| **Beneficio bruto** | **+7 800 €/año** |
+| Coste integración Caso C en operaciones | -2 000 € one-time |
+| **Payback** | **~3 meses** |
+
+## Bibliografía
+
+- Liu, F., Ting, K., Zhou, Z. (2008). *Isolation Forest*. ICDM 2008.
+- Hinton, G., Salakhutdinov, R. (2006). *Reducing dimensionality with NN*. Science.
+- LBNL FDD Dataset — [datadryad.org/stash/dataset/doi:10.7941/D1N33Q](https://datadryad.org/stash/dataset/doi:10.7941/D1N33Q).
+- ASHRAE Guideline 36-2021 — High-Performance Sequences of Operation for HVAC.

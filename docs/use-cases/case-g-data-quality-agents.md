@@ -81,3 +81,43 @@ referencia.
 - **Caso F** versiona las reglas en lakeFS.
 - **Caso H** — el agente evaluador del chatbot se integra con el chatbot
   G1 para auditar las respuestas.
+
+## Marco teórico (nivel doctoral)
+
+### Reglas de calidad jerárquicas
+
+Sea $\mathcal{D}_b$ bronce, $\mathcal{D}_s$ plata, $\mathcal{D}_o$ oro. El score:
+
+\[
+\mathcal{Q}(\mathcal{D}) = \frac{1}{|R|} \sum_{r \in R} \mathbb{1}[E_r(\mathcal{D}) \text{ holds}], \quad \mathcal{Q} \in [0, 1]
+\]
+
+| Capa | Reglas |
+|---|---|
+| Bronce | Schema validity, no PII inline, encoding UTF-8, dedup |
+| Plata | 5 tags canónicos, range check, monotonic time, NaN < 2 % |
+| Oro | Class balance, no leakage, splits documented |
+
+### Agentes especialistas
+
+Patrón LLM con tools:
+
+\[
+\text{Agent}_i = \langle \pi_i, \mathcal{T}_i, \mathcal{M}_i \rangle
+\]
+
+con $\pi_i$ política (prompt), $\mathcal{T}_i$ toolkit (Flux query, schema lookup), $\mathcal{M}_i$ memoria conversacional.
+
+## ROI Caso G
+
+| Concepto | Valor |
+|---|---|
+| Detección temprana de drift en modelos | +1 500 €/año |
+| Auditoría continua sin intervención | +800 €/año productividad |
+| **Beneficio bruto** | **+2 300 €/año** |
+
+## Bibliografía
+
+- Schelter, S. et al. (2018). *Automating Large-Scale Data Quality Verification*. VLDB.
+- Great Expectations — [greatexpectations.io](https://greatexpectations.io).
+- Anthropic Claude — [docs.anthropic.com](https://docs.anthropic.com).

@@ -78,3 +78,45 @@ Solo se actualiza:
   convención del Caso F.
 - **Caso G** — audita el contenido de `mlruns/` y verifica que cada run
   tiene baseline documentada y referencia lakeFS.
+
+## Marco teórico (nivel doctoral)
+
+### Versionado de datasets (lakeFS)
+
+Modelo Git-like sobre object storage. Un commit es:
+
+\[
+\text{commit}_t = \langle \text{tree}_t, \text{parent}_{t-1}, \text{metadata}_t \rangle
+\]
+
+con `tree` = Merkle DAG. Los modelos referencian
+`dataset_uri = lakefs://repo/branch/commit_id` en lugar de paths mutables.
+
+### Tracking experimentos (MLflow)
+
+\[
+\text{run}_i = \langle \text{params}_i, \text{metrics}_i, \text{artifacts}_i, \text{tags}_i, \text{dataset\_uri}_i \rangle
+\]
+
+### Reproducibilidad determinista
+
+\[
+\hat{y} = M(D, \theta, s = 42)
+\]
+
+Garantía: dado $(D, \theta, s)$, dos ejecuciones producen $\hat{y}$ idéntico
+bit-a-bit (ADR-008).
+
+## ROI Caso F
+
+| Concepto | Valor |
+|---|---|
+| Reducción tiempo auditoría modelos (8 h → 1 h) | +800 €/año |
+| Eliminación re-runs por incertidumbre | +400 €/año compute |
+| **Beneficio bruto** | **+1 200 €/año** |
+
+## Bibliografía
+
+- Zaharia, M. et al. (2018). *MLflow*. CIDR.
+- lakeFS — [docs.lakefs.io](https://docs.lakefs.io).
+- Sculley, D. et al. (2015). *Hidden Technical Debt in ML Systems*. NeurIPS.

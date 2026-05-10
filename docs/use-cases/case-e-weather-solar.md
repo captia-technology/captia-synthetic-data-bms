@@ -85,3 +85,47 @@ en lugar del CSV mock.
   críticas. Coordinar la descarga.
 - **Caso H** (G1) — el modelo se sirve como tool `get_weather_prediction`.
 - **Caso J** (G5) — meteorología cruzada con tráfico (lluvia → congestión).
+
+## Marco teórico (nivel doctoral)
+
+### Modelo de irradiancia solar
+
+\[
+G_h(t) = G_b(t) + G_d(t), \quad G_b(t) = G_{sc} \cdot \tau_b(t) \cdot \cos\theta_z(t)
+\]
+
+con $G_{sc} = 1361$ W/m², $\theta_z$ ángulo cenital del sol calculado a partir
+de declinación $\delta$, latitud $\phi$ (Xátiva 38.99°N) y ángulo horario $\omega$:
+
+\[
+\cos\theta_z = \sin\delta \sin\phi + \cos\delta \cos\phi \cos\omega
+\]
+
+### Predicción solar XGBoost
+
+\[
+\hat{G}_h(t) = \text{XGB}(\mathbf{x}_t) \cdot G_{clearsky}(t)
+\]
+
+separando astronomía (determinista) de meteorología (estocástica via clear-sky index).
+
+### Métricas
+
+\[
+\text{Skill} = 1 - \frac{\text{RMSE}_{model}}{\text{RMSE}_{persistence}}
+\]
+
+Objetivos: $\text{nMAE} \leq 8\%$ a 24 h, $\text{Skill} \geq 0.3$.
+
+## ROI Caso E
+
+Optimización despacho solar (centro 50 kWp): **+800 €/año**. Sinergia con
+Caso B forecast: **+500 €/año**. Coste integración ERA5+AEMET: 1 200 €
+one-time. **Payback ~12 meses**.
+
+## Bibliografía
+
+- ERA5 Copernicus — [cds.climate.copernicus.eu](https://cds.climate.copernicus.eu).
+- Iqbal, M. (1983). *An Introduction to Solar Radiation*. Academic Press.
+- AEMET Open Data — [opendata.aemet.es](https://opendata.aemet.es).
+- pvlib python — [pvlib-python.readthedocs.io](https://pvlib-python.readthedocs.io).

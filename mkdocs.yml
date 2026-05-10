@@ -69,6 +69,14 @@ markdown_extensions:
       alternate_style: true
   - pymdownx.tasklist:
       custom_checkbox: true
+  # LaTeX / MathJax para documentación doctoral con fórmulas
+  - pymdownx.arithmatex:
+      generic: true
+
+extra_javascript:
+  - assets/javascripts/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
 plugins:
   - search:
@@ -144,6 +152,9 @@ nav:
     - Inicialización .env: operations/init-env.md
     - Healthchecks: operations/healthchecks.md
     - Dependabot: operations/dependabot.md
+  - CAPTIA Corporate:
+    - Presentación: captia-corporate/index.md
+    - Business case: captia-corporate/business-case.md
   - Decisiones:
     - Índice ADR: decisions/index.md
   - Archivo:

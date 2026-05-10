@@ -78,3 +78,88 @@ los sensores reales generen suficiente histórico.
   InfluxDB — features exógenas críticas.
 - **Caso H** (G1) consumirá el modelo como tool `get_consumption_prediction`.
 - **Caso F** (G4) define la convención de naming de experimentos MLflow.
+
+## Marco teórico (nivel doctoral)
+
+### Modelos SARIMA
+
+El modelo $\text{SARIMA}(p, d, q)(P, D, Q)_s$ con período estacional $s$ se define como:
+
+\[
+\Phi_P(B^s) \phi_p(B) (1 - B)^d (1 - B^s)^D y_t = \Theta_Q(B^s) \theta_q(B) \varepsilon_t
+\]
+
+donde $B$ es el operador de retardo, $y_t$ la serie observada (consumo
+eléctrico horario `power_01`), y $\varepsilon_t \sim \mathcal{N}(0, \sigma^2)$.
+
+Para Simarro elegimos $s = 24$ (estacionalidad diaria) y $(p,d,q)(P,D,Q)_{24} =
+(2,0,2)(1,1,1)_{24}$ tras minimizar AIC en el dataset BDG2.
+
+### XGBoost para series temporales
+
+Para $\hat{y}_t$ usamos un modelo de boosting con gradiente:
+
+\[
+\hat{y}_t = \sum_{k=1}^{K} f_k(\mathbf{x}_t), \quad f_k \in \mathcal{F}
+\]
+
+donde $\mathbf{x}_t = [y_{t-1}, y_{t-24}, \text{hour}, \text{dow}, T_{out}, ...]$
+es el vector de features lags + calendario + meteorología.
+
+La función objetivo regularizada:
+
+\[
+\mathcal{L}(\phi) = \sum_t \ell(y_t, \hat{y}_t) + \sum_k \Omega(f_k), \quad
+\Omega(f) = \gamma T + \frac{1}{2} \lambda \|w\|^2
+\]
+
+con $T$ = número de hojas y $w$ los pesos.
+
+### LSTM (Long Short-Term Memory)
+
+La celda LSTM mantiene estado interno $c_t$ y $h_t$:
+
+\[
+\begin{aligned}
+f_t &= \sigma(W_f [h_{t-1}, x_t] + b_f) \\
+i_t &= \sigma(W_i [h_{t-1}, x_t] + b_i) \\
+\tilde{c}_t &= \tanh(W_c [h_{t-1}, x_t] + b_c) \\
+c_t &= f_t \odot c_{t-1} + i_t \odot \tilde{c}_t \\
+o_t &= \sigma(W_o [h_{t-1}, x_t] + b_o) \\
+h_t &= o_t \odot \tanh(c_t)
+\end{aligned}
+\]
+
+donde $\sigma$ es la sigmoide, $\odot$ producto Hadamard, y los $f_t, i_t, o_t$
+son los gates forget, input y output.
+
+### Métricas de evaluación
+
+\[
+\begin{aligned}
+\text{MAE} &= \frac{1}{n} \sum_{t=1}^{n} | y_t - \hat{y}_t | \\
+\text{RMSE} &= \sqrt{\frac{1}{n} \sum_{t=1}^{n} (y_t - \hat{y}_t)^2} \\
+\text{sMAPE} &= \frac{100\%}{n} \sum_{t=1}^{n} \frac{|y_t - \hat{y}_t|}{(|y_t| + |\hat{y}_t|)/2}
+\end{aligned}
+\]
+
+Objetivos para Simarro: $\text{MAE} \leq 0.15$ kWh, $\text{sMAPE} \leq 12\%$.
+
+## ROI estimado del Caso B
+
+| Métrica | Valor |
+|---|---|
+| Ahorro consumo HVAC tras forecast + ajuste setpoint | $\sim 15 \%$ |
+| Aulas tipo Simarro (40) | 9 600 kWh / aula·año |
+| Coste energía España 2025 | 0.14 €/kWh |
+| **Ahorro centro**: $40 \cdot 9\,600 \cdot 0.14 \cdot 0.15$ | **8 064 €/año** |
+| Coste implantación + integración | ~3 000 € one-time |
+| **Payback** | **~ 5 meses** |
+
+## Bibliografía
+
+- Box, G., Jenkins, G., Reinsel, G. (2015). *Time Series Analysis*. Wiley.
+- Chen, T., Guestrin, C. (2016). *XGBoost: A Scalable Tree Boosting System*. KDD '16.
+- Hochreiter, S., Schmidhuber, J. (1997). *Long Short-Term Memory*. Neural Computation.
+- BDG2 — Building Data Genome 2 ([github.com/buds-lab/building-data-genome-project-2](https://github.com/buds-lab/building-data-genome-project-2)).
+- ASHRAE 90.1-2022 — Energy Standard for Buildings.

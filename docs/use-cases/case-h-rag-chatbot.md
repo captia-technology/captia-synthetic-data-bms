@@ -82,3 +82,48 @@ documentos RAG se enriquecen con material real del IES Simarro.
 - **Caso E** (G3) — `get_weather_prediction` consume el predictor de E.
 - **Caso D** (G4) — `get_building_state` lee del InfluxDB de D.
 - **Caso G** — el agente evaluador audita las respuestas del chatbot.
+
+## Marco teórico (nivel doctoral)
+
+### RAG (Retrieval-Augmented Generation)
+
+\[
+P(y | x) = \sum_{z \in \mathcal{Z}} P_\eta(z | x) \cdot P_\theta(y | x, z)
+\]
+
+con $x$ pregunta, $z$ documento recuperado, $P_\eta$ retriever, $P_\theta$
+LLM generador. Similarity coseno:
+
+\[
+\text{sim}(x, z) = \frac{\mathbf{e}_x \cdot \mathbf{e}_z}{\|\mathbf{e}_x\| \|\mathbf{e}_z\|}
+\]
+
+### Tools tipadas
+
+\[
+\mathcal{T} = \{ t_i : \mathbb{X}_i \to \mathbb{Y}_i \text{ con schema JSON} \}
+\]
+
+### Métricas
+
+\[
+\text{Hit Rate@k}, \quad \text{MRR} = \frac{1}{N} \sum \frac{1}{\text{rank}_i}
+\]
+
+Objetivos: Hit@5 ≥ 0.85, MRR ≥ 0.7, Faithfulness ≥ 0.9.
+
+## ROI Caso H
+
+| Concepto | Valor |
+|---|---|
+| Reducción tickets soporte L1 | +3 500 €/año |
+| Tiempo respuesta profesores | +1 200 €/año |
+| **Bruto** | **+4 700 €/año** |
+| Coste API LLM | -1 800 €/año |
+| **Neto** | **+2 900 €/año** |
+
+## Bibliografía
+
+- Lewis, P. et al. (2020). *Retrieval-Augmented Generation*. NeurIPS.
+- Reimers, N. (2019). *Sentence-BERT*. EMNLP.
+- LangChain — [python.langchain.com](https://python.langchain.com).

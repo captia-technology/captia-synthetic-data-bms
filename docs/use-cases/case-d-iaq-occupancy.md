@@ -89,3 +89,79 @@ from(bucket: "telemetry_1m")
 - **Caso E** (G3) — coordinar variables exteriores comunes (T, HR, lux).
 - **Caso H** (G1) — el modelo se sirve como tool `get_building_state`.
 - **Caso G** — auditar balance de clases en el dataset supervisado.
+
+## Marco teórico (nivel doctoral)
+
+### Modelo IAQ (EN 16798-1:2019)
+
+El índice de calidad del aire interior CO₂ se modela como un sistema de
+balance de masa "well-mixed" (un solo compartimento):
+
+\[
+V \frac{dC(t)}{dt} = N(t) \cdot G - Q(t) \cdot (C(t) - C_{out})
+\]
+
+donde:
+- $V$ = volumen del aula (m³).
+- $C(t)$ = concentración CO₂ interior (ppm).
+- $C_{out}$ = concentración CO₂ exterior $\approx 420$ ppm.
+- $N(t)$ = ocupación instantánea (personas).
+- $G$ = tasa de generación CO₂ por persona (4.5 ppm·m³/min·persona, ASHRAE 62.1).
+- $Q(t)$ = tasa de ventilación (m³/min).
+
+Solución estacionaria con $N$ constante y $Q$ constante:
+
+\[
+C_\infty = C_{out} + \frac{N \cdot G}{Q}
+\]
+
+Para clase típica Simarro ($V = 180$ m³, $N = 25$, $Q = 7.5$ m³/min con
+HVAC ON, $G = 4.5$): $C_\infty \approx 570$ ppm. Sin ventilación
+($Q \to 0$) la concentración crece sin asíntota hasta clipping a 2 200 ppm.
+
+### Modelo de ocupación (Random Forest)
+
+\[
+\hat{N} = \text{RF}(\mathbf{x}), \quad \mathbf{x} = [C, T, RH, \text{noise}, \text{lux}, \text{hour}, \text{dow}]
+\]
+
+con $\text{RF} = \frac{1}{B} \sum_{b=1}^{B} T_b(\mathbf{x})$ ensemble de
+$B = 100$ árboles entrenados con bootstrap.
+
+Métrica: F1 binario sobre `Occupied` ($N > 0$). Objetivo $\text{F1} \geq 0.8$.
+
+### Confort térmico (modelo PMV simplificado)
+
+Predicted Mean Vote (Fanger 1970):
+
+\[
+\text{PMV} = (0.303 e^{-0.036 M} + 0.028) (M - W - H_{loss})
+\]
+
+donde $M$ = tasa metabólica, $W$ = trabajo mecánico, $H_{loss}$ pérdida de calor.
+
+Para aulas (sentado, ropa ligera, $M \approx 70$ W/m², $W \approx 0$):
+
+\[
+\text{PMV}_{aula} \approx 0.234 \cdot (70 - H_{loss}(T, RH, v_{air}))
+\]
+
+con objetivos PMV $\in [-0.5, +0.5]$ para banda de confort.
+
+## ROI del Caso D
+
+| Concepto | Valor anual |
+|---|---|
+| Reducción consumo HVAC (15 %) por ajuste IAQ | +1 162 €/año |
+| Reducción quejas alumnos / profesores | +500 €/año (productividad) |
+| **Beneficio bruto** | **+1 662 €/año** |
+| Coste implantación dashboard IAQ | -800 € one-time |
+| **Payback** | **~6 meses** |
+
+## Bibliografía
+
+- ASHRAE 62.1-2019 — Ventilation for Acceptable Indoor Air Quality.
+- EN 16798-1:2019 — Energy performance of buildings.
+- Fanger, P. O. (1970). *Thermal Comfort*. McGraw-Hill.
+- In-Gauge Dataset — [github.com/InGauge-au/InGauge-Dataset](https://github.com/InGauge-au/InGauge-Dataset).
+- UCI Occupancy Detection — [archive.ics.uci.edu/ml/datasets/Occupancy+Detection+](https://archive.ics.uci.edu/ml/datasets/Occupancy+Detection+).
