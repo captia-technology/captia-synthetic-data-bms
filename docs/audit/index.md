@@ -19,6 +19,8 @@
 | 9 | GitHub Pages workflow | despliegue automático | ✅ |
 | 10 | [Plan de acción](ACTION_PLAN.md) | priorización MoSCoW; 27 hallazgos abiertos (3 alta · 11 media · 13 baja) + roadmap | ✅ |
 | 11 | [Matriz casos uso](USE_CASE_MATRIX.md) · [Plan notebooks](NOTEBOOK_PLAN.md) · [Reporte docs](DOCS_REPORT.md) | 45 notebooks + 28 docs web nuevos | ✅ |
+| Cierre | [**Reporte final consolidado**](FINAL_REPORT.md) | snapshot tras 11 fases; stack live; todos los patches/ADRs/reportes/commits | ✅ |
+| Re-run | [**Audit re-run 2026-05-10**](AUDIT_RERUN_2026-05-10.md) | post-cierre; detecta + cierra dashboard caseD fail; consolida drift 74 files; 10 servicios live | ✅ |
 
 ## Hallazgos consolidados
 
