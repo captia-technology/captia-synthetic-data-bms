@@ -120,17 +120,44 @@ wait-healthy:  ## Block until all 9 services report healthy (max 120s)
 	bash scripts/wait_healthy.sh
 
 .PHONY: wait-init
-wait-init:  ## Block until influx-init exits successfully (max 60s)
-	@deadline=$$(( $$(date +%s) + 60 )); \
-	while [ $$(date +%s) -lt $$deadline ]; do \
-	    state=$$(docker inspect --format='{{.State.Status}}' captia-bms-influx-init 2>/dev/null || echo missing); \
-	    code=$$(docker inspect --format='{{.State.ExitCode}}' captia-bms-influx-init 2>/dev/null || echo 0); \
-	    if [ "$$state" = "exited" ] && [ "$$code" = "0" ]; then echo "==> influx-init OK"; exit 0; fi; \
-	    if [ "$$state" = "exited" ] && [ "$$code" != "0" ]; then echo "ERROR: influx-init exited with code $$code"; docker logs captia-bms-influx-init | tail -20; exit 1; fi; \
-	    sleep 2; \
-	done; \
-	echo "ERROR: timeout waiting for influx-init"; \
-	docker logs captia-bms-influx-init 2>&1 | tail -20; exit 1
+wait-init:  ## Block until influx-init AND metadata-bootstrap exit successfully (max 90s)
+	@for c in captia-bms-influx-init captia-bms-metadata-bootstrap; do \
+	    deadline=$$(( $$(date +%s) + 90 )); \
+	    echo "==> Waiting for $$c..."; \
+	    while [ $$(date +%s) -lt $$deadline ]; do \
+	        state=$$(docker inspect --format='{{.State.Status}}' $$c 2>/dev/null || echo missing); \
+	        code=$$(docker inspect --format='{{.State.ExitCode}}' $$c 2>/dev/null || echo 0); \
+	        if [ "$$state" = "exited" ] && [ "$$code" = "0" ]; then echo "==> $$c OK"; break; fi; \
+	        if [ "$$state" = "exited" ] && [ "$$code" != "0" ]; then echo "ERROR: $$c exited with code $$code"; docker logs $$c | tail -20; exit 1; fi; \
+	        sleep 2; \
+	    done; \
+	    if [ "$$state" != "exited" ] || [ "$$code" != "0" ]; then echo "ERROR: timeout waiting for $$c"; docker logs $$c 2>&1 | tail -20; exit 1; fi; \
+	done
+
+.PHONY: verify-metadata
+verify-metadata:  ## Verify captia_metadata is populated (210 captia_point_meta + 1 captia_domain_meta)
+	@bash -c '\
+	    TOKEN=$$(grep INFLUXDB_TOKEN .env | cut -d= -f2); \
+	    P=$$(curl -s -X POST "http://localhost:$${INFLUXDB_PORT_HOST:-8087}/api/v2/query?org=$${INFLUXDB_ORG:-captia}" \
+	        -H "Authorization: Token $$TOKEN" -H "Accept: application/csv" -H "Content-type: application/vnd.flux" \
+	        -d "from(bucket:\"captia_metadata\") |> range(start:0) |> filter(fn:(r) => r._measurement == \"captia_point_meta\") |> filter(fn:(r) => r._field == \"metric_kind\") |> count() |> group() |> sum()" \
+	        | tail -2 | head -1 | grep -oE "[0-9]+$$"); \
+	    D=$$(curl -s -X POST "http://localhost:$${INFLUXDB_PORT_HOST:-8087}/api/v2/query?org=$${INFLUXDB_ORG:-captia}" \
+	        -H "Authorization: Token $$TOKEN" -H "Accept: application/csv" -H "Content-type: application/vnd.flux" \
+	        -d "from(bucket:\"captia_metadata\") |> range(start:0) |> filter(fn:(r) => r._measurement == \"captia_domain_meta\") |> filter(fn:(r) => r._field == \"domain_name\") |> count() |> group() |> sum()" \
+	        | tail -2 | head -1 | grep -oE "[0-9]+$$"); \
+	    EXPECTED_P=$$(( $${BMS_N_AULAS:-10} * 21 )); \
+	    if [ "$${P:-0}" -ge "$$EXPECTED_P" ] && [ "$${D:-0}" -ge "1" ]; then \
+	        echo "==> verify-metadata OK: $$P captia_point_meta (>= $$EXPECTED_P), $$D captia_domain_meta (>= 1)"; \
+	    else \
+	        echo "ERROR: captia_metadata under-populated. point_meta=$${P:-0}/$$EXPECTED_P, domain_meta=$${D:-0}/1"; \
+	        echo "Run: make metadata-bootstrap"; exit 1; \
+	    fi'
+
+.PHONY: metadata-bootstrap
+metadata-bootstrap:  ## Re-run metadata-bootstrap manually (purge + rewrite captia_metadata)
+	@docker compose --env-file $(ENV_FILE) -f compose/base.yaml -f compose/data-plane-init.yaml \
+	    run --rm metadata-bootstrap
 
 .PHONY: wait-healthy-infra
 wait-healthy-infra:  ## Block until infra services (no generator) are healthy
@@ -271,6 +298,26 @@ notebooks-build: notebooks-data  ## Regenerate the 45 didactic notebooks (idempo
 .PHONY: notebooks-test
 notebooks-test:  ## Run notebook integrity audit (JSON, schema, no secrets)
 	uv run pytest tests/integration/test_notebooks_integrity.py -q --no-header
+
+.PHONY: notebooks-execute
+notebooks-execute:  ## Execute 45 notebooks with workers=2 (in-place outputs)
+	uv run --group notebooks python scripts/execute_notebooks.py --workers 2 --timeout 300
+
+.PHONY: notebooks-audit
+notebooks-audit:  ## Regenerate the 9 audit deliverables in docs/audit/notebooks/
+	uv run python scripts/audit_notebooks.py --inventory --matrix --reviews-skeleton --status
+
+.PHONY: notebooks-template
+notebooks-template:  ## Regenerate the canonical CAPTIA notebook template
+	uv run python -m scripts.build_notebook_template
+
+.PHONY: notebooks-refactor-validate
+notebooks-refactor-validate:  ## Full validation: tests + ruff + score delta + bottom-10 + execute
+	uv run pytest tests/integration/test_notebooks_integrity.py -q
+	uv run ruff check . && uv run ruff format --check .
+	uv run python scripts/audit_notebooks.py --score-delta
+	uv run python scripts/audit_notebooks.py --bottom 10 --threshold 7.5
+	uv run --group notebooks python scripts/execute_notebooks.py --workers 2 --timeout 300
 
 .PHONY: notebooks-lab
 notebooks-lab:  ## Open Jupyter Lab pointing at notebooks/ (auto-installs jupyterlab)

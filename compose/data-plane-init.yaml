@@ -1,7 +1,13 @@
 # =============================================================================
-# CAPTIA-SYNTHETIC-DATA-BMS — data plane init (one-shot)
-# Servicio: influx-init que crea 7 buckets, aplica las 5 tareas Flux y
-# puebla captia_metadata desde config/domains/<dominio>/variables.yaml.
+# CAPTIA-SYNTHETIC-DATA-BMS — data plane init (one-shots)
+# 1. influx-init: crea 7 buckets + aplica las Flux tasks de downsampling.
+# 2. metadata-bootstrap: pobla captia_metadata desde variables.yaml.
+#
+# Ambos one-shot servicios (`restart: "no"`) corren AUTOMÁTICAMENTE en cada
+# `make demo` / `make quickstart`. metadata-bootstrap se encadena tras
+# influx-init para garantizar que los buckets existen antes de poblarlos.
+#
+# Patrón inspirado en captia-connect/compose/base.yaml (tools/metadata-bootstrap).
 # =============================================================================
 
 name: captia-bms
@@ -25,6 +31,34 @@ services:
       - CAPTIA_ENV=${CAPTIA_ENV:-dev}
       - CAPTIA_SITE=${CAPTIA_SITE:-ies_simarro}
     entrypoint: ["/bin/sh", "/scripts/init_buckets_tasks.sh"]
+
+  # ---------------------------------------------------------------------------
+  # Metadata bootstrap (one-shot) — pobla captia_metadata con el catálogo de
+  # variables canónicas (21 vars × N aulas + 1 domain meta).
+  # Encadenado tras influx-init (que ya creó el bucket captia_metadata).
+  # BOOTSTRAP_MODE=force purga y reescribe en cada deploy (catálogo fresco
+  # alineado con el variables.yaml montado).
+  # ---------------------------------------------------------------------------
+  metadata-bootstrap:
+    build:
+      context: ..
+      dockerfile: tools/metadata-bootstrap/Dockerfile
+    container_name: captia-bms-metadata-bootstrap
+    restart: "no"
+    depends_on:
+      influx-init:
+        condition: service_completed_successfully
+    volumes:
+      - ../config/domains:/app/domains:ro
+    environment:
+      - INFLUX_HOST=${INFLUXDB_URL:-http://influxdb:8086}
+      - INFLUX_TOKEN=${INFLUXDB_TOKEN:?required}
+      - INFLUX_ORG=${INFLUXDB_ORG:-captia}
+      - CAPTIA_ENV=${CAPTIA_ENV:-dev}
+      - BMS_DOMAIN_ID=${BMS_DOMAIN_ID:-bms_classrooms}
+      - BMS_N_AULAS=${BMS_N_AULAS:-10}
+      - DOMAINS_DIR=/app/domains
+      - BOOTSTRAP_MODE=${BOOTSTRAP_MODE:-force}
 
 networks:
   default:

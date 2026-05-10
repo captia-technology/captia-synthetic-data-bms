@@ -114,6 +114,12 @@ create_bucket_if_missing "captia_metadata" "0"
 # Closes the gap reported by CENTINELA+ guide (line 549, 268): the rollup
 # tasks only emit data for variables present in captia_metadata.
 # =============================================================================
+# DEPRECATED (2026-05-10): la población de captia_metadata ahora la hace
+# el servicio dedicado tools/metadata-bootstrap (Python, más robusto).
+# Esta función se mantiene como fallback awk para entornos donde el contenedor
+# metadata-bootstrap no esté disponible (bare-metal influx-init standalone).
+# El servicio dedicado es invocado automáticamente tras influx-init en
+# compose/data-plane-init.yaml.
 populate_metadata() {
     domain_dir="$1"
     [ -d "${domain_dir}" ] || return 0
