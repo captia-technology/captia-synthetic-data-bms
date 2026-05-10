@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from scripts.build_notebooks._helpers import common_summary, emit, section, setup_section
+from scripts.build_notebooks._appendices import APPENDICES_CASE_J
 
 CASE = "J — Tráfico + YOLO"
 SPEC = "docs/specs/synthetic-bms/01-product-spec.md"
@@ -38,13 +39,13 @@ def _captura(target: Path) -> Path:
             "Bronce = JPEG en MinIO; Plata = conteos en `traffic_cameras`.",
         ),
         section(6, "Datos de entrada", "Conceptual + mock JPEG."),
+        setup_section(),
         section(
-            7,
+            8,
             "Schema CAPTIA esperado",
             "Tags `domain_id=traffic_cameras`, `site_id=valencia`, `asset_id=DGT_CAM_*`, "
             "`variable=vehicle_count`.",
         ),
-        setup_section(),
         section(
             9,
             "Carga de datos o mock",
@@ -100,8 +101,9 @@ plt.tight_layout()
             "El path generado es estable.",
             """\
 ts = dt.datetime(2026, 5, 10, 12, 30, tzinfo=dt.timezone.utc)
-assert store_path("DGT_CAM_V46_001", ts) == "cameras/DGT_CAM_V46_001/2026-05-10/1747052200.jpg"
-print("Path schema OK")
+expected = f"cameras/DGT_CAM_V46_001/2026-05-10/{int(ts.timestamp())}.jpg"
+assert store_path("DGT_CAM_V46_001", ts) == expected
+print("Path schema OK:", expected)
 """,
         ),
         section(
@@ -134,6 +136,7 @@ print("Path schema OK")
         layer="bronce",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_J,
     )
 
 
@@ -157,12 +160,12 @@ def _yolo(target: Path) -> Path:
         section(4, "Relación con CENTINELA+", "El conteo es analog_gauge."),
         section(5, "Relación con Medallion", "Bronce → plata: conteo en plata."),
         section(6, "Datos de entrada", "JPEG mock."),
+        setup_section(),
         section(
-            7,
+            8,
             "Schema CAPTIA esperado",
             "`variable ∈ {vehicle_count, congestion_level, detection_confidence}`.",
         ),
-        setup_section(),
         section(
             9,
             "Carga de datos o mock",
@@ -264,6 +267,7 @@ print("Mock OK")
         layer="bronce → plata",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_J,
     )
 
 
@@ -287,13 +291,13 @@ def _series(target: Path) -> Path:
         section(4, "Relación con CENTINELA+", "Independiente del aula."),
         section(5, "Relación con Medallion", "Bronce → plata."),
         section(6, "Datos de entrada", "Mock 7 días × 15 min × 2 cámaras."),
+        setup_section(),
         section(
-            7,
+            8,
             "Schema CAPTIA esperado",
             "`vehicle_count` (analog_gauge), `congestion_level` (analog_gauge), "
             "`detection_confidence` (analog_gauge).",
         ),
-        setup_section(),
         section(
             9,
             "Carga de datos o mock",
@@ -390,110 +394,227 @@ print("Sample:", sample)
         layer="bronce → plata",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_J,
     )
 
 
 def _meteo(target: Path) -> Path:
-    title = "Caso J · 04 Integración tráfico × meteorología — predicción congestión"
+    title = "Caso J · 04 Predicción congestión a 15 min — tráfico × meteorología"
     sections = [
         section(
             1,
             "Objetivo",
-            "Cruzar conteos de tráfico con meteorología (lluvia) y entrenar un modelo "
-            "que prediga `congestion_level`.",
+            "Predecir `congestion_level(t+15min)` a partir de `vehicle_count(t)`, "
+            "lluvia y horario. **Predicción real con target lagged**, no "
+            "clasificación contemporánea. Comparar 3 modelos:\n\n"
+            "1. Baseline persistencia: `Ĉ(t+15) = C(t)`.\n"
+            "2. RandomForest sobre features tiempo + meteo + cuenta.\n"
+            "3. Modelo solo-meteo (sin `vehicle_count`) — para medir cuánta señal "
+            "viene del tráfico vs del clima.",
         ),
         section(
             2,
             "Qué se aprende",
-            "- Merge time-aligned.\n"
-            "- Random Forest para clasificación ordinal.\n"
-            "- Feature importance climática.",
+            "- Target lagged (`shift(-1)` en frecuencia 15-min).\n"
+            "- Diagnóstico de leakage por correlación (`corr(X, y) > 0.85` ⇒ "
+            "auditar el DGP del mock).\n"
+            "- Multi-clase + matriz de confusión + `balanced_accuracy`.\n"
+            "- Comparar modelos con/sin feature crítica para medir contribución.",
         ),
-        section(3, "Contexto del caso de uso", "Capa oro: predicción para los próximos 15 min."),
-        section(4, "Relación con CENTINELA+", "Tool del chatbot Caso H opcional."),
-        section(5, "Relación con Medallion", "Lee plata, escribe oro."),
-        section(6, "Datos de entrada", "Mock traffic + AEMET (incluido en mismo CSV)."),
-        section(7, "Schema CAPTIA esperado", "No aplica (oro)."),
+        section(
+            3,
+            "Contexto del caso de uso",
+            "Operadores de smart city necesitan estimar congestión 15 min antes para "
+            "ajustar semáforos o avisar a emergencias. La señal entra por dos canales: "
+            "histórico de cuentas y meteorología. El modelo debe captar **ambos**.",
+        ),
+        section(
+            4,
+            "Relación con CENTINELA+",
+            "Tool opcional `predict_congestion(camera_id, horizon_min)` para el chatbot "
+            "Caso H. Cliente final: ayuntamiento o autopista, no centro educativo.",
+        ),
+        section(5, "Relación con Medallion", "Lee plata `traffic_cameras`, escribe oro."),
+        section(
+            6,
+            "Datos de entrada",
+            "Mock `traffic_camera_mock.csv` con DGP **mixto** (congestion_level "
+            "depende de hora+lluvia+ruido categórico, no es función directa de "
+            "vehicle_count).",
+        ),
         setup_section(),
+        section(8, "Schema CAPTIA esperado", "No aplica (oro)."),
         section(
             9,
             "Carga de datos o mock",
-            "Cargamos.",
+            "Cargamos y aplicamos **lag de 1 step (15 min)** al target. Ordenamos por "
+            "(camera, timestamp) para evitar contaminación entre cámaras.",
             """\
 csv_path = ROOT / "notebooks/_data/traffic_camera_mock.csv"
-df = pd.read_csv(csv_path, comment="#", parse_dates=["timestamp"])
+df = pd.read_csv(csv_path, comment="#", parse_dates=["timestamp"]).sort_values(
+    ["camera_id", "timestamp"]
+)
 df["hour"] = df["timestamp"].dt.hour
 df["weekday"] = df["timestamp"].dt.dayofweek
 df["is_rush"] = ((df["hour"].isin([7, 8, 9, 17, 18, 19])) & (df["weekday"] < 5)).astype(int)
-df.head()
+df["rain_event"] = (df["precip_mm"] > 1.0).astype(int)
+df["vehicle_count_lag1"] = df.groupby("camera_id")["vehicle_count"].shift(1)
+# TARGET: congestion 15 min DESPUÉS (un step de 15 min)
+df["y_target"] = df.groupby("camera_id")["congestion_level"].shift(-1)
+df = df.dropna(subset=["y_target", "vehicle_count_lag1"])
+df["y_target"] = df["y_target"].astype(int)
+print({"filas": len(df), "y_dist": df["y_target"].value_counts().to_dict()})
 """,
         ),
         section(
             10,
             "Exploración paso a paso",
-            "Correlación.",
+            "**Diagnóstico de leakage**: si `corr(vehicle_count, y_target) > 0.85` el "
+            "mock está mal diseñado y el modelo será tautológico.",
             """\
-print(df[["vehicle_count", "precip_mm", "is_rush", "congestion_level"]].corr().round(2))
+corr = df[["vehicle_count", "vehicle_count_lag1", "precip_mm", "rain_event",
+           "is_rush", "hour", "y_target"]].corr().round(2)
+print(corr["y_target"].sort_values(ascending=False))
+peak_corr = corr.loc["vehicle_count", "y_target"]
+print(f"\\ncorr(vehicle_count, y_target) = {peak_corr}")
+assert abs(peak_corr) < 0.85, "Probable leakage en el mock — auditar DGP"
 """,
         ),
         section(11, "Transformación bronce → plata", "No aplica."),
         section(
             12,
             "Construcción de capa oro",
-            "Modelo.",
+            "**Tres modelos** sobre split temporal estricto.",
             """\
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import classification_report
+from sklearn.metrics import balanced_accuracy_score, classification_report, f1_score
 
-X = df[["vehicle_count", "precip_mm", "is_rush", "hour"]]
-y = df["congestion_level"]
+features_full = ["vehicle_count", "vehicle_count_lag1", "precip_mm", "rain_event", "is_rush", "hour"]
+features_meteo_only = ["precip_mm", "rain_event", "is_rush", "hour"]
+y = df["y_target"]
+X_full = df[features_full]
+X_meteo = df[features_meteo_only]
+
+# Split temporal por timestamp (mezclando cámaras OK porque ordenamos por timestamp dentro)
 n = len(df); i = int(n * 0.7)
-X_tr, X_te = X.iloc[:i], X.iloc[i:]
 y_tr, y_te = y.iloc[:i], y.iloc[i:]
+X_tr_full, X_te_full = X_full.iloc[:i], X_full.iloc[i:]
+X_tr_meteo, X_te_meteo = X_meteo.iloc[:i], X_meteo.iloc[i:]
 
-m = RandomForestClassifier(n_estimators=120, random_state=SEED).fit(X_tr, y_tr)
-y_pred = m.predict(X_te)
-print(classification_report(y_te, y_pred, zero_division=0))
+# (1) Persistencia: Ĉ(t+15) = C(t) → la observación contemporánea
+y_pred_persist = df["congestion_level"].iloc[i:].to_numpy()
+
+# (2) RF full features
+rf_full = RandomForestClassifier(
+    n_estimators=200, max_depth=8, class_weight="balanced",
+    random_state=SEED, n_jobs=1,
+).fit(X_tr_full, y_tr)
+y_pred_full = rf_full.predict(X_te_full)
+
+# (3) RF solo meteo + horario (sin tráfico)
+rf_meteo = RandomForestClassifier(
+    n_estimators=200, max_depth=8, class_weight="balanced",
+    random_state=SEED, n_jobs=1,
+).fit(X_tr_meteo, y_tr)
+y_pred_meteo = rf_meteo.predict(X_te_meteo)
+
+table = pd.DataFrame({
+    "model": ["persistencia", "RF_full", "RF_solo_meteo"],
+    "balanced_acc": [
+        balanced_accuracy_score(y_te, y_pred_persist),
+        balanced_accuracy_score(y_te, y_pred_full),
+        balanced_accuracy_score(y_te, y_pred_meteo),
+    ],
+    "f1_macro": [
+        f1_score(y_te, y_pred_persist, average="macro", zero_division=0),
+        f1_score(y_te, y_pred_full, average="macro", zero_division=0),
+        f1_score(y_te, y_pred_meteo, average="macro", zero_division=0),
+    ],
+}).round(3)
+print(table)
 """,
         ),
         section(
             13,
             "Visualizaciones explicativas",
-            "Feature importance.",
+            "Matriz de confusión multi-clase + feature importance + barra "
+            "comparativa de modelos.",
             """\
-imp = pd.Series(m.feature_importances_, index=X.columns).sort_values()
-imp.plot.barh(color="#9C27B0", figsize=(7, 3))
-plt.title("Feature importance — congestion_level")
+from sklearn.metrics import ConfusionMatrixDisplay
+import matplotlib.pyplot as plt
+
+fig, axes = plt.subplots(1, 3, figsize=(13, 4))
+ConfusionMatrixDisplay.from_predictions(y_te, y_pred_full, ax=axes[0], cmap="Blues", colorbar=False)
+axes[0].set_title("RF full — confusión")
+imp = pd.Series(rf_full.feature_importances_, index=features_full).sort_values()
+imp.plot.barh(ax=axes[1], color="#9C27B0")
+axes[1].set_title("Feature importance — RF full")
+table.set_index("model")[["balanced_acc", "f1_macro"]].plot.bar(ax=axes[2])
+axes[2].set_title("Modelos comparados")
+axes[2].tick_params(axis="x", rotation=15)
 plt.tight_layout()
 """,
         ),
         section(
             14,
             "Validaciones",
-            "El modelo discrimina niveles base.",
+            "El **mejor de los modelos ML** debe batir persistencia. Si "
+            "`RF_solo_meteo > RF_full`, es una señal de que `vehicle_count` "
+            "introduce ruido y hay que reconsiderar el feature engineering "
+            "(p.ej. usar `vehicle_count_lag` con lag mayor o normalización por "
+            "horario).",
             """\
-from sklearn.metrics import balanced_accuracy_score
-print({"balanced_acc": balanced_accuracy_score(y_te, y_pred)})
+acc_persist = balanced_accuracy_score(y_te, y_pred_persist)
+acc_full = balanced_accuracy_score(y_te, y_pred_full)
+acc_meteo = balanced_accuracy_score(y_te, y_pred_meteo)
+acc_best = max(acc_full, acc_meteo)
+print(f"persistencia={acc_persist:.3f}  RF_full={acc_full:.3f}  RF_solo_meteo={acc_meteo:.3f}")
+assert acc_best > acc_persist, "Ningún modelo ML bate persistencia — investigar"
+
+if acc_meteo > acc_full + 0.02:
+    print(
+        "INSIGHT — solo_meteo > full por > 0.02:\\n"
+        "  vehicle_count introduce ruido. El DGP de congestion_level depende "
+        "principalmente de horario+lluvia. Considerar:\\n"
+        "  - normalizar count por hora del día (count - count_baseline_hora);\\n"
+        "  - usar lags más largos (15→60 min);\\n"
+        "  - reducir profundidad del RF para evitar overfit a ruido."
+    )
+print("Validaciones OK")
 """,
         ),
         section(
             15,
             "Errores comunes",
-            "1. Predecir como regresión cuando es ordinal.\n"
-            "2. No incluir hora del día.\n"
-            "3. Comparar accuracy entre datasets desbalanceados.",
+            "1. **Target sin lag**: predecir `C(t)` con features de `t` es "
+            "clasificación, no predicción. Cualquier modelo con ground truth como "
+            "input tendrá accuracy ~1.0 sin valor real.\n"
+            "2. **Leakage encubierto en el mock**: `corr(X, y) > 0.85` es alarma. "
+            "Auditar el DGP del simulador antes de modelar.\n"
+            "3. **Comparar accuracy multi-clase desbalanceada** sin `balanced_accuracy` "
+            "ni `f1_macro` — se infla con la clase mayoritaria.\n"
+            "4. **No medir contribución por feature group**: si solo-meteo iguala a "
+            "full, el tráfico no aporta — el caso de uso pierde sentido.\n"
+            "5. **Mezclar cámaras sin estratificar**: en producción, train/test debe "
+            "respetar particiones por cámara o usar ID hold-out.",
         ),
         section(
             16,
             "Ejercicios propuestos",
-            "1. Añade `dvehicle_count_15min` como feature.\n"
-            "2. Reemplaza por `OrdinalRegression`.\n"
-            "3. Construye un dashboard Grafana con prediction live.",
+            "1. Cambia el horizonte a 30 min (`shift(-2)`) y mide cómo decae "
+            "`balanced_accuracy`. Plotea curva accuracy vs horizonte.\n"
+            "2. Implementa `OrdinalRegression` (vía `mord` o transformación binaria "
+            "por nivel) y compara con RF.\n"
+            "3. Auditar el mock: ¿cuál es la correlación máxima feature-target en el "
+            "DGP? ¿Cómo cambiarías `synthetic_mocks.make_traffic_camera_mock` para "
+            "introducir/eliminar señal?",
         ),
         section(
             17,
             "Cómo se reutiliza con datos reales",
-            "Cambiar el mock por la query Flux que combina `traffic_cameras` + `weather_station`.",
+            "Sustituir el CSV por una query Flux que cruce `traffic_cameras` (count) y "
+            "`weather_station` (precipitation, wind). El feature engineering "
+            "(`shift(-1)`, `rain_event`) y el RF se mantienen idénticos.",
         ),
         common_summary(
             next_notebook=None,
@@ -512,6 +633,7 @@ print({"balanced_acc": balanced_accuracy_score(y_te, y_pred)})
         layer="oro",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_J,
     )
 
 

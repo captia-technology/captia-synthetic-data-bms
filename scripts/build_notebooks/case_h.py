@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from scripts.build_notebooks._helpers import common_summary, emit, section, setup_section
+from scripts.build_notebooks._appendices import APPENDICES_CASE_H
 
 CASE = "H — RAG + Chatbot"
 SPEC = "docs/specs/synthetic-bms/01-product-spec.md"
@@ -39,8 +40,8 @@ def _arq(target: Path) -> Path:
         ),
         section(5, "Relación con Medallion", "Consume plata; oro = tools + RAG."),
         section(6, "Datos de entrada", "Conceptual."),
-        section(7, "Schema CAPTIA esperado", "No aplica."),
         setup_section(),
+        section(8, "Schema CAPTIA esperado", "No aplica."),
         section(
             9,
             "Carga de datos o mock",
@@ -85,7 +86,7 @@ flowchart LR
             "Visualizaciones explicativas",
             "Distribución del golden set por categoría.",
             """\
-golden = pd.read_csv(ROOT / "notebooks/_data/chatbot_golden_set.csv")
+golden = pd.read_csv(ROOT / "notebooks/_data/chatbot_golden_set.csv", comment="#")
 golden["category"].value_counts().plot.bar(color="#3F51B5")
 plt.title("Golden set — preguntas por categoría")
 plt.tight_layout()
@@ -124,6 +125,7 @@ plt.tight_layout()
         layer="oro",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_H,
     )
 
 
@@ -151,8 +153,8 @@ def _tools(target: Path) -> Path:
         ),
         section(5, "Relación con Medallion", "Lee plata."),
         section(6, "Datos de entrada", "InfluxDB (real o mock)."),
-        section(7, "Schema CAPTIA esperado", "5 tags y `value`."),
         setup_section(),
+        section(8, "Schema CAPTIA esperado", "5 tags y `value`."),
         section(
             9,
             "Carga de datos o mock",
@@ -270,6 +272,7 @@ json.dumps(query_influxdb("co2"))
         layer="oro",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_H,
     )
 
 
@@ -297,8 +300,8 @@ def _mocks(target: Path) -> Path:
         section(4, "Relación con CENTINELA+", "Idéntico."),
         section(5, "Relación con Medallion", "Oro."),
         section(6, "Datos de entrada", "Funciones puras."),
-        section(7, "Schema CAPTIA esperado", "No aplica."),
         setup_section(),
+        section(8, "Schema CAPTIA esperado", "No aplica."),
         section(
             9,
             "Carga de datos o mock",
@@ -379,6 +382,7 @@ for fn in (get_weather_prediction, get_consumption_prediction, check_hvac_anomal
         layer="oro",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_H,
     )
 
 
@@ -407,8 +411,8 @@ def _rag(target: Path) -> Path:
         section(4, "Relación con CENTINELA+", "Mismo retriever; otro vectorizador en prod."),
         section(5, "Relación con Medallion", "Bronce: docs markdown; Plata: vectores; Oro: tool."),
         section(6, "Datos de entrada", "12 .md en `notebooks/_data/docs_rag_seed/`."),
-        section(7, "Schema CAPTIA esperado", "No aplica."),
         setup_section(),
+        section(8, "Schema CAPTIA esperado", "No aplica."),
         section(
             9,
             "Carga de datos o mock",
@@ -426,12 +430,24 @@ df_docs.head(3)
         section(
             10,
             "Exploración paso a paso",
-            "TF-IDF + cosine.",
+            "TF-IDF en español con bigrams + cosine. Aplicamos stop-words ES para "
+            "evitar que palabras vacías ('es', 'la', 'qué') dominen el ranking.",
             """\
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-vec = TfidfVectorizer(stop_words=None, ngram_range=(1, 2), min_df=1)
+# Stop-words español manual (sklearn no las trae built-in)
+SPANISH_STOPWORDS = [
+    "el", "la", "los", "las", "un", "una", "unos", "unas", "y", "o", "de",
+    "del", "al", "a", "en", "que", "qué", "cuál", "cuáles", "cuando", "cómo",
+    "se", "es", "son", "ser", "está", "esta", "este", "estos", "estas",
+    "para", "por", "con", "sin", "más", "menos", "como", "muy", "ya", "no",
+    "sí", "si", "entre", "sobre", "su", "sus", "le", "les", "lo", "me",
+]
+
+vec = TfidfVectorizer(
+    stop_words=SPANISH_STOPWORDS, ngram_range=(1, 2), min_df=1, max_df=0.95,
+)
 M = vec.fit_transform(df_docs["text"])
 
 def retrieve(query: str, k: int = 3):
@@ -444,33 +460,109 @@ print(retrieve("¿Qué es CENTINELA+?")[["id", "score"]])
 """,
         ),
         section(11, "Transformación bronce → plata", "Vectorizamos."),
-        section(12, "Construcción de capa oro", "La función retrieve es la tool RAG."),
+        section(
+            12,
+            "Construcción de capa oro",
+            "**Recall@k y MRR reales** sobre golden set. Para cada pregunta RAG "
+            "definimos un `expected_doc_id` (el documento que la responde) y "
+            "calculamos:\n\n"
+            "$$\n\\text{Recall@k} = \\frac{1}{N}\\sum_i \\mathbb{1}[\\text{rank}_i \\leq k], \\quad \\text{MRR} = \\frac{1}{N}\\sum_i \\frac{1}{\\text{rank}_i}\n$$",
+            """\
+# Mapeo de queries del golden set a su doc esperado (manual, basado en contenido)
+expected_map = {
+    "¿Qué es CENTINELA+?": "01_que_es_centinela",
+    "¿Para qué sirve la arquitectura Medallion?": "02_arquitectura_medallion",
+    "¿Por qué CENTINELA+ usa MQTT?": "07_topics_mqtt_captia",
+    "¿Qué hace Telegraf en CENTINELA+?": "11_telegraf_pipeline",
+    "¿Qué es el bucket telemetry_1h?": "04_buckets_y_retenciones",
+    "¿Qué nivel de CO₂ se considera peligroso?": "05_co2_aulas_oms",
+    "¿Por qué sube el CO₂ en un aula cerrada?": "05_co2_aulas_oms",
+    "¿Qué dice la OMS sobre temperatura en aulas?": "09_normativa_aulas_espana",
+    "¿Qué normativa española aplica a la calidad del aire en aulas?": "09_normativa_aulas_espana",
+    "¿Qué es el índice IAQ?": "06_indice_iaq",
+    "¿Qué es un IsolationForest?": "08_isolation_forest",
+    "¿Qué es el bucket telemetry_1h?": "04_buckets_y_retenciones",
+}
+
+gs = pd.read_csv(ROOT / "notebooks/_data/chatbot_golden_set.csv", comment="#")
+gs_rag = gs[gs["expected_mechanism"] == "rag"].copy()
+gs_rag["expected_doc"] = gs_rag["question"].map(expected_map)
+labelled = gs_rag.dropna(subset=["expected_doc"]).reset_index(drop=True)
+print(f"Golden set RAG con etiqueta de doc esperado: {len(labelled)}/{len(gs_rag)}")
+
+def rank_of_expected(query: str, expected_doc: str) -> int:
+    qv = vec.transform([query])
+    sims = cosine_similarity(qv, M)[0]
+    order = np.argsort(-sims)
+    ranked_ids = df_docs["id"].iloc[order].tolist()
+    return ranked_ids.index(expected_doc) + 1 if expected_doc in ranked_ids else len(ranked_ids) + 1
+
+ranks = [rank_of_expected(r["question"], r["expected_doc"]) for _, r in labelled.iterrows()]
+
+def recall_at_k(ranks, k):
+    return float(np.mean([r <= k for r in ranks]))
+
+def mrr(ranks):
+    return float(np.mean([1.0 / r for r in ranks]))
+
+metrics_rag = {
+    "n_queries": len(ranks),
+    "Recall@1": round(recall_at_k(ranks, 1), 3),
+    "Recall@3": round(recall_at_k(ranks, 3), 3),
+    "Recall@5": round(recall_at_k(ranks, 5), 3),
+    "MRR": round(mrr(ranks), 3),
+    "rank_mean": round(float(np.mean(ranks)), 2),
+    "rank_p90": int(np.quantile(ranks, 0.9)),
+}
+print(metrics_rag)
+""",
+        ),
         section(
             13,
             "Visualizaciones explicativas",
-            "Heatmap docs × queries del golden set.",
+            "Heatmap queries × docs (similarity) + barra Recall@k.",
             """\
-gs = pd.read_csv(ROOT / "notebooks/_data/chatbot_golden_set.csv")
-gs_rag = gs[gs["expected_mechanism"] == "rag"].head(8)
-sims_matrix = cosine_similarity(vec.transform(gs_rag["question"]), M)
-plt.figure(figsize=(8, 3))
-plt.imshow(sims_matrix, aspect="auto", cmap="viridis")
-plt.colorbar()
-plt.yticks(range(len(gs_rag)), gs_rag["question"].str[:30] + "...")
-plt.xticks(range(len(df_docs)), df_docs["id"], rotation=90, fontsize=8)
-plt.title("Cosine similarity preguntas RAG vs docs")
+gs_rag_show = labelled.head(8)
+sims_matrix = cosine_similarity(vec.transform(gs_rag_show["question"]), M)
+fig, axes = plt.subplots(1, 2, figsize=(13, 4))
+im = axes[0].imshow(sims_matrix, aspect="auto", cmap="viridis")
+plt.colorbar(im, ax=axes[0], label="cosine sim")
+axes[0].set_yticks(range(len(gs_rag_show)))
+axes[0].set_yticklabels(gs_rag_show["question"].str[:30] + "...", fontsize=8)
+axes[0].set_xticks(range(len(df_docs)))
+axes[0].set_xticklabels(df_docs["id"], rotation=80, fontsize=7)
+axes[0].set_title("Similarity queries × docs")
+
+bars = pd.Series({
+    "Recall@1": metrics_rag["Recall@1"],
+    "Recall@3": metrics_rag["Recall@3"],
+    "Recall@5": metrics_rag["Recall@5"],
+    "MRR": metrics_rag["MRR"],
+})
+bars.plot.bar(ax=axes[1], color="#3F51B5")
+axes[1].set_title("Métricas retrieval")
+axes[1].set_ylim(0, 1.05)
+axes[1].tick_params(axis="x", rotation=0)
 plt.tight_layout()
 """,
         ),
         section(
             14,
             "Validaciones",
-            "Top-1 score > 0 para todas las preguntas RAG.",
+            "Aserciones cuantitativas: Recall@3 ≥ 0.5, MRR ≥ 0.5, y al menos el "
+            "80 % de las queries deben retornar un top-1 con score > 0. "
+            "Si no se cumple, indica problema en el retriever (stop-words mal "
+            "calibradas, n-gramas insuficientes, falta lemmatización).",
             """\
-for q in gs_rag["question"]:
-    r = retrieve(q, k=1)
-    assert r["score"].iloc[0] > 0
-print("Retrieval OK")
+assert metrics_rag["Recall@3"] >= 0.5, f"Recall@3 demasiado bajo: {metrics_rag['Recall@3']}"
+assert metrics_rag["MRR"] >= 0.5, f"MRR demasiado bajo: {metrics_rag['MRR']}"
+non_zero = [r["score"].iloc[0] > 0 for r in [retrieve(q, 1) for q in labelled["question"]]]
+hit_rate = float(np.mean(non_zero))
+assert hit_rate >= 0.8, f"Hit rate top-1 demasiado bajo: {hit_rate:.2%}"
+print(
+    f"Retrieval OK · Recall@3={metrics_rag['Recall@3']} · MRR={metrics_rag['MRR']} · "
+    f"hit_rate={hit_rate:.0%}"
+)
 """,
         ),
         section(
@@ -505,6 +597,7 @@ print("Retrieval OK")
         layer="oro",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_H,
     )
 
 
@@ -528,14 +621,14 @@ def _eval(target: Path) -> Path:
         section(4, "Relación con CENTINELA+", "Tarea diaria de auditoría del bot."),
         section(5, "Relación con Medallion", "Oro."),
         section(6, "Datos de entrada", "Golden set + tools del notebook 02-04."),
-        section(7, "Schema CAPTIA esperado", "No aplica."),
         setup_section(),
+        section(8, "Schema CAPTIA esperado", "No aplica."),
         section(
             9,
             "Carga de datos o mock",
             "Cargamos golden set.",
             """\
-gs = pd.read_csv(ROOT / "notebooks/_data/chatbot_golden_set.csv")
+gs = pd.read_csv(ROOT / "notebooks/_data/chatbot_golden_set.csv", comment="#")
 print(gs["category"].value_counts())
 """,
         ),
@@ -626,6 +719,7 @@ assert acc > 0.55
         layer="oro",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_H,
     )
 
 

@@ -1,0 +1,112 @@
+{
+  "version": "1.13.0",
+  "exportedFrom": "captia-bms-synthetic-data",
+  "exportedAt": "2026-05-10T00:00:00.000Z",
+  "connections": [
+    {
+      "id": "captia-bms-local-ws",
+      "name": "CAPTIA BMS · local (WebSocket)",
+      "clientId": "mqttx-web-captia-bms-local",
+      "createAt": "2026-05-10T00:00:00.000Z",
+      "updateAt": "2026-05-10T00:00:00.000Z",
+      "protocol": "ws",
+      "host": "localhost",
+      "port": 9102,
+      "path": "/mqtt",
+      "ssl": false,
+      "username": "",
+      "password": "",
+      "keepalive": 60,
+      "clean": true,
+      "connectTimeout": 10,
+      "reconnect": true,
+      "reconnectPeriod": 4000,
+      "mqttVersion": "5.0",
+      "certType": "",
+      "isCollection": false,
+      "parentId": null,
+      "orderId": 0,
+      "messages": [],
+      "subscriptions": [
+        {
+          "id": "sub-captia-all",
+          "topic": "captia/#",
+          "qos": 1,
+          "alias": "all-captia",
+          "color": "#34C388",
+          "createAt": "2026-05-10T00:00:00.000Z"
+        },
+        {
+          "id": "sub-telemetry-aulas",
+          "topic": "captia/dev/bms_classrooms/ies_simarro/+/telemetry/+",
+          "qos": 1,
+          "alias": "telemetry-aulas",
+          "color": "#1E88E5",
+          "createAt": "2026-05-10T00:00:00.000Z"
+        },
+        {
+          "id": "sub-temperature",
+          "topic": "captia/dev/bms_classrooms/ies_simarro/+/telemetry/temperature_01",
+          "qos": 1,
+          "alias": "temperature-only",
+          "color": "#F4511E",
+          "createAt": "2026-05-10T00:00:00.000Z"
+        },
+        {
+          "id": "sub-co2",
+          "topic": "captia/dev/bms_classrooms/ies_simarro/+/telemetry/co2",
+          "qos": 1,
+          "alias": "co2-only",
+          "color": "#8E24AA",
+          "createAt": "2026-05-10T00:00:00.000Z"
+        },
+        {
+          "id": "sub-power",
+          "topic": "captia/dev/bms_classrooms/ies_simarro/+/telemetry/power_01",
+          "qos": 1,
+          "alias": "power-only",
+          "color": "#FB8C00",
+          "createAt": "2026-05-10T00:00:00.000Z"
+        },
+        {
+          "id": "sub-iaq",
+          "topic": "captia/dev/bms_classrooms/ies_simarro/+/telemetry/iaq-index",
+          "qos": 1,
+          "alias": "iaq-only",
+          "color": "#43A047",
+          "createAt": "2026-05-10T00:00:00.000Z"
+        },
+        {
+          "id": "sub-events",
+          "topic": "captia/dev/bms_classrooms/ies_simarro/+/event/+",
+          "qos": 1,
+          "alias": "events-and-faults",
+          "color": "#E53935",
+          "createAt": "2026-05-10T00:00:00.000Z"
+        }
+      ],
+      "will": {
+        "lastWillTopic": "",
+        "lastWillPayload": "",
+        "lastWillQos": 0,
+        "lastWillRetain": false
+      }
+    }
+  ],
+  "scripts": [
+    {
+      "id": "script-decode-captia",
+      "name": "decode-captia-payload",
+      "createAt": "2026-05-10T00:00:00.000Z",
+      "updateAt": "2026-05-10T00:00:00.000Z",
+      "script": "// Decodifica payload CAPTIA: {value, ts_ns} -> human-readable\nfunction execute(value, msg) {\n  try {\n    const obj = typeof value === 'string' ? JSON.parse(value) : value;\n    const tsMs = Math.floor(obj.ts_ns / 1e6);\n    const date = new Date(tsMs).toISOString();\n    const variable = (msg.topic || '').split('/').pop();\n    const aula = (msg.topic || '').split('/')[4];\n    const formatted = {\n      aula,\n      variable,\n      value: typeof obj.value === 'number' ? Number(obj.value.toFixed(3)) : obj.value,\n      ts: date\n    };\n    return JSON.stringify(formatted, null, 2);\n  } catch (e) {\n    return value;\n  }\n}"
+    },
+    {
+      "id": "script-publish-fake-fault",
+      "name": "publish-fault-example",
+      "createAt": "2026-05-10T00:00:00.000Z",
+      "updateAt": "2026-05-10T00:00:00.000Z",
+      "script": "// Genera un payload de avería para publicar manualmente\n// Topic sugerido: captia/dev/bms_classrooms/ies_simarro/AULA01/event/fault.sensor_drift\nfunction execute(value, msg) {\n  const payload = {\n    value: 1.0,\n    ts_ns: Date.now() * 1000000,\n    severity: 0.7,\n    fault_type: 'sensor_drift',\n    source: 'manual'\n  };\n  return JSON.stringify(payload);\n}"
+    }
+  ]
+}

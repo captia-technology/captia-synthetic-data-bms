@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from scripts.build_notebooks._helpers import common_summary, emit, section, setup_section
+from scripts.build_notebooks._appendices import APPENDICES_OVERVIEW
 
 CASE = "Overview"
 SPEC = "docs/specs/synthetic-bms/01-product-spec.md"
@@ -69,8 +70,9 @@ def _nb_00_arquitectura(target: Path) -> Path:
             "Este notebook es **conceptual**: no carga ningún dataset. Visualizaremos "
             "tablas comparando capas y un Mermaid resumen de los 11 casos.",
         ),
+        setup_section(),
         section(
-            7,
+            8,
             "Schema CAPTIA esperado",
             "Aunque no hagamos ETL, fijamos las constantes que aparecerán en todos "
             "los notebooks siguientes.",
@@ -80,7 +82,6 @@ print("CANONICAL TAGS:", CANONICAL_TAGS)
 print("BUCKETS:", list(DEFAULT_BUCKET_RETENTIONS.keys()))
 """,
         ),
-        setup_section(),
         section(
             9,
             "Carga de datos o mock",
@@ -235,6 +236,7 @@ print("Schema canónico OK")
         layer="transversal",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_OVERVIEW,
     )
 
 
@@ -284,8 +286,9 @@ def _nb_01_schema(target: Path) -> Path:
             "Construiremos manualmente 3 puntos sintéticos para AULA01 y los "
             "imprimiremos en line protocol.",
         ),
+        setup_section(),
         section(
-            7,
+            8,
             "Schema CAPTIA esperado",
             "Importamos las constantes del repo y mostramos los 7 buckets.",
             """\
@@ -296,7 +299,6 @@ print("FAULT LABELS MEASUREMENT:", MEASUREMENT_FAULT_LABELS)
 print(json.dumps(DEFAULT_BUCKET_RETENTIONS, indent=2))
 """,
         ),
-        setup_section(),
         section(
             9,
             "Carga de datos o mock",
@@ -442,6 +444,7 @@ print("Schema OK:", linea)
         layer="plata",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_OVERVIEW,
     )
 
 
@@ -491,15 +494,15 @@ def _nb_02_conexion(target: Path) -> Path:
             "El `.env` del repo (`.env.example` como referencia). Variables esperadas: "
             "`INFLUXDB_URL`, `INFLUXDB_TOKEN`, `INFLUXDB_ORG`, `INFLUXDB_BUCKET`.",
         ),
-        section(
-            7,
-            "Schema CAPTIA esperado",
-            "El cliente solo se conecta al servidor; no escribe nada en este notebook. "
-            "Las variables anteriores son del entorno, no del schema.",
-        ),
         setup_section(
             "Comprobamos que `INFLUXDB_URL` está cargado y que `python-dotenv` está "
             "disponible (si no, usamos el parser propio).",
+        ),
+        section(
+            8,
+            "Schema CAPTIA esperado",
+            "El cliente solo se conecta al servidor; no escribe nada en este notebook. "
+            "Las variables anteriores son del entorno, no del schema.",
         ),
         section(
             9,
@@ -622,6 +625,7 @@ print("Validaciones OK")
         layer="transversal",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_OVERVIEW,
     )
 
 

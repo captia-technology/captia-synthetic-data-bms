@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from scripts.build_notebooks._helpers import common_summary, emit, section, setup_section
+from scripts.build_notebooks._appendices import APPENDICES_CASE_I
 
 CASE = "I — Spark vs Pandas"
 SPEC = "docs/specs/synthetic-bms/01-product-spec.md"
@@ -36,8 +37,8 @@ def _overview(target: Path) -> Path:
         section(4, "Relación con CENTINELA+", "BDG2 es academic; sirve como caso comparativo."),
         section(5, "Relación con Medallion", "Bronce: BDG2 ZIP; Plata: subset; Oro: benchmark."),
         section(6, "Datos de entrada", "Mock subset BDG2."),
-        section(7, "Schema CAPTIA esperado", "No aplica para benchmark."),
         setup_section(),
+        section(8, "Schema CAPTIA esperado", "No aplica para benchmark."),
         section(
             9,
             "Carga de datos o mock",
@@ -120,6 +121,7 @@ assert len(df) < 200_000
         layer="bronce",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_I,
     )
 
 
@@ -138,8 +140,8 @@ def _pandas(target: Path) -> Path:
         section(4, "Relación con CENTINELA+", "Comparable cuando los volúmenes crezcan."),
         section(5, "Relación con Medallion", "Bronce + plata."),
         section(6, "Datos de entrada", "Mock BDG2."),
-        section(7, "Schema CAPTIA esperado", "No aplica."),
         setup_section(),
+        section(8, "Schema CAPTIA esperado", "No aplica."),
         section(
             9,
             "Carga de datos o mock",
@@ -248,6 +250,7 @@ assert (bench_pd["median_s"] > 0).all()
         layer="bronce → plata",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_I,
     )
 
 
@@ -271,8 +274,8 @@ def _spark(target: Path) -> Path:
         section(4, "Relación con CENTINELA+", "Cluster ITI cuando esté."),
         section(5, "Relación con Medallion", "Idéntico al notebook 02."),
         section(6, "Datos de entrada", "Mock BDG2."),
-        section(7, "Schema CAPTIA esperado", "No aplica."),
         setup_section(),
+        section(8, "Schema CAPTIA esperado", "No aplica."),
         section(
             9,
             "Carga de datos o mock",
@@ -387,109 +390,203 @@ if not bench_spark.empty:
         layer="bronce → plata",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_I,
     )
 
 
 def _comparativa(target: Path) -> Path:
-    title = "Caso I · 04 Comparativa pandas vs Spark — cuándo merece la pena"
+    title = "Caso I · 04 Benchmark medido — pandas vs polars vs duckdb"
     sections = [
         section(
             1,
             "Objetivo",
-            "Combinar los resultados de los notebooks 02 y 03 y emitir una recomendación clara.",
+            "**Medir empíricamente** (no simular) tiempos de tres motores tabulares "
+            "single-node modernos: pandas, polars, duckdb. Reportar mediana de 5 runs "
+            "+ varianza. Decidir cuándo cada motor es la opción correcta.",
         ),
         section(
             2,
             "Qué se aprende",
-            "- Speedup en función del tamaño.\n"
-            "- Punto de cruce pandas / Spark.\n"
-            "- Coste fijo de Spark.",
+            "- Cómo medir tiempos correctamente (`perf_counter`, warmup, mediana).\n"
+            "- Diferencias prácticas entre eager (pandas) y lazy (polars, duckdb).\n"
+            "- Por qué el espacio de decisión moderno NO es solo pandas vs Spark.\n"
+            "- Cuándo el coste de startup de Spark se amortiza.",
         ),
         section(3, "Contexto del caso de uso", "Recomendación final del proyecto."),
-        section(4, "Relación con CENTINELA+", "Tomas de decisión."),
+        section(4, "Relación con CENTINELA+", "Decisión de stack en producción."),
         section(5, "Relación con Medallion", "Oro: análisis."),
-        section(6, "Datos de entrada", "JSON tiempos."),
-        section(7, "Schema CAPTIA esperado", "No aplica."),
+        section(6, "Datos de entrada", "Mock BDG2 escalado a varios tamaños."),
         setup_section(),
+        section(8, "Schema CAPTIA esperado", "No aplica."),
         section(
             9,
             "Carga de datos o mock",
-            "Combinamos resultados de demo.",
+            "Generamos datasets sintéticos a 3 tamaños (10⁴, 10⁵, 10⁶) para que el "
+            "benchmark se ejecute en < 60 s en una laptop.",
             """\
-demo_pd = pd.DataFrame([{"op": "groupby_building", "median_s": 0.05},
-                          {"op": "groupby_hour_dow", "median_s": 0.07}])
-demo_sp = pd.DataFrame([{"op": "groupby_building", "spark_s": 1.2},
-                          {"op": "groupby_hour_dow", "spark_s": 1.5}])
-combined = demo_pd.merge(demo_sp, on="op")
-combined["speedup_pandas_better"] = combined["spark_s"] / combined["median_s"]
-combined
+import time
+
+import polars as pl
+try:
+    import duckdb
+    HAS_DUCKDB = True
+except ImportError:
+    HAS_DUCKDB = False
+
+def make_synthetic_table(n_rows: int, seed: int = SEED) -> pd.DataFrame:
+    g = np.random.default_rng(seed)
+    return pd.DataFrame({
+        "building_id": g.choice([f"b_{i:04d}" for i in range(50)], size=n_rows),
+        "timestamp": pd.date_range("2024-01-01", periods=n_rows, freq="h"),
+        "power_kw": g.gamma(2, 30, size=n_rows),
+        "t_outdoor": 12 + 12 * np.sin(np.linspace(0, 4 * np.pi, n_rows)) + g.normal(0, 2, n_rows),
+    })
+
+sizes = [10_000, 100_000, 1_000_000]
+print({n: f"{n / 1e6:.1f}M filas" for n in sizes})
 """,
         ),
         section(
             10,
             "Exploración paso a paso",
-            "En subsets pequeños pandas gana.",
+            "Definimos las **operaciones** a benchmarkar — todas devuelven el mismo "
+            "resultado (groupby+agg) para que las comparaciones sean justas.",
             """\
-sizes = [1e3, 1e4, 1e5, 1e6, 1e7]
-# Modelo simplificado: pandas O(N), Spark = startup_const + alpha*N (alpha << pandas alpha cuando N grande)
-pd_t = [n * 1e-7 for n in sizes]
-sp_t = [1.0 + n * 1e-9 for n in sizes]
-table = pd.DataFrame({"N": sizes, "pandas_s": pd_t, "spark_s": sp_t})
-table["winner"] = np.where(np.array(pd_t) < np.array(sp_t), "pandas", "spark")
-table
+def op_pandas(df_pd: pd.DataFrame) -> pd.Series:
+    return df_pd.groupby("building_id")["power_kw"].mean().sort_index()
+
+def op_polars(df_pl: pl.DataFrame) -> pd.Series:
+    out = (
+        df_pl.group_by("building_id").agg(pl.col("power_kw").mean())
+              .sort("building_id").to_pandas()
+    )
+    return out.set_index("building_id")["power_kw"]
+
+def op_duckdb(df_pd: pd.DataFrame) -> pd.Series:
+    if not HAS_DUCKDB:
+        return pd.Series(dtype=float)
+    con = duckdb.connect()
+    con.register("t", df_pd)
+    res = con.execute(
+        "SELECT building_id, AVG(power_kw) AS power_kw FROM t GROUP BY building_id ORDER BY building_id"
+    ).df()
+    con.close()
+    return res.set_index("building_id")["power_kw"]
 """,
         ),
         section(11, "Transformación bronce → plata", "No aplica."),
         section(
             12,
             "Construcción de capa oro",
-            "Plot speedup.",
+            "**Benchmark medido** con 1 warmup + 5 runs por (engine, size). Reportamos "
+            "mediana y MAD (median absolute deviation).",
             """\
-plt.figure(figsize=(8, 3))
-plt.plot(sizes, pd_t, label="pandas", color="#3F51B5", marker="o")
-plt.plot(sizes, sp_t, label="spark", color="#FF5722", marker="o")
-plt.xscale("log"); plt.yscale("log")
-plt.xlabel("N filas"); plt.ylabel("segundos")
-plt.legend(); plt.title("Cruce pandas vs Spark (modelo)")
-plt.tight_layout()
+def time_runs(fn, *args, runs: int = 5, warmup: int = 1):
+    for _ in range(warmup):
+        fn(*args)
+    ts = []
+    for _ in range(runs):
+        t0 = time.perf_counter()
+        fn(*args)
+        ts.append(time.perf_counter() - t0)
+    arr = np.array(ts)
+    return float(np.median(arr)), float(np.median(np.abs(arr - np.median(arr))))
+
+results = []
+for n in sizes:
+    df_pd = make_synthetic_table(n)
+    df_pl = pl.from_pandas(df_pd)
+    med_pd, mad_pd = time_runs(op_pandas, df_pd)
+    med_pl, mad_pl = time_runs(op_polars, df_pl)
+    med_dd, mad_dd = (time_runs(op_duckdb, df_pd) if HAS_DUCKDB else (float("nan"), float("nan")))
+    results.append({
+        "n": n,
+        "pandas_s": round(med_pd, 4), "pandas_mad": round(mad_pd, 4),
+        "polars_s": round(med_pl, 4), "polars_mad": round(mad_pl, 4),
+        "duckdb_s": round(med_dd, 4) if not np.isnan(med_dd) else None,
+        "duckdb_mad": round(mad_dd, 4) if not np.isnan(mad_dd) else None,
+    })
+bench = pd.DataFrame(results)
+print(bench.to_string(index=False))
 """,
         ),
         section(
             13,
             "Visualizaciones explicativas",
-            "Recomendación textual.",
+            "Tiempos en escala log-log + speedup vs pandas.",
             """\
-crossover = sizes[next((i for i, (p, s) in enumerate(zip(pd_t, sp_t)) if p > s), -1)]
-print(f"Punto de cruce aproximado: {crossover:.0e} filas")
-print("Recomendación: Spark cuando el dataset > 1M filas o cuando se proyecte crecer.")
+import matplotlib.pyplot as plt
+
+fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+axes[0].plot(bench["n"], bench["pandas_s"], marker="o", label="pandas", color="#3F51B5")
+axes[0].plot(bench["n"], bench["polars_s"], marker="o", label="polars", color="#FF5722")
+if HAS_DUCKDB:
+    axes[0].plot(bench["n"], bench["duckdb_s"], marker="o", label="duckdb", color="#4CAF50")
+axes[0].set_xscale("log"); axes[0].set_yscale("log")
+axes[0].set_xlabel("N filas"); axes[0].set_ylabel("s (mediana 5 runs)")
+axes[0].set_title("Latencia groupby+mean")
+axes[0].legend(); axes[0].grid(alpha=0.3)
+
+speedup = pd.DataFrame({
+    "polars": (bench["pandas_s"] / bench["polars_s"]).round(2),
+    "duckdb": (bench["pandas_s"] / bench["duckdb_s"]).round(2) if HAS_DUCKDB else 1,
+}, index=bench["n"])
+speedup.plot.bar(ax=axes[1])
+axes[1].set_title("Speedup vs pandas (mayor = mejor)")
+axes[1].axhline(1.0, color="gray", linestyle="--")
+axes[1].set_xlabel("N filas")
+plt.tight_layout()
 """,
         ),
         section(
             14,
             "Validaciones",
-            "El cruce está en escala log.",
+            "Los tres motores deben dar **resultados numéricamente equivalentes** "
+            "(equivalencia funcional) y los tiempos deben ser positivos.",
             """\
-assert any(p > s for p, s in zip(pd_t, sp_t))
+df_check = make_synthetic_table(10_000)
+r_pd = op_pandas(df_check)
+r_pl = op_polars(pl.from_pandas(df_check))
+joined = pd.concat([r_pd, r_pl], axis=1, keys=["pandas", "polars"])
+diff = (joined["pandas"] - joined["polars"]).abs().max()
+assert diff < 1e-6, f"pandas y polars discrepan: max diff = {diff}"
+if HAS_DUCKDB:
+    r_dd = op_duckdb(df_check)
+    diff2 = (r_pd - r_dd).abs().max()
+    assert diff2 < 1e-6, f"pandas y duckdb discrepan: max diff = {diff2}"
+assert (bench["pandas_s"] > 0).all() and (bench["polars_s"] > 0).all()
+print("Validaciones OK · resultados numéricamente equivalentes y tiempos positivos")
 """,
         ),
         section(
             15,
             "Errores comunes",
-            "1. Recomendar Spark sin medir.\n"
-            "2. No considerar coste operativo del cluster.\n"
-            "3. Comparar Spark single-node con pandas — no es justo.",
+            "1. **No hacer warmup**: el primer run incluye JIT/import overhead → "
+            "outlier que sesga la mediana.\n"
+            "2. **Reportar 1 sola medición**: alta varianza → reportar 5+ con MAD.\n"
+            "3. **Comparar resultados sin verificar equivalencia**: los engines "
+            "pueden diferir en orden o tipo (e.g. nan handling).\n"
+            "4. **Comparar Spark single-node con pandas**: el coste de startup de "
+            "Spark es ~1.5 s, casi nunca se amortiza para < 1M filas.\n"
+            "5. **No publicar el dataset**: el benchmark debe ser reproducible — "
+            "publicar `make_synthetic_table` o el script.",
         ),
         section(
             16,
             "Ejercicios propuestos",
-            "1. Mide el modelo real con tu subset.\n"
-            "2. Calcula el tamaño BDG2 completo y predice speedup.\n"
-            "3. Ensaya `polars` como alternativa.",
+            "1. Añade `pyspark` con `master('local[*]')` al benchmark. ¿Cuándo "
+            "comienza a ganar? Rúbrica: encontrar el N donde Spark < polars.\n"
+            "2. Sustituye groupby+mean por una **operación shuffle-heavy** (e.g. "
+            "join entre dos tablas de 1M filas). ¿Polars sigue ganando?\n"
+            "3. Mide consumo de memoria con `tracemalloc` — pandas suele "
+            "consumir 3-5× lo que polars/duckdb. Verifícalo y reporta.",
         ),
         section(
             17,
             "Cómo se reutiliza con datos reales",
-            "Re-ejecutar con BDG2 completo en cluster ITI.",
+            "Reemplazar `make_synthetic_table` por la lectura del CSV BDG2 (53M "
+            "filas) y re-ejecutar. Ojo con la memoria: pandas necesitará ~16 GB "
+            "RAM, polars/duckdb ~4 GB.",
         ),
         common_summary(
             next_notebook="10_case_J_traffic_yolo/01_captura_imagenes_dgt.ipynb",
@@ -504,6 +601,7 @@ assert any(p > s for p, s in zip(pd_t, sp_t))
         layer="oro",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_I,
     )
 
 

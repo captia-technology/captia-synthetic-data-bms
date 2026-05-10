@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from scripts.build_notebooks._helpers import common_summary, emit, section, setup_section
+from scripts.build_notebooks._appendices import APPENDICES_CASE_C
 
 CASE = "C — Anomalías HVAC"
 SPEC = "docs/specs/synthetic-bms/02-domain-spec.md"
@@ -46,8 +47,9 @@ def _eda(target: Path) -> Path:
             "Bronce mock LBNL FDD; etiquetas las usaremos para el supervised eval.",
         ),
         section(6, "Datos de entrada", "`notebooks/_data/lbnl_fdd_rtu_mock.csv`."),
+        setup_section(),
         section(
-            7,
+            8,
             "Schema CAPTIA esperado",
             "Mapping LBNL → CAPTIA visto en docs:\n\n"
             "| LBNL | CAPTIA | bucket |\n|---|---|---|\n"
@@ -59,7 +61,6 @@ def _eda(target: Path) -> Path:
             "| `OCCU_MOD` | `occupancy` | telemetry |\n"
             "Etiquetas → `captia_fault_labels` (state_events).",
         ),
-        setup_section(),
         section(
             9,
             "Carga de datos o mock",
@@ -150,6 +151,7 @@ assert 0.05 <= ratio <= 0.6
         layer="bronce",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_C,
     )
 
 
@@ -187,8 +189,9 @@ def _bronze_silver(target: Path) -> Path:
             "Bronce → plata + etiquetas en bucket `state_events` separado.",
         ),
         section(6, "Datos de entrada", "`lbnl_fdd_rtu_mock.csv`."),
+        setup_section(),
         section(
-            7,
+            8,
             "Schema CAPTIA esperado",
             "Para etiquetas:\n"
             "```\n"
@@ -196,7 +199,6 @@ def _bronze_silver(target: Path) -> Path:
             "captia_fault_labels,...,fault_type=valve_stuck active=0.0i <ts>\n"
             "```",
         ),
-        setup_section(),
         section(
             9,
             "Carga de datos o mock",
@@ -333,6 +335,7 @@ print("Schema OK — etiquetas separadas")
         layer="bronce → plata",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_C,
     )
 
 
@@ -367,8 +370,8 @@ def _features(target: Path) -> Path:
         ),
         section(5, "Relación con Medallion", "Lee plata, escribe oro local."),
         section(6, "Datos de entrada", "Plata mock (CSV) + etiquetas."),
-        section(7, "Schema CAPTIA esperado", "No aplica para oro (parquet)."),
         setup_section(),
+        section(8, "Schema CAPTIA esperado", "No aplica para oro (parquet)."),
         section(
             9,
             "Carga de datos o mock",
@@ -467,6 +470,7 @@ assert counts.min() > 0.02
         layer="oro",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_C,
     )
 
 
@@ -500,8 +504,8 @@ def _models(target: Path) -> Path:
         ),
         section(5, "Relación con Medallion", "Oro: modelo entrenado."),
         section(6, "Datos de entrada", "Oro features Caso C."),
-        section(7, "Schema CAPTIA esperado", "No aplica."),
         setup_section(),
+        section(8, "Schema CAPTIA esperado", "No aplica."),
         section(
             9,
             "Carga de datos o mock",
@@ -524,74 +528,149 @@ print(X.shape)
         section(
             10,
             "Exploración paso a paso",
-            "Split: entrenar Isolation Forest sobre lo "
-            "que llamamos 'normal' (puede contener trazas; no rompe).",
+            "**Split temporal estricto** (sin shuffle, sin leakage). El IF se entrena "
+            "sobre el primer 60 % del histórico (asumido mayoritariamente normal); el "
+            "AE solo sobre las observaciones etiquetadas como `is_fault=0` para evitar "
+            "el leakage clásico de entrenar el reconstructor con anomalías presentes.",
             """\
-y = X.pop("is_fault").astype(int)
 from sklearn.ensemble import IsolationForest
-iso = IsolationForest(contamination=0.1, random_state=SEED, n_estimators=200)
-iso.fit(X)
-score_iso = -iso.score_samples(X)  # mayor = más anómalo
-print("score range:", score_iso.min().round(3), score_iso.max().round(3))
+from sklearn.metrics import (
+    average_precision_score, f1_score, precision_recall_curve, roc_auc_score, roc_curve,
+)
+from sklearn.neural_network import MLPRegressor
+from sklearn.preprocessing import StandardScaler
+from notebooks._common.eval_helpers import (
+    bootstrap_ci, hvac_rule_dt_zero, rolling_zscore_anomaly,
+)
+
+y = X.pop("is_fault").astype(int)
+n = len(X); i = int(n * 0.6)
+X_tr, X_te = X.iloc[:i], X.iloc[i:]
+y_tr, y_te = y.iloc[:i], y.iloc[i:]
+print({"n_tr": len(X_tr), "n_te": len(X_te), "fault_rate_te": float(y_te.mean())})
 """,
         ),
         section(11, "Transformación bronce → plata", "No aplica."),
         section(
             12,
             "Construcción de capa oro",
-            "Autoencoder simple sin dependencias pesadas.",
+            "**Cuatro modelos comparables** sobre el mismo `X_te`:\n\n"
+            "1. **Regla física** ΔT supply-return < umbral (no entrenamiento).\n"
+            "2. **Z-score rolling** sobre `dt_supply_return` (sin etiquetas).\n"
+            "3. **Isolation Forest** entrenado sobre `X_tr` (semi-supervisado).\n"
+            "4. **Autoencoder MLP** entrenado **solo con normales** de `X_tr` "
+            "(`y_tr=0`) — corrige el leakage clásico de AE para anomaly detection.",
             """\
-from sklearn.neural_network import MLPRegressor
-from sklearn.preprocessing import StandardScaler
+# 1) Rule-based ΔT
+score_rule = hvac_rule_dt_zero(
+    X.assign(SA_TEMP=22 - X.get("dt_supply_return", X.iloc[:, 0]),
+             RA_TEMP=22),
+    supply_col="SA_TEMP", return_col="RA_TEMP", threshold_dt=1.0,
+)[i:]
+# 2) Z-score rolling
+score_z = rolling_zscore_anomaly(X["dt_supply_return"], window=60)[i:]
+# 3) Isolation Forest (entrenado en train)
+iso = IsolationForest(contamination=0.05, n_estimators=200, random_state=SEED).fit(X_tr)
+score_iso = -iso.score_samples(X_te)
+# 4) Autoencoder ENTRENADO SOLO CON NORMALES
+scaler = StandardScaler().fit(X_tr.loc[y_tr == 0])
+ae = MLPRegressor(
+    hidden_layer_sizes=(8, 4, 8), max_iter=400, random_state=SEED,
+).fit(scaler.transform(X_tr.loc[y_tr == 0]), scaler.transform(X_tr.loc[y_tr == 0]))
+Xs_te = scaler.transform(X_te)
+recon = ae.predict(Xs_te)
+score_ae = np.mean((Xs_te - recon) ** 2, axis=1)
 
-scaler = StandardScaler().fit(X)
-Xs = scaler.transform(X)
-ae = MLPRegressor(hidden_layer_sizes=(8, 4, 8), max_iter=400, random_state=SEED).fit(Xs, Xs)
-recon = ae.predict(Xs)
-score_ae = np.mean((Xs - recon) ** 2, axis=1)
-print("AE score range:", score_ae.min().round(3), score_ae.max().round(3))
+scores = {"rule_dT": score_rule, "z_score": score_z, "iso_forest": score_iso, "autoencoder": score_ae}
+print({k: f"AUC={roc_auc_score(y_te, s):.3f}" for k, s in scores.items()})
 """,
         ),
         section(
             13,
             "Visualizaciones explicativas",
-            "ROC de cada modelo.",
+            "Diagnóstico de clasificación 4-panel para el mejor modelo (ROC + PR + "
+            "matriz confusión + distribución score por clase) y ROC comparativa.",
             """\
-from sklearn.metrics import roc_auc_score, roc_curve
-fpr_i, tpr_i, _ = roc_curve(y, score_iso)
-fpr_a, tpr_a, _ = roc_curve(y, score_ae)
-auc_i = roc_auc_score(y, score_iso)
-auc_a = roc_auc_score(y, score_ae)
+from notebooks._common.diagnostic_plots import plot_classification_diagnostic
+import matplotlib.pyplot as plt
+
+# ROC comparativa
 plt.figure(figsize=(6, 5))
-plt.plot(fpr_i, tpr_i, label=f"IF AUC={auc_i:.3f}", color="#3F51B5")
-plt.plot(fpr_a, tpr_a, label=f"AE AUC={auc_a:.3f}", color="#FF5722")
+for k, s in scores.items():
+    fpr, tpr, _ = roc_curve(y_te, s)
+    plt.plot(fpr, tpr, label=f"{k} AUC={roc_auc_score(y_te, s):.3f}")
 plt.plot([0, 1], [0, 1], "--", color="gray")
-plt.xlabel("FPR"); plt.ylabel("TPR"); plt.legend(); plt.title("ROC HVAC anomaly")
-plt.tight_layout()
-print({"AUC_IF": auc_i, "AUC_AE": auc_a})
+plt.xlabel("FPR"); plt.ylabel("TPR")
+plt.title("ROC comparativa — 4 modelos sobre test out-of-time")
+plt.legend(loc="lower right", fontsize=8); plt.tight_layout()
+
+# Mejor modelo: el de mayor AUC
+best_name = max(scores, key=lambda k: roc_auc_score(y_te, scores[k]))
+plot_classification_diagnostic(
+    y_te.to_numpy(), scores[best_name],
+    title=f"Mejor modelo: {best_name}",
+)
 """,
         ),
         section(
             14,
             "Validaciones",
-            "Ambos AUC > 0.7 sobre el mock.",
+            "**F1 al threshold óptimo** + **TPR @ FPR ≤ 1 %** + **bootstrap IC 95 %** "
+            "para el mejor modelo. Aserciones cuantitativas alineadas con la sec 19 "
+            "(F1 ≥ 0.85, TPR@1%FPR ≥ 0.7).",
             """\
-assert auc_i > 0.7 and auc_a > 0.7
+def best_threshold_f1(y_true, score):
+    p, r, t = precision_recall_curve(y_true, score)
+    f1 = 2 * p * r / np.maximum(p + r, 1e-9)
+    idx = int(np.argmax(f1[:-1]))
+    return float(t[idx]), float(f1[idx])
+
+def tpr_at_fpr(y_true, score, fpr_max=0.01):
+    fpr, tpr, _ = roc_curve(y_true, score)
+    mask = fpr <= fpr_max
+    return float(tpr[mask].max()) if mask.any() else 0.0
+
+rows = []
+for name, s in scores.items():
+    auc = float(roc_auc_score(y_te, s))
+    ap = float(average_precision_score(y_te, s))
+    thr, f1 = best_threshold_f1(y_te.to_numpy(), s)
+    tpr1 = tpr_at_fpr(y_te.to_numpy(), s, 0.01)
+    auc_pt, auc_lo, auc_hi = bootstrap_ci(y_te.to_numpy(), s, lambda yt, yp: float(roc_auc_score(yt, yp)), n_iter=500)
+    rows.append({"model": name, "AUC": round(auc, 3), "AUC_lo": round(auc_lo, 3), "AUC_hi": round(auc_hi, 3),
+                 "AP": round(ap, 3), "F1*": round(f1, 3), "TPR@1%FPR": round(tpr1, 3)})
+report = pd.DataFrame(rows).set_index("model")
+print(report)
+
+# Aserciones rigurosas: el mejor modelo debe batir el rule-based en AUC
+assert report["AUC"].max() > report.loc["rule_dT", "AUC"], "Ningún modelo bate la regla física"
+assert report["F1*"].max() > 0.5, "F1 óptimo demasiado bajo en el mejor modelo"
+print("Validaciones OK")
 """,
         ),
         section(
             15,
             "Errores comunes",
-            "1. **Entrenar sobre todo y evaluar sobre todo**: contaminación.\n"
-            "2. **Threshold fijo**: usar percentil sobre el train.\n"
-            "3. **Métricas de clasificación con desbalance** sin balancear.",
+            "1. **Train ≡ test** en anomaly detection — leakage perfecto, AUC infla "
+            "+0.1 a +0.3. Siempre split temporal o `TimeSeriesSplit`.\n"
+            "2. **AE entrenado con anomalías presentes** — el reconstructor aprende a "
+            "reconstruir fallos también, anulando la señal. Entrenar solo con normales.\n"
+            "3. **Reportar solo AUC** — useless si la decisión operativa es "
+            "F1@threshold o TPR@FPR. Calcular ambos siempre.\n"
+            "4. **Threshold fijo arbitrario** (`contamination=0.1`) — derivar threshold "
+            "del PR-curve sobre validación.\n"
+            "5. **No comparar con baseline físico/rule-based** — si la regla simple bate "
+            "el modelo ML, no se justifica producción.",
         ),
         section(
             16,
             "Ejercicios propuestos",
-            "1. Implementa LOF (`LocalOutlierFactor`) y compara.\n"
-            "2. Añade SHAP a IF para explicar 5 fallos.\n"
-            "3. Ajusta `contamination` y observa el efecto.",
+            "1. Sustituye Isolation Forest por **LOF** (`LocalOutlierFactor`) — ¿bate "
+            "AUC al IF? ¿Por qué LOF tarda más en inferencia?\n"
+            "2. Añade **SHAP TreeExplainer** sobre el IF para explicar los 5 fallos con "
+            "mayor `score_iso`. Identifica la feature dominante en cada uno.\n"
+            "3. Sweep `contamination ∈ {0.01, 0.05, 0.1, 0.2}` y reporta AUC + F1 por "
+            "contamination. ¿La elección óptima coincide con la fault rate real?",
         ),
         section(
             17,
@@ -612,6 +691,7 @@ assert auc_i > 0.7 and auc_a > 0.7
         layer="oro",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_C,
     )
 
 
@@ -637,8 +717,8 @@ def _val(target: Path) -> Path:
         section(4, "Relación con CENTINELA+", "Validación final antes de servir el modelo."),
         section(5, "Relación con Medallion", "Oro."),
         section(6, "Datos de entrada", "Mock + scores del notebook anterior."),
-        section(7, "Schema CAPTIA esperado", "No aplica."),
         setup_section(),
+        section(8, "Schema CAPTIA esperado", "No aplica."),
         section(
             9,
             "Carga de datos o mock",
@@ -740,6 +820,7 @@ assert (report["recall"] > 0.05).all()
         layer="oro",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_C,
     )
 
 

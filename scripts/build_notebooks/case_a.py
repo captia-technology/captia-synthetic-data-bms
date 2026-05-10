@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from scripts.build_notebooks._helpers import common_summary, emit, section, setup_section
+from scripts.build_notebooks._appendices import APPENDICES_CASE_A
 
 CASE = "A — Pipeline IoT CENTINELA+"
 SPEC = "docs/specs/synthetic-bms/03-architecture-spec.md"
@@ -56,8 +57,9 @@ def _nb_01_pipeline(target: Path) -> Path:
             "Conceptual: no cargamos datasets. Mostraremos un payload de ejemplo y "
             "explicaremos cómo viaja por las capas.",
         ),
+        setup_section(),
         section(
-            7,
+            8,
             "Schema CAPTIA esperado",
             "El topic MQTT y el payload JSON; la línea final en InfluxDB.",
             """\
@@ -68,7 +70,6 @@ print("topic:", topic)
 print("payload:", payload)
 """,
         ),
-        setup_section(),
         section(
             9,
             "Carga de datos o mock",
@@ -200,6 +201,7 @@ print("Topic OK:", topic)
         layer="bronce → plata",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_A,
     )
 
 
@@ -245,8 +247,12 @@ def _nb_02_publicacion(target: Path) -> Path:
             "Datos de entrada",
             "`notebooks/_data/ingauge_aula01_mock.csv` (1 semana × 1min, 9 columnas).",
         ),
+        setup_section(
+            "Si el stack está levantado, importamos `paho.mqtt.client`. Si no, "
+            "definimos un cliente mock que registra los mensajes en memoria.",
+        ),
         section(
-            7,
+            8,
             "Schema CAPTIA esperado",
             "Para cada fila del CSV producimos varios topics MQTT (uno por variable). "
             "Mapping In-Gauge → CAPTIA según `docs/specs/synthetic-bms/02-domain-spec.md`.",
@@ -263,10 +269,6 @@ mapping_ingauge = {
 }
 mapping_ingauge
 """,
-        ),
-        setup_section(
-            "Si el stack está levantado, importamos `paho.mqtt.client`. Si no, "
-            "definimos un cliente mock que registra los mensajes en memoria.",
         ),
         section(
             9,
@@ -390,6 +392,7 @@ for topic, payload in muestras[:3]:
         layer="bronce → plata",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_A,
     )
 
 
@@ -437,14 +440,14 @@ def _nb_03_validacion(target: Path) -> Path:
             "InfluxDB con los datos publicados. Si trabajamos en modo offline, "
             "construimos el resultado esperado a mano para comparar.",
         ),
+        setup_section(),
         section(
-            7,
+            8,
             "Schema CAPTIA esperado",
             "El resultado de la query debe contener filas con `captia_env=dev`, "
             "`domain_id=bms_classrooms`, `site_id=ies_simarro`, `asset_id=AULA01`, "
             "`variable=<algo>`, `_field=value`, `_value=<float>`.",
         ),
-        setup_section(),
         section(
             9,
             "Carga de datos o mock",
@@ -577,6 +580,7 @@ print("Validaciones OK")
         layer="plata",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_A,
     )
 
 

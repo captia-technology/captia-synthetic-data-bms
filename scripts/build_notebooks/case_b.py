@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from scripts.build_notebooks._helpers import common_summary, emit, section, setup_section
+from scripts.build_notebooks._appendices import APPENDICES_CASE_B
 
 CASE = "B — Forecast consumo 24h"
 SPEC = "docs/specs/synthetic-bms/01-product-spec.md"
@@ -53,8 +54,9 @@ def _eda(target: Path) -> Path:
             "Datos de entrada",
             "`notebooks/_data/bdg2_education_subset_mock.csv` (6 edif × 12m × 1h).",
         ),
+        setup_section(),
         section(
-            7,
+            8,
             "Schema CAPTIA esperado",
             "Las columnas del CSV se mapean a tags+variable así:\n\n"
             "| CSV | tag/variable |\n|---|---|\n"
@@ -63,7 +65,6 @@ def _eda(target: Path) -> Path:
             "| `t_outdoor` | `variable=temperature_outdoor` |\n"
             "| `ghi` | `variable=solar_irradiance` |\n",
         ),
-        setup_section(),
         section(
             9,
             "Carga de datos o mock",
@@ -170,6 +171,7 @@ print("Validaciones OK")
         layer="bronce",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_B,
     )
 
 
@@ -211,13 +213,13 @@ def _bronze_silver(target: Path) -> Path:
             "Datos de entrada",
             "Mismo CSV que el notebook anterior. Si tienes BDG2 completo, sustituye el path.",
         ),
+        setup_section(),
         section(
-            7,
+            8,
             "Schema CAPTIA esperado",
             "5 tags: `captia_env=dev`, `domain_id=bms_buildings`, `site_id=bdg2_education`, "
             "`asset_id=<building_id>`, `variable ∈ {power_01, temperature_outdoor, solar_irradiance}`.",
         ),
-        setup_section(),
         section(
             9,
             "Carga de datos o mock",
@@ -336,6 +338,7 @@ for ln in firstlines:
         layer="bronce → plata",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_B,
     )
 
 
@@ -376,12 +379,12 @@ def _features(target: Path) -> Path:
             "Datos de entrada",
             "Mock `bdg2_education_subset_mock.csv`. En modo online, se leería de Influx.",
         ),
+        setup_section(),
         section(
-            7,
+            8,
             "Schema CAPTIA esperado",
             "Las features no se publican como `captia_point`; viven en pandas / Parquet.",
         ),
-        setup_section(),
         section(
             9,
             "Carga de datos o mock",
@@ -499,6 +502,7 @@ print("Features shape:", X.shape)
         layer="oro",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_B,
     )
 
 
@@ -537,8 +541,8 @@ def _baseline(target: Path) -> Path:
             "Lee oro (features parquet); produce un nuevo artefacto oro: el modelo.",
         ),
         section(6, "Datos de entrada", "`output/case_B/features_b0.parquet`."),
-        section(7, "Schema CAPTIA esperado", "No aplica (oro local)."),
         setup_section(),
+        section(8, "Schema CAPTIA esperado", "No aplica (oro local)."),
         section(
             9,
             "Carga de datos o mock",
@@ -658,6 +662,7 @@ assert mae_model < mae_naive, "El modelo debería ser mejor que naive"
         layer="oro",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_B,
     )
 
 
@@ -690,8 +695,8 @@ def _validacion(target: Path) -> Path:
         ),
         section(5, "Relación con Medallion", "Oro: dataset de validación + reporte."),
         section(6, "Datos de entrada", "Features oro del Caso B."),
-        section(7, "Schema CAPTIA esperado", "No aplica."),
         setup_section(),
+        section(8, "Schema CAPTIA esperado", "No aplica."),
         section(
             9,
             "Carga de datos o mock",
@@ -811,6 +816,7 @@ print({"mae_1h": mae_1h, "mae_24h": mae_24h, "ratio": mae_24h / mae_1h})
         layer="oro",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_B,
     )
 
 

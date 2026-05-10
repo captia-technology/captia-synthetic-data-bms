@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from scripts.build_notebooks._helpers import common_summary, emit, section, setup_section
+from scripts.build_notebooks._appendices import APPENDICES_CASE_E
 
 CASE = "E — Meteo & solar"
 SPEC = "docs/specs/synthetic-bms/02-domain-spec.md"
@@ -45,13 +46,13 @@ def _eda(target: Path) -> Path:
             "Bronce: NetCDF / mock CSV. Plata: `captia_point` con domain `weather_station`.",
         ),
         section(6, "Datos de entrada", "`era5_xativa_mock.csv`."),
+        setup_section(),
         section(
-            7,
+            8,
             "Schema CAPTIA esperado",
             "Tags: `captia_env=dev`, `domain_id=weather_station`, `site_id=xativa`, "
             "`asset_id=era5_gridpoint`, `variable ∈ {temperature_outdoor, solar_irradiance, ...}`.",
         ),
-        setup_section(),
         section(
             9,
             "Carga de datos o mock",
@@ -132,6 +133,7 @@ print("Rangos OK")
         layer="bronce",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_E,
     )
 
 
@@ -155,13 +157,13 @@ def _bronze_silver(target: Path) -> Path:
         section(4, "Relación con CENTINELA+", "Site `xativa` independiente del aula."),
         section(5, "Relación con Medallion", "Bronce → plata."),
         section(6, "Datos de entrada", "`era5_xativa_mock.csv`."),
+        setup_section(),
         section(
-            7,
+            8,
             "Schema CAPTIA esperado",
             "5 variables: `temperature_outdoor`, `solar_irradiance`, `wind_speed`, "
             "`precipitation`, `pressure`.",
         ),
-        setup_section(),
         section(
             9,
             "Carga de datos o mock",
@@ -267,6 +269,7 @@ print("Rangos físicos OK")
         layer="bronce → plata",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_E,
     )
 
 
@@ -293,8 +296,8 @@ def _features(target: Path) -> Path:
         section(4, "Relación con CENTINELA+", "Features se calculan al vuelo en producción."),
         section(5, "Relación con Medallion", "Lee plata, escribe oro."),
         section(6, "Datos de entrada", "Mock ERA5."),
-        section(7, "Schema CAPTIA esperado", "No aplica."),
         setup_section(),
+        section(8, "Schema CAPTIA esperado", "No aplica."),
         section(
             9,
             "Carga de datos o mock",
@@ -387,41 +390,54 @@ print("Sanity check OK")
         layer="oro",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_E,
     )
 
 
 def _prediccion(target: Path) -> Path:
-    title = "Caso E · 04 Predicción de generación solar"
+    title = "Caso E · 04 Predicción solar — clear-sky decomposition + 3 baselines"
     sections = [
         section(
             1,
             "Objetivo",
-            "Entrenar un regressor para `solar_irradiance` con T, hora del día y día del "
-            "año. Punto de partida para predicción FV.",
+            "Predecir `solar_irradiance` (GHI) **separando astronomía determinista de "
+            "meteorología estocástica** (clear-sky decomposition). Comparar 4 modelos:\n\n"
+            "1. **Persistencia 24 h**: $\\hat G(t) = G(t-24h)$.\n"
+            "2. **Climatología por hora**: media histórica del valor a esa hora del día.\n"
+            "3. **Clear-sky baseline**: $\\hat G(t) = G_{clear}(t) \\cdot 0.7$.\n"
+            "4. **RF sobre clear-sky index** $k_c = G_{real}/G_{clear}$ predicho con XGB.",
         ),
         section(
             2,
             "Qué se aprende",
-            "- Modelo simple de GHI con features físicas.\n"
-            "- Métrica RMSE (W/m²).\n"
-            "- Por qué la predicción solar a 24h es viable con buenos features.",
+            "- Por qué predecir $k_c$ es **mejor** que predecir GHI directo.\n"
+            "- `np.clip(0)` y máscara nocturna para evitar irradiancias absurdas.\n"
+            "- Skill score $1 - \\text{RMSE}_{\\text{model}}/\\text{RMSE}_{\\text{persistence}}$.\n"
+            "- Diagnóstico 4-panel (timeline, scatter, residuos, CDF).",
         ),
         section(3, "Contexto del caso de uso", "Predicción solar es tool del chatbot."),
         section(4, "Relación con CENTINELA+", "Sirve a Caso B y Caso H."),
-        section(5, "Relación con Medallion", "Oro: modelo entrenado."),
+        section(5, "Relación con Medallion", "Oro: modelo entrenado + decomposición clear-sky."),
         section(6, "Datos de entrada", "Oro features Caso E."),
-        section(7, "Schema CAPTIA esperado", "No aplica."),
         setup_section(),
+        section(
+            8,
+            "Schema CAPTIA esperado",
+            "Variables canónicas:\n\n"
+            "| Variable CAPTIA | Rol |\n|---|---|\n"
+            "| `solar_irradiance` | target (GHI W/m²) |\n"
+            "| `temperature_outdoor` | feature meteorológica |\n",
+        ),
         section(
             9,
             "Carga de datos o mock",
-            "Cargamos.",
+            "Cargamos features.",
             """\
 parquet_path = ROOT / "output" / "case_E" / "weather_features.parquet"
 if parquet_path.exists():
     df = pd.read_parquet(parquet_path)
 else:
-    df, _ = mocks.make_era5_xativa_mock()
+    df, _ = mocks.make_era5_xativa_mock(days=90)
     df = df.set_index("timestamp")
 
 X = pd.DataFrame(index=df.index)
@@ -430,69 +446,151 @@ X["doy"] = df.index.dayofyear
 X["t"] = df["t_air_c"]
 X["hour_sin"] = np.sin(2 * np.pi * X["hour"] / 24)
 X["hour_cos"] = np.cos(2 * np.pi * X["hour"] / 24)
+X["doy_sin"] = np.sin(2 * np.pi * X["doy"] / 365)
+X["doy_cos"] = np.cos(2 * np.pi * X["doy"] / 365)
 X["y"] = df["ghi_w_m2"]
 X = X.dropna()
-print(X.shape)
+print({"filas": len(X), "rango_dias": (X.index.max() - X.index.min()).days})
 """,
         ),
         section(
             10,
             "Exploración paso a paso",
-            "Split temporal.",
+            "Computamos un **clear-sky model** simplificado (Iqbal 1983 reducido a "
+            "geometría solar sin transmittance atmosférica detallada) y derivamos el "
+            "clear-sky index $k_c$. Latitud Xátiva ≈ 38.99°N.",
             """\
-n = len(X)
-i = int(n * 0.7)
-X_tr, X_te = X.iloc[:i], X.iloc[i:]
-y_tr, y_te = X_tr.pop("y"), X_te.pop("y")
+LAT = np.deg2rad(38.99)
+def clear_sky_ghi(idx):
+    \"\"\"Clear-sky GHI simplificado: G_sc * cos(zenith) con cap superior.\"\"\"
+    hour_frac = idx.hour + idx.minute / 60.0
+    omega = np.deg2rad(15 * (hour_frac - 12))  # ángulo horario
+    delta = np.deg2rad(23.45 * np.sin(2 * np.pi * (idx.dayofyear + 284) / 365))
+    cos_z = np.sin(LAT) * np.sin(delta) + np.cos(LAT) * np.cos(delta) * np.cos(omega)
+    g_clear = 1361 * np.maximum(cos_z, 0) * 0.75  # transmitancia clear-sky ~0.75
+    return np.clip(g_clear, 0, 1100)
+
+X["g_clear"] = clear_sky_ghi(X.index)
+X["kc"] = (X["y"] / np.maximum(X["g_clear"], 1.0)).clip(0, 1.5)
+X.loc[X["g_clear"] < 5, "kc"] = 0  # noche: kc indefinido
+print({"kc_mean_diurno": float(X.loc[X["g_clear"] > 50, "kc"].mean()),
+       "kc_p50_diurno": float(X.loc[X["g_clear"] > 50, "kc"].quantile(0.5))})
 """,
         ),
         section(11, "Transformación bronce → plata", "No aplica."),
         section(
             12,
             "Construcción de capa oro",
-            "Modelo y métrica.",
+            "**4 modelos comparables** con clip(0) y máscara nocturna aplicada en "
+            "predicción.",
             """\
 from sklearn.ensemble import RandomForestRegressor
+from notebooks._common.eval_helpers import (
+    naive_persistence_24h, climatology_by_hour, mae as _mae, rmse as _rmse,
+)
 
-m = RandomForestRegressor(n_estimators=200, random_state=SEED).fit(X_tr, y_tr)
-y_pred = m.predict(X_te)
-rmse = float(np.sqrt(np.mean((y_te.values - y_pred) ** 2)))
-print({"RMSE_W_m2": round(rmse, 2)})
+n = len(X); i = int(n * 0.7)
+X_tr, X_te = X.iloc[:i], X.iloc[i:]
+y_tr, y_te = X_tr["y"], X_te["y"]
+g_clear_te = X_te["g_clear"]
+night_mask_te = (g_clear_te < 5)
+
+# (1) Persistencia 24h
+y_persist = naive_persistence_24h(y_tr, y_te)
+
+# (2) Climatología por hora
+y_climat = climatology_by_hour(y_tr, y_te)
+
+# (3) Clear-sky con kc=0.7 fijo
+y_clear = (g_clear_te * 0.7).to_numpy()
+
+# (4) RF sobre kc (predicción del clear-sky index)
+features = ["t", "hour_sin", "hour_cos", "doy_sin", "doy_cos"]
+diurno_tr = X_tr["g_clear"] > 5
+m_kc = RandomForestRegressor(n_estimators=200, random_state=SEED, n_jobs=1).fit(
+    X_tr.loc[diurno_tr, features], X_tr.loc[diurno_tr, "kc"]
+)
+kc_pred = m_kc.predict(X_te[features])
+y_rf_kc = (kc_pred * g_clear_te.to_numpy()).clip(0)
+
+# Aplicar máscara nocturna a TODOS los modelos
+preds = {"persistencia_24h": y_persist, "climatologia_h": y_climat,
+         "clear_sky_07": y_clear, "RF_kc": y_rf_kc}
+for k in preds:
+    preds[k] = np.where(night_mask_te, 0, np.clip(preds[k], 0, 1100))
+
+table = pd.DataFrame({
+    "model": list(preds.keys()),
+    "RMSE": [_rmse(y_te.to_numpy(), p) for p in preds.values()],
+    "MAE":  [_mae(y_te.to_numpy(), p) for p in preds.values()],
+}).round(2)
+rmse_persist = float(table.loc[table["model"] == "persistencia_24h", "RMSE"].iloc[0])
+table["skill"] = (1 - table["RMSE"] / rmse_persist).round(3)
+print(table)
 """,
         ),
         section(
             13,
             "Visualizaciones explicativas",
-            "Curva real vs predicción 7 días.",
+            "Diagnóstico 4-panel del mejor modelo (timeline + scatter + residuos + "
+            "CDF errores) y comparativa skill por modelo.",
             """\
-plt.figure(figsize=(10, 3))
-plt.plot(y_te.index[:24*7], y_te.values[:24*7], label="real", color="#FF5722")
-plt.plot(y_te.index[:24*7], y_pred[:24*7], label="modelo", color="#3F51B5")
-plt.legend(); plt.title("GHI predicho 7 días")
-plt.tight_layout()
+from notebooks._common.diagnostic_plots import plot_regression_diagnostic
+import matplotlib.pyplot as plt
+
+best_model = table.sort_values("RMSE").iloc[0]["model"]
+y_best = preds[best_model]
+plot_regression_diagnostic(
+    y_te.to_numpy(), y_best,
+    timestamps=y_te.index, title=f"Mejor modelo: {best_model}",
+    sample_window=24*7,
+)
+
+plt.figure(figsize=(7, 3))
+table.set_index("model")["skill"].plot.bar(color="#FF5722")
+plt.axhline(0, color="gray", linestyle="--", label="persistencia (baseline)")
+plt.title("Skill score vs persistencia 24h")
+plt.legend(); plt.tight_layout()
 """,
         ),
         section(
             14,
             "Validaciones",
-            "RMSE < 200 W/m² aceptable para clase.",
+            "(a) Skill > 0 para al menos un modelo (algo bate persistencia). "
+            "(b) GHI predicho ≥ 0 siempre (clip aplicado). "
+            "(c) GHI nocturno = 0 (máscara aplicada).",
             """\
-assert rmse < 250
+best = table.sort_values("RMSE").iloc[0]
+assert best["skill"] > 0, f"Ningún modelo bate persistencia: best={best['model']} skill={best['skill']}"
+for k, p in preds.items():
+    assert (p >= 0).all(), f"{k}: predicciones negativas detectadas"
+    assert (p[night_mask_te.to_numpy()] == 0).all(), f"{k}: predicciones nocturnas no = 0"
+print(f"Validaciones OK · mejor modelo {best['model']} con skill={best['skill']:.3f}")
 """,
         ),
         section(
             15,
             "Errores comunes",
-            "1. **Olvidar ciclo anual** (dayofyear).\n"
-            "2. **Predecir GHI nocturno** distinto de cero.\n"
-            "3. **No clip a 0**.",
+            "1. **Predecir GHI directo** sin clear-sky decomposition: el modelo gasta "
+            "capacidad reaprendiendo la astronomía solar.\n"
+            "2. **Olvidar `clip(0)`**: regresores devuelven valores negativos en datos "
+            "extremos. Físicamente imposible (irradiancia ≥ 0).\n"
+            "3. **No aplicar máscara nocturna**: `g_clear` ya es 0 de noche, pero el "
+            "modelo puede predecir +50 W/m² a las 3 AM si el dataset es ruidoso.\n"
+            "4. **Train < 90 días**: estacionalidad anual no observable; el modelo "
+            "extrapola mal a otra estación.\n"
+            "5. **Skill score sin baseline**: reportar RMSE=120 W/m² no dice nada — "
+            "comparar siempre contra persistencia y climatología.",
         ),
         section(
             16,
             "Ejercicios propuestos",
-            "1. Añade `cloud_cover` (mock razonable).\n"
-            "2. Convierte GHI a Wh/día y compara con energía esperada FV.\n"
-            "3. Ensaya XGBoost y compara.",
+            "1. Sustituye el clear-sky simplificado por `pvlib.clearsky.ineichen` y "
+            "compara skill score. Rúbrica: skill ≥ +0.05 vs versión simplificada.\n"
+            "2. Añade `cloud_cover` mock como feature al RF de $k_c$. ¿Mejora "
+            "RMSE > 5 W/m²?\n"
+            "3. Convierte GHI a producción FV (50 kWp, η=18 %, T_panel=T_air+25) y "
+            "compara producción real vs predicha. Rúbrica: error diario < 10 %.",
         ),
         section(
             17,
@@ -513,6 +611,7 @@ assert rmse < 250
         layer="oro",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_E,
     )
 
 

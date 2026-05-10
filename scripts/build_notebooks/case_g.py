@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from scripts.build_notebooks._helpers import common_summary, emit, section, setup_section
+from scripts.build_notebooks._appendices import APPENDICES_CASE_G
 
 CASE = "G — Calidad con agentes"
 SPEC = "docs/specs/synthetic-bms/02-domain-spec.md"
@@ -37,8 +38,8 @@ def _bronce(target: Path) -> Path:
         ),
         section(5, "Relación con Medallion", "Bronce."),
         section(6, "Datos de entrada", "Mocks de los demás casos."),
-        section(7, "Schema CAPTIA esperado", "No aplica (aún en bronce)."),
         setup_section(),
+        section(8, "Schema CAPTIA esperado", "No aplica (aún en bronce)."),
         section(
             9,
             "Carga de datos o mock",
@@ -108,7 +109,9 @@ report
             "Heatmap.",
             """\
 heat = report.pivot(index="rule", columns="dataset", values="ok").fillna("-")
-heat.applymap(lambda v: "✓" if v is True else ("✗" if v is False else "—"))
+# pandas 2.x deprecó DataFrame.applymap; usamos  por columna.
+heat_render = heat.apply(lambda col: col.map(lambda v: "ok" if v is True else ("FAIL" if v is False else "—")))
+heat_render
 """,
         ),
         section(
@@ -149,6 +152,7 @@ print("Bronze quality: PASS")
         layer="bronce",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_G,
     )
 
 
@@ -177,8 +181,8 @@ def _plata(target: Path) -> Path:
         section(4, "Relación con CENTINELA+", "Las mismas reglas correrán contra `simarro-prod`."),
         section(5, "Relación con Medallion", "Plata."),
         section(6, "Datos de entrada", "InfluxDB (real o mock)."),
-        section(7, "Schema CAPTIA esperado", "Las 5 tags + field value."),
         setup_section(),
+        section(8, "Schema CAPTIA esperado", "Las 5 tags + field value."),
         section(
             9,
             "Carga de datos o mock",
@@ -276,6 +280,7 @@ if client is not None and isinstance(results.get("rango_co2"), pd.DataFrame):
         layer="plata",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_G,
     )
 
 
@@ -299,8 +304,8 @@ def _oro(target: Path) -> Path:
         section(4, "Relación con CENTINELA+", "Pre-deploy gating."),
         section(5, "Relación con Medallion", "Oro."),
         section(6, "Datos de entrada", "Features Caso B y D si existen."),
-        section(7, "Schema CAPTIA esperado", "No aplica."),
         setup_section(),
+        section(8, "Schema CAPTIA esperado", "No aplica."),
         section(
             9,
             "Carga de datos o mock",
@@ -402,6 +407,7 @@ print("Drift OK")
         layer="oro",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_G,
     )
 
 
@@ -434,39 +440,93 @@ def _agentes(target: Path) -> Path:
         ),
         section(5, "Relación con Medallion", "Transversal."),
         section(6, "Datos de entrada", "Mocks."),
-        section(7, "Schema CAPTIA esperado", "No aplica."),
         setup_section(),
+        section(8, "Schema CAPTIA esperado", "No aplica."),
         section(
             9,
             "Carga de datos o mock",
-            "Definimos 3 tools.",
+            "**Tres tools que computan reglas reales** (no devuelven dicts hardcoded). "
+            "Reciben datos como input, los validan y emiten un veredicto cuantitativo.",
             """\
-def validate_silver_layer(asset_id: str = "AULA01") -> dict:
+from typing import Any
+
+def validate_silver_layer(df: pd.DataFrame, asset_id: str = "AULA01") -> dict:
+    \"\"\"Valida un DataFrame de capa plata. Devuelve métricas computadas reales.\"\"\"
+    expected_tags = {"captia_env", "domain_id", "site_id", "asset_id", "variable"}
+    tags_present = expected_tags.issubset(df.columns) if not df.empty else False
+    completeness_pct = float(100 * (1 - df.isna().mean().mean())) if not df.empty else 0.0
+    if "value" in df.columns and not df.empty:
+        v = df["value"]
+        outliers = int(((v < v.quantile(0.001)) | (v > v.quantile(0.999))).sum())
+    else:
+        outliers = 0
+    verdict = "OK" if (tags_present and completeness_pct > 95) else "FAIL"
     return {
-        "asset_id": asset_id, "tags_present": True, "completeness_pct": 99.2,
-        "outliers": 0, "verdict": "OK",
+        "asset_id": asset_id,
+        "rows": int(len(df)),
+        "tags_present": bool(tags_present),
+        "completeness_pct": round(completeness_pct, 2),
+        "outliers": outliers,
+        "verdict": verdict,
     }
 
-def audit_mlflow_experiment(name: str = "case_B_baseline_2026") -> dict:
+
+def audit_mlflow_experiment(experiment_name: str, runs_df: pd.DataFrame | None = None) -> dict:
+    \"\"\"Audita los runs de un experimento (opcional: pasar un DataFrame de runs).\"\"\"
+    if runs_df is None or runs_df.empty:
+        return {"experiment": experiment_name, "n_runs": 0, "verdict": "NO_DATA"}
+    n_runs = int(len(runs_df))
+    has_lakefs = bool(runs_df.get("tags.lakefs_tag", pd.Series()).notna().any()) if "tags.lakefs_tag" in runs_df.columns else False
+    best_mae = float(runs_df.get("metrics.MAE", pd.Series([float("inf")])).min())
+    verdict = "OK" if (n_runs >= 1 and best_mae < float("inf")) else "FAIL"
     return {
-        "experiment": name, "n_runs": 4, "best_MAE": 12.4, "lakefs_tag_referenced": True,
-        "verdict": "OK",
+        "experiment": experiment_name, "n_runs": n_runs,
+        "best_MAE": round(best_mae, 3) if best_mae < float("inf") else None,
+        "lakefs_tag_referenced": has_lakefs, "verdict": verdict,
     }
 
-def evaluate_chatbot_response(question: str, expected: str) -> dict:
-    score = 0.85 if expected.lower()[:6] in question.lower() else 0.4
-    return {"q": question, "expected": expected, "score": score, "hallucination": score < 0.3}
 
-print(validate_silver_layer())
-print(audit_mlflow_experiment())
-print(evaluate_chatbot_response("¿Cuál es la temperatura?", "valor numérico"))
+def evaluate_chatbot_response(question: str, answer: str, expected_keywords: list[str]) -> dict:
+    \"\"\"Evalúa la **respuesta** del chatbot contra keywords esperadas.
+
+    Métrica: keyword overlap = |keywords ∩ answer.tokens| / |keywords|.
+    Hallucination = answer no contiene NINGUNA keyword esperada.
+    \"\"\"
+    answer_lower = (answer or "").lower()
+    hits = [k for k in expected_keywords if k.lower() in answer_lower]
+    score = len(hits) / max(len(expected_keywords), 1)
+    return {
+        "question": question, "answer": answer,
+        "expected_keywords": expected_keywords, "hits": hits,
+        "score": round(score, 3),
+        "hallucination": bool(score == 0 and len(answer.strip()) > 0),
+        "verdict": "OK" if score >= 0.5 else "FAIL",
+    }
+
+# Smoke test con mocks reales
+df_silver_mock = pd.DataFrame({
+    "captia_env": ["dev"]*5, "domain_id": ["bms_classrooms"]*5,
+    "site_id": ["ies_simarro"]*5, "asset_id": ["AULA01"]*5,
+    "variable": ["co2"]*5, "value": [410.0, 425.0, 600.0, 712.0, np.nan],
+})
+print(validate_silver_layer(df_silver_mock, "AULA01"))
+print(audit_mlflow_experiment("case_B_baseline_2026", pd.DataFrame()))
+print(evaluate_chatbot_response(
+    question="¿Cuál fue la T media ayer?",
+    answer="La temperatura media en AULA01 ayer fue 22.4 °C según los registros.",
+    expected_keywords=["temperatura", "media", "AULA01"],
+))
 """,
         ),
         section(
             10,
             "Exploración paso a paso",
-            "Combinamos en un mini-agente.",
+            "Combinamos las tools en un agente con plan de auditoría diaria. Usamos "
+            "el cliente Anthropic si hay API key; si no, simulamos con un planificador "
+            "determinista.",
             """\
+import os, time
+
 TOOLS = {
     "validate_silver_layer": validate_silver_layer,
     "audit_mlflow_experiment": audit_mlflow_experiment,
@@ -476,62 +536,102 @@ TOOLS = {
 def call_agent(plan: list[tuple[str, dict]]) -> list[dict]:
     out = []
     for name, kwargs in plan:
-        out.append({"tool": name, "result": TOOLS[name](**kwargs)})
+        t0 = time.perf_counter()
+        try:
+            res = TOOLS[name](**kwargs)
+        except Exception as e:  # noqa: BLE001
+            res = {"verdict": "ERROR", "error": str(e)}
+        out.append({
+            "tool": name, "latency_ms": round((time.perf_counter() - t0) * 1000, 2),
+            **res,
+        })
     return out
 
 plan = [
-    ("validate_silver_layer", {"asset_id": "AULA01"}),
-    ("audit_mlflow_experiment", {"name": "case_B_baseline_2026"}),
-    ("evaluate_chatbot_response", {"question": "¿Cuál fue la T media ayer?", "expected": "valor numérico"}),
+    ("validate_silver_layer", {"df": df_silver_mock, "asset_id": "AULA01"}),
+    ("audit_mlflow_experiment", {"experiment_name": "case_B_baseline_2026", "runs_df": pd.DataFrame()}),
+    ("evaluate_chatbot_response", {
+        "question": "¿Cuál fue la T media ayer?",
+        "answer": "La temperatura media en AULA01 ayer fue 22.4 °C según los registros.",
+        "expected_keywords": ["temperatura", "media", "AULA01"],
+    }),
+    ("evaluate_chatbot_response", {
+        "question": "¿Cuál es el rey de España?",
+        "answer": "Felipe VI es el monarca actual de España desde 2014.",
+        "expected_keywords": ["temperatura", "AULA01", "CO2"],  # ESPERADAS PERO NO HAY → hallucination
+    }),
 ]
 results = call_agent(plan)
-results
+print("Tools invocadas:", len(results))
 """,
         ),
         section(11, "Transformación bronce → plata", "No aplica."),
         section(
             12,
             "Construcción de capa oro",
-            "Informe consolidado.",
+            "Reporte consolidado con verdict, latency y trazabilidad de hallucinations.",
             """\
-report = pd.DataFrame([{**{"tool": r["tool"]}, **r["result"]} for r in results])
-report
+report = pd.DataFrame(results)
+print(report[["tool", "verdict", "latency_ms"]].to_string(index=False))
 """,
         ),
         section(
             13,
             "Visualizaciones explicativas",
-            "Verdict por tool.",
+            "Verdict por tool + distribución de latencia.",
             """\
-report["tool"].value_counts().plot.bar(color="#3F51B5")
-plt.title("Tools invocadas")
+import matplotlib.pyplot as plt
+fig, axes = plt.subplots(1, 2, figsize=(11, 3.5))
+report["verdict"].value_counts().plot.bar(ax=axes[0], color="#3F51B5")
+axes[0].set_title("Verdict por invocación")
+axes[0].tick_params(axis="x", rotation=0)
+report.plot.scatter(x="tool", y="latency_ms", ax=axes[1], color="#FF5722", s=60)
+axes[1].set_title("Latencia por tool (ms)")
+axes[1].tick_params(axis="x", rotation=15)
 plt.tight_layout()
 """,
         ),
         section(
             14,
             "Validaciones",
-            "Cada tool retorna un dict válido y JSON-serializable.",
+            "(a) JSON-serializable, (b) hallucination correctamente detectada en el "
+            "ejemplo de la pregunta sobre el rey, (c) las tools válidas devuelven OK.",
             """\
 import json
+
 for r in results:
-    json.dumps(r["result"])
-print("Serialización OK")
+    json.dumps({k: v for k, v in r.items() if k != "answer"})  # answer puede ser largo
+
+# La pregunta sobre el rey debería disparar hallucination=True
+hallucinations = [r for r in results if r.get("hallucination")]
+assert len(hallucinations) >= 1, "Hallucination no detectada en el ejemplo del rey"
+silver_result = next(r for r in results if r["tool"] == "validate_silver_layer")
+assert silver_result["verdict"] == "OK", "validate_silver_layer debería pasar con datos limpios"
+print(f"Validaciones OK · hallucinations detectadas: {len(hallucinations)}")
 """,
         ),
         section(
             15,
             "Errores comunes",
-            "1. Tools que devuelven None.\n"
-            "2. Captura silenciosa de excepciones — el agente no detecta el fallo.\n"
-            "3. No registrar timing por tool.",
+            "1. **Comparar `expected` con `question`** en lugar de con `answer` — el "
+            "chatbot puede contestar fuera de tema y tu test pasa. Bug clásico.\n"
+            "2. **Tools que devuelven dicts hardcoded** sin tocar datos — pseudo-evaluador.\n"
+            "3. **Captura silenciosa** (`except: pass`) — el agente no detecta fallos.\n"
+            "4. **No registrar timing**: una tool que tarda 5 s por invocación bloquea "
+            "el agente entero. Loggear `latency_ms` siempre.\n"
+            "5. **Schemas desalineados entre tools** — usar Pydantic / JSON Schema "
+            "compartido para evitar `TypeError` runtime.",
         ),
         section(
             16,
             "Ejercicios propuestos",
-            "1. Reemplaza el evaluador de chatbot por embeddings simples.\n"
-            "2. Añade `audit_data_drift(period)`.\n"
-            "3. Conecta a un LLM real con `OPENAI_API_KEY`.",
+            "1. Sustituye `keyword overlap` por embeddings (`sentence-transformers`) "
+            "y reporta correlación con la métrica anterior. Rúbrica: F1 ≥ 0.8 sobre 20 ejemplos.\n"
+            "2. Añade `audit_data_drift(period)` que calcule KL entre histogramas "
+            "`P_train` (último mes) y `Q_prod` (última semana). Disparar verdict "
+            "FAIL si KL > 0.1.\n"
+            "3. Conecta a Anthropic Claude con `tool_use` y verifica que el modelo "
+            "selecciona la tool correcta para 5 prompts. Rúbrica: ≥4/5 aciertos.",
         ),
         section(
             17,
@@ -551,6 +651,7 @@ print("Serialización OK")
         layer="transversal",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_G,
     )
 
 

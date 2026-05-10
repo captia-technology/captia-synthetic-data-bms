@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from scripts.build_notebooks._helpers import common_summary, emit, section, setup_section
+from scripts.build_notebooks._appendices import APPENDICES_CASE_F
 
 CASE = "F — MLOps"
 SPEC = "docs/specs/synthetic-bms/01-product-spec.md"
@@ -44,8 +45,8 @@ def _overview(target: Path) -> Path:
             "MLOps es **transversal**: versiona artefactos derivados de plata y oro.",
         ),
         section(6, "Datos de entrada", "Conceptual."),
-        section(7, "Schema CAPTIA esperado", "No aplica."),
         setup_section(),
+        section(8, "Schema CAPTIA esperado", "No aplica."),
         section(
             9,
             "Carga de datos o mock",
@@ -135,6 +136,7 @@ flowchart LR
         layer="transversal",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_F,
     )
 
 
@@ -167,8 +169,8 @@ def _tracking(target: Path) -> Path:
         ),
         section(5, "Relación con Medallion", "Transversal."),
         section(6, "Datos de entrada", "Mock BDG2."),
-        section(7, "Schema CAPTIA esperado", "No aplica."),
         setup_section(),
+        section(8, "Schema CAPTIA esperado", "No aplica."),
         section(
             9,
             "Carga de datos o mock",
@@ -207,47 +209,94 @@ print("mlflow disponible:", HAS_MLFLOW)
         section(
             12,
             "Construcción de capa oro",
-            "Run MLflow.",
+            "**Tres runs comparables** para que el alumno vea MLflow funcionando: "
+            "(1) baseline naïve-24h sin entrenamiento, (2) RF con 100 árboles, "
+            "(3) RF con 300 árboles + max_depth 8. Loggea params + métricas + el "
+            "improvement vs naïve para cada uno.",
             """\
-import math, json
-
+import math
 from sklearn.ensemble import RandomForestRegressor
+from notebooks._common.eval_helpers import naive_persistence_24h, mae as _mae, rmse as _rmse
 
-if HAS_MLFLOW:
-    mlflow_dir = ROOT / "output" / "mlruns"
-    mlflow_dir.mkdir(parents=True, exist_ok=True)
-    mlflow.set_tracking_uri(mlflow_dir.as_uri())
-    mlflow.set_experiment("case_B_baseline_2026")
+assert HAS_MLFLOW, "MLflow es obligatorio para este notebook (`uv sync --group notebooks`)"
 
-    with mlflow.start_run(run_name="rf_v1_seed42"):
-        params = {"n_estimators": 200, "max_depth": 5, "seed": SEED}
-        mlflow.log_params(params)
-        m = RandomForestRegressor(**{k: v for k, v in params.items() if k != "seed"},
-                                   random_state=params["seed"]).fit(X_tr, y_tr)
+mlflow_dir = ROOT / "output" / "mlruns"
+mlflow_dir.mkdir(parents=True, exist_ok=True)
+mlflow.set_tracking_uri(mlflow_dir.as_uri())
+mlflow.set_experiment("case_B_baseline_2026")
+
+# Baseline naïve-24h (referencia obligatoria)
+y_naive = naive_persistence_24h(y_tr, y_te)
+mae_naive = _mae(y_te.to_numpy(), y_naive)
+
+runs = [
+    {"name": "rf_n100_d5",  "n_estimators": 100, "max_depth": 5},
+    {"name": "rf_n300_d8",  "n_estimators": 300, "max_depth": 8},
+]
+
+run_ids = []
+for cfg in runs:
+    with mlflow.start_run(run_name=cfg["name"]) as run:
+        mlflow.log_params({**cfg, "seed": SEED})
+        m = RandomForestRegressor(
+            n_estimators=cfg["n_estimators"], max_depth=cfg["max_depth"],
+            random_state=SEED, n_jobs=1,
+        ).fit(X_tr, y_tr)
         y_pred = m.predict(X_te)
-        mae = float(np.mean(np.abs(y_te - y_pred)))
-        rmse = math.sqrt(np.mean((y_te - y_pred) ** 2))
-        mlflow.log_metric("MAE", mae)
-        mlflow.log_metric("RMSE", rmse)
+        mae_m = _mae(y_te.to_numpy(), y_pred)
+        rmse_m = _rmse(y_te.to_numpy(), y_pred)
+        improvement = (1 - mae_m / mae_naive) * 100 if mae_naive > 0 else 0
+        mlflow.log_metric("MAE", mae_m)
+        mlflow.log_metric("RMSE", rmse_m)
+        mlflow.log_metric("MAE_naive", mae_naive)
+        mlflow.log_metric("MAE_improvement_pct", improvement)
         mlflow.set_tag("lakefs_tag", "case_B/baseline_v1")
-        # artefacto plot
-        plt.figure()
-        plt.plot(y_te.index, y_te.values, label="real")
-        plt.plot(y_te.index, y_pred, label="pred")
-        plt.legend(); plt.title("Pred vs real")
-        plot_path = ROOT / "output" / "case_F_pred_vs_real.png"
-        plt.savefig(plot_path)
+        mlflow.set_tag("baseline", "naive_persistence_24h")
+        # artefact plot
+        plt.figure(figsize=(10, 3))
+        plt.plot(y_te.index, y_te.values, label="real", color="#3F51B5", linewidth=1)
+        plt.plot(y_te.index, y_pred, label="pred", color="#FF5722", linewidth=1, alpha=0.9)
+        plt.plot(y_te.index, y_naive, label="naive_24h", color="gray", linewidth=0.7, alpha=0.7)
+        plt.legend(loc="upper right", fontsize=8)
+        plt.title(f"{cfg['name']}: MAE={mae_m:.2f} (vs naive={mae_naive:.2f}, +{improvement:.1f}%)")
+        plot_path = ROOT / "output" / f"case_F_{cfg['name']}.png"
+        plt.savefig(plot_path, dpi=120, bbox_inches="tight")
         plt.close()
         mlflow.log_artifact(str(plot_path))
-        print(f"Run completed. MAE={mae:.2f}  RMSE={rmse:.2f}")
-else:
-    print("MLflow no instalado: registramos a JSON local como fallback")
-    out = ROOT / "output" / "case_F_run.json"
-    out.write_text(json.dumps({"params": {"n_estimators": 200}, "metrics": {"MAE": 12.4}}, indent=2))
+        run_ids.append(run.info.run_id)
+        print(f"  {cfg['name']}: MAE={mae_m:.2f}  RMSE={rmse_m:.2f}  vs naive +{improvement:.1f}%")
+print(f"\\n{len(run_ids)} runs registrados en {mlflow_dir.as_uri()}")
 """,
         ),
-        section(13, "Visualizaciones explicativas", "Listamos runs."),
-        section(14, "Validaciones", "El run dejó traza."),
+        section(
+            13,
+            "Visualizaciones explicativas",
+            "Listamos los runs en la experiment con `mlflow.search_runs()` y "
+            "comparamos métricas en una tabla.",
+            """\
+runs_df = mlflow.search_runs(experiment_names=["case_B_baseline_2026"], output_format="pandas")
+cols = ["tags.mlflow.runName", "metrics.MAE", "metrics.RMSE",
+        "metrics.MAE_improvement_pct", "params.n_estimators", "params.max_depth"]
+present = [c for c in cols if c in runs_df.columns]
+runs_summary = runs_df[present].sort_values("metrics.MAE")
+print(runs_summary.to_string(index=False))
+""",
+        ),
+        section(
+            14,
+            "Validaciones",
+            "Cada run debe (a) batir la línea naïve-24h en MAE y (b) tener "
+            "`MAE_improvement_pct > 0`.",
+            """\
+for run_id in run_ids:
+    run = mlflow.get_run(run_id)
+    mae_m = run.data.metrics["MAE"]
+    impr = run.data.metrics["MAE_improvement_pct"]
+    assert mae_m < mae_naive, f"Run {run.info.run_name} no bate naive ({mae_m:.2f} >= {mae_naive:.2f})"
+    assert impr > 0, f"Improvement no positivo en {run.info.run_name}"
+print("Validaciones OK — todos los runs baten naive-24h")
+""",
+        ),
         section(
             15,
             "Errores comunes",
@@ -280,6 +329,7 @@ else:
         layer="transversal",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_F,
     )
 
 
@@ -308,8 +358,8 @@ def _repro(target: Path) -> Path:
         section(4, "Relación con CENTINELA+", "Idéntico."),
         section(5, "Relación con Medallion", "Transversal."),
         section(6, "Datos de entrada", "Mock BDG2."),
-        section(7, "Schema CAPTIA esperado", "No aplica."),
         setup_section(),
+        section(8, "Schema CAPTIA esperado", "No aplica."),
         section(
             9,
             "Carga de datos o mock",
@@ -408,6 +458,7 @@ assert h1 == h2
         layer="transversal",
         spec=SPEC,
         sections=sections,
+        appendices=APPENDICES_CASE_F,
     )
 
 

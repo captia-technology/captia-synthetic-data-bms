@@ -20,6 +20,7 @@ Uso (importable):
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Iterable
 from pathlib import Path
@@ -52,18 +53,26 @@ def _split_lines(text: str) -> list[str]:
     return lines
 
 
-def make_md_cell(source: str) -> dict:
+def _cell_id(source: str, idx: int) -> str:
+    """ID determinista, alfanumérico, 8 caracteres."""
+    h = hashlib.sha256(f"{idx}-{source[:200]}".encode()).hexdigest()[:8]
+    return f"c{h}"
+
+
+def make_md_cell(source: str, *, idx: int) -> dict:
     return {
         "cell_type": "markdown",
+        "id": _cell_id(source, idx),
         "metadata": {},
         "source": _split_lines(source),
     }
 
 
-def make_code_cell(source: str) -> dict:
+def make_code_cell(source: str, *, idx: int) -> dict:
     return {
         "cell_type": "code",
         "execution_count": None,
+        "id": _cell_id(source, idx),
         "metadata": {},
         "outputs": [],
         "source": _split_lines(source),
@@ -82,11 +91,11 @@ def write_notebook(
     metadata canónica del notebook (caso, capa, spec).
     """
     cell_list: list[dict] = []
-    for kind, content in cells:
+    for idx, (kind, content) in enumerate(cells):
         if kind == "md":
-            cell_list.append(make_md_cell(content))
+            cell_list.append(make_md_cell(content, idx=idx))
         elif kind == "py":
-            cell_list.append(make_code_cell(content))
+            cell_list.append(make_code_cell(content, idx=idx))
         else:
             raise ValueError(f"Unknown cell kind: {kind!r}")
 
@@ -120,6 +129,7 @@ SETUP_BLOCK = """\
 # Setup canónico — todos los notebooks didácticos lo usan
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
