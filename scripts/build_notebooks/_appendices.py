@@ -95,12 +95,14 @@ con $s$ semilla, $D$ dataset (versionado lakeFS), $\theta$ hiperparámetros.
             "y score realismo físico 0.94."
         ),
     ),
-    bibliography_section([
-        "Inmon, W. H., Linstedt, D., & Levins, M. (2019). *Data Architecture: A Primer for the Data Scientist*. Academic Press.",
-        "Databricks (2021). *Lakehouse: A New Generation of Open Platforms*. CIDR.",
-        "InfluxData (2024). *InfluxDB 2.7 Reference Architecture*. https://docs.influxdata.com/influxdb/v2/",
-        "ECMWF (2024). *ERA5 reanalysis dataset documentation*. Copernicus Climate Change Service.",
-    ]),
+    bibliography_section(
+        [
+            "Inmon, W. H., Linstedt, D., & Levins, M. (2019). *Data Architecture: A Primer for the Data Scientist*. Academic Press.",
+            "Databricks (2021). *Lakehouse: A New Generation of Open Platforms*. CIDR.",
+            "InfluxData (2024). *InfluxDB 2.7 Reference Architecture*. https://docs.influxdata.com/influxdb/v2/",
+            "ECMWF (2024). *ERA5 reanalysis dataset documentation*. Copernicus Climate Change Service.",
+        ]
+    ),
 ]
 
 
@@ -165,11 +167,13 @@ con percentil 99 medido in-vivo $< 500$ ms.
             "Telegraf de 60 s."
         ),
     ),
-    bibliography_section([
-        "Banks, A., Briggs, E., Borgendale, K. & Gupta, R. (2014). *MQTT Version 3.1.1*. OASIS.",
-        "InfluxData (2024). *Telegraf 1.32 — MQTT Consumer Plugin*. https://docs.influxdata.com/telegraf/",
-        "OASIS (2019). *MQTT v5.0*. https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html",
-    ]),
+    bibliography_section(
+        [
+            "Banks, A., Briggs, E., Borgendale, K. & Gupta, R. (2014). *MQTT Version 3.1.1*. OASIS.",
+            "InfluxData (2024). *Telegraf 1.32 — MQTT Consumer Plugin*. https://docs.influxdata.com/telegraf/",
+            "OASIS (2019). *MQTT v5.0*. https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html",
+        ]
+    ),
 ]
 
 
@@ -251,13 +255,15 @@ Objetivos Simarro: $\text{MAE} \leq 0.15$ kWh, $\text{sMAPE} \leq 12\%$.
             "- Drift estacional: re-entrenar trimestralmente."
         ),
     ),
-    bibliography_section([
-        "Box, G. E. P., Jenkins, G. M., Reinsel, G. C. & Ljung, G. M. (2015). *Time Series Analysis: Forecasting and Control* (5ª ed.). Wiley.",
-        "Chen, T. & Guestrin, C. (2016). *XGBoost: A Scalable Tree Boosting System*. KDD '16.",
-        "Hochreiter, S. & Schmidhuber, J. (1997). *Long Short-Term Memory*. Neural Computation 9(8).",
-        "Miller, C. et al. (2020). *The Building Data Genome 2 (BDG2) data-set*. Scientific Data.",
-        "ASHRAE (2022). *ASHRAE 90.1-2022 — Energy Standard for Buildings*.",
-    ]),
+    bibliography_section(
+        [
+            "Box, G. E. P., Jenkins, G. M., Reinsel, G. C. & Ljung, G. M. (2015). *Time Series Analysis: Forecasting and Control* (5ª ed.). Wiley.",
+            "Chen, T. & Guestrin, C. (2016). *XGBoost: A Scalable Tree Boosting System*. KDD '16.",
+            "Hochreiter, S. & Schmidhuber, J. (1997). *Long Short-Term Memory*. Neural Computation 9(8).",
+            "Miller, C. et al. (2020). *The Building Data Genome 2 (BDG2) data-set*. Scientific Data.",
+            "ASHRAE (2022). *ASHRAE 90.1-2022 — Energy Standard for Buildings*.",
+        ]
+    ),
 ]
 
 
@@ -332,12 +338,14 @@ Objetivos: $\text{F1} \geq 0.85$, $\text{TPR}@1\%\text{FPR} \geq 0.7$.
             "- Drift en HVAC envejecido: incluir age-feature."
         ),
     ),
-    bibliography_section([
-        "Liu, F. T., Ting, K. M. & Zhou, Z.-H. (2008). *Isolation Forest*. ICDM '08.",
-        "Hinton, G. & Salakhutdinov, R. (2006). *Reducing the Dimensionality of Data with Neural Networks*. Science 313(5786).",
-        "Granderson, J. et al. (2020). *Building Fault Detection Data to Aid Diagnostic Algorithm Creation and Performance Testing*. Scientific Data 7.",
-        "ASHRAE (2021). *Guideline 36-2021 — High-Performance Sequences of Operation for HVAC Systems*.",
-    ]),
+    bibliography_section(
+        [
+            "Liu, F. T., Ting, K. M. & Zhou, Z.-H. (2008). *Isolation Forest*. ICDM '08.",
+            "Hinton, G. & Salakhutdinov, R. (2006). *Reducing the Dimensionality of Data with Neural Networks*. Science 313(5786).",
+            "Granderson, J. et al. (2020). *Building Fault Detection Data to Aid Diagnostic Algorithm Creation and Performance Testing*. Scientific Data 7.",
+            "ASHRAE (2021). *Guideline 36-2021 — High-Performance Sequences of Operation for HVAC Systems*.",
+        ]
+    ),
 ]
 
 
@@ -398,12 +406,14 @@ con pesos calibrados para reflejar normativa EN 16798.
             "| **Total año 1** | **+5 150 €** |"
         ),
     ),
-    bibliography_section([
-        "ASHRAE (2022). *Standard 62.1-2022 — Ventilation for Acceptable Indoor Air Quality*.",
-        "EN 16798-1:2019. *Energy performance of buildings — Ventilation for buildings*.",
-        "Wang, S., Burnett, J. & Chong, H. (2017). *Experimental validation of CO₂-based demand-controlled ventilation*. Building and Environment 39(2).",
-        "OMS (2010). *WHO Guidelines for Indoor Air Quality*.",
-    ]),
+    bibliography_section(
+        [
+            "ASHRAE (2022). *Standard 62.1-2022 — Ventilation for Acceptable Indoor Air Quality*.",
+            "EN 16798-1:2019. *Energy performance of buildings — Ventilation for buildings*.",
+            "Wang, S., Burnett, J. & Chong, H. (2017). *Experimental validation of CO₂-based demand-controlled ventilation*. Building and Environment 39(2).",
+            "OMS (2010). *WHO Guidelines for Indoor Air Quality*.",
+        ]
+    ),
 ]
 
 
@@ -468,12 +478,14 @@ Objetivo Simarro: $\text{nMAE} \leq 8\%$ a 24 h, $\text{Skill} \geq 0.3$.
             "| **Payback** | **~12 meses** |"
         ),
     ),
-    bibliography_section([
-        "Iqbal, M. (1983). *An Introduction to Solar Radiation*. Academic Press.",
-        "ECMWF (2024). *ERA5 Reanalysis Documentation*. Copernicus Climate Change Service.",
-        "AEMET. *Open Data Portal*. https://opendata.aemet.es",
-        "Holmgren, W. F. et al. (2018). *pvlib python: a python package for modeling solar energy systems*. JOSS 3(29).",
-    ]),
+    bibliography_section(
+        [
+            "Iqbal, M. (1983). *An Introduction to Solar Radiation*. Academic Press.",
+            "ECMWF (2024). *ERA5 Reanalysis Documentation*. Copernicus Climate Change Service.",
+            "AEMET. *Open Data Portal*. https://opendata.aemet.es",
+            "Holmgren, W. F. et al. (2018). *pvlib python: a python package for modeling solar energy systems*. JOSS 3(29).",
+        ]
+    ),
 ]
 
 
@@ -535,12 +547,14 @@ Trazabilidad bidireccional dataset $\leftrightarrow$ run $\leftrightarrow$ deplo
             "| **Bruto** | **+1 200 €/año** + risk hedging |"
         ),
     ),
-    bibliography_section([
-        "Zaharia, M. et al. (2018). *Accelerating the Machine Learning Lifecycle with MLflow*. CIDR.",
-        "lakeFS Project. *Documentation*. https://docs.lakefs.io",
-        "Sculley, D. et al. (2015). *Hidden Technical Debt in Machine Learning Systems*. NeurIPS.",
-        "EU (2024). *Artificial Intelligence Act*. Regulation (EU) 2024/1689.",
-    ]),
+    bibliography_section(
+        [
+            "Zaharia, M. et al. (2018). *Accelerating the Machine Learning Lifecycle with MLflow*. CIDR.",
+            "lakeFS Project. *Documentation*. https://docs.lakefs.io",
+            "Sculley, D. et al. (2015). *Hidden Technical Debt in Machine Learning Systems*. NeurIPS.",
+            "EU (2024). *Artificial Intelligence Act*. Regulation (EU) 2024/1689.",
+        ]
+    ),
 ]
 
 
@@ -603,12 +617,14 @@ $$
             "| **Bruto** | **+2 300 €/año** |"
         ),
     ),
-    bibliography_section([
-        "Schelter, S. et al. (2018). *Automating Large-Scale Data Quality Verification*. VLDB.",
-        "Great Expectations. *Documentation*. https://greatexpectations.io",
-        "Anthropic (2024). *Claude API — Tools*. https://docs.anthropic.com",
-        "Polyzotis, N. et al. (2017). *Data Lifecycle Challenges in Production Machine Learning*. SIGMOD.",
-    ]),
+    bibliography_section(
+        [
+            "Schelter, S. et al. (2018). *Automating Large-Scale Data Quality Verification*. VLDB.",
+            "Great Expectations. *Documentation*. https://greatexpectations.io",
+            "Anthropic (2024). *Claude API — Tools*. https://docs.anthropic.com",
+            "Polyzotis, N. et al. (2017). *Data Lifecycle Challenges in Production Machine Learning*. SIGMOD.",
+        ]
+    ),
 ]
 
 
@@ -674,12 +690,14 @@ Objetivos: $\text{Hit@5} \geq 0.85$, $\text{MRR} \geq 0.7$, Faithfulness ≥ 0.9
             "- Coste API escala linealmente con uso: monitorizar."
         ),
     ),
-    bibliography_section([
-        "Lewis, P. et al. (2020). *Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks*. NeurIPS.",
-        "Reimers, N. & Gurevych, I. (2019). *Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks*. EMNLP.",
-        "LangChain Project. *Documentation*. https://python.langchain.com",
-        "Anthropic (2024). *Claude 3.5 Sonnet Model Card*.",
-    ]),
+    bibliography_section(
+        [
+            "Lewis, P. et al. (2020). *Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks*. NeurIPS.",
+            "Reimers, N. & Gurevych, I. (2019). *Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks*. EMNLP.",
+            "LangChain Project. *Documentation*. https://python.langchain.com",
+            "Anthropic (2024). *Claude 3.5 Sonnet Model Card*.",
+        ]
+    ),
 ]
 
 
@@ -740,11 +758,13 @@ debajo, pandas es más rápido.
             "| **Payback** | **~3 meses** |"
         ),
     ),
-    bibliography_section([
-        "Zaharia, M. et al. (2010). *Spark: Cluster Computing with Working Sets*. HotCloud.",
-        "Miller, C. et al. (2020). *The Building Data Genome 2 (BDG2) data-set*. Scientific Data 7.",
-        "Dean, J. & Ghemawat, S. (2008). *MapReduce: Simplified Data Processing on Large Clusters*. CACM 51(1).",
-    ]),
+    bibliography_section(
+        [
+            "Zaharia, M. et al. (2010). *Spark: Cluster Computing with Working Sets*. HotCloud.",
+            "Miller, C. et al. (2020). *The Building Data Genome 2 (BDG2) data-set*. Scientific Data 7.",
+            "Dean, J. & Ghemawat, S. (2008). *MapReduce: Simplified Data Processing on Large Clusters*. CACM 51(1).",
+        ]
+    ),
 ]
 
 
@@ -811,10 +831,12 @@ Objetivos: mAP@0.5 ≥ 0.90 (car/truck), ≥ 0.75 (motorbike/bicycle).
             "| **Neto** | **+15 500 €/año** |"
         ),
     ),
-    bibliography_section([
-        "Redmon, J. & Farhadi, A. (2018). *YOLOv3: An Incremental Improvement*. arXiv:1804.02767.",
-        "Ultralytics (2024). *YOLOv8 Documentation*. https://docs.ultralytics.com",
-        "Lin, T.-Y. et al. (2014). *Microsoft COCO: Common Objects in Context*. ECCV.",
-        "DGT España. *Información en tiempo real*. http://infocar.dgt.es",
-    ]),
+    bibliography_section(
+        [
+            "Redmon, J. & Farhadi, A. (2018). *YOLOv3: An Incremental Improvement*. arXiv:1804.02767.",
+            "Ultralytics (2024). *YOLOv8 Documentation*. https://docs.ultralytics.com",
+            "Lin, T.-Y. et al. (2014). *Microsoft COCO: Common Objects in Context*. ECCV.",
+            "DGT España. *Información en tiempo real*. http://infocar.dgt.es",
+        ]
+    ),
 ]

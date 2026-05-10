@@ -481,8 +481,7 @@ print({"kc_mean_diurno": float(X.loc[X["g_clear"] > 50, "kc"].mean()),
         section(
             12,
             "Construcción de capa oro",
-            "**4 modelos comparables** con clip(0) y máscara nocturna aplicada en "
-            "predicción.",
+            "**4 modelos comparables** con clip(0) y máscara nocturna aplicada en predicción.",
             """\
 from sklearn.ensemble import RandomForestRegressor
 from notebooks._common.eval_helpers import (

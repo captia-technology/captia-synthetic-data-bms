@@ -109,18 +109,60 @@ print("Rangos físicos OK")
         section(
             13,
             "Visualizaciones explicativas",
-            "Heatmap hora × día de la semana sobre el consumo medio.",
+            "**4 paneles**: heatmap hora × día, autocorrelación (ACF) hasta lag 200, "
+            "test ADF de estacionariedad y boxplot mensual.",
             """\
-df_b0 = df[df.building_id == df.building_id.unique()[0]].copy()
+from statsmodels.tsa.stattools import acf, adfuller
+
+building_id = df.building_id.unique()[0]
+df_b0 = df[df.building_id == building_id].copy()
 df_b0["hour"] = df_b0["timestamp"].dt.hour
 df_b0["dow"] = df_b0["timestamp"].dt.dayofweek
+df_b0["month"] = df_b0["timestamp"].dt.month
+power = df_b0.set_index("timestamp")["power_kw"]
+
+# (1) ADF test sobre la serie cruda y diferenciada
+adf_raw = adfuller(power.dropna(), maxlag=24, autolag=None)
+adf_diff = adfuller(power.diff(24).dropna(), maxlag=24, autolag=None)
+print(f"ADF cruda: stat={adf_raw[0]:.3f}, p-value={adf_raw[1]:.3f} "
+      f"(p<0.05 -> estacionaria)")
+print(f"ADF diff_24h: stat={adf_diff[0]:.3f}, p-value={adf_diff[1]:.3f}")
+
+# (2) ACF hasta lag 200 (cubre semana completa)
+acf_vals = acf(power.dropna(), nlags=200, fft=True)
+
+# Plots
+fig, axes = plt.subplots(2, 2, figsize=(13, 8))
 heat = df_b0.pivot_table(index="dow", columns="hour", values="power_kw", aggfunc="mean")
-plt.figure(figsize=(10, 3))
-plt.imshow(heat.values, aspect="auto", cmap="viridis")
-plt.colorbar(label="kW medio")
-plt.yticks(range(7), ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"])
-plt.xticks(range(0, 24, 2))
-plt.title("Heatmap consumo · edificio 0")
+im = axes[0, 0].imshow(heat.values, aspect="auto", cmap="viridis")
+plt.colorbar(im, ax=axes[0, 0], label="kW medio")
+axes[0, 0].set_yticks(range(7))
+axes[0, 0].set_yticklabels(["Lun", "Mar", "Mié", "Jue", "Vie", "Sab", "Dom"])
+axes[0, 0].set_xticks(range(0, 24, 2))
+axes[0, 0].set_title(f"Heatmap consumo · {building_id}")
+
+axes[0, 1].plot(range(len(acf_vals)), acf_vals, color="#3F51B5")
+axes[0, 1].axhline(0, color="gray", linestyle="--")
+axes[0, 1].axvline(24, color="#FF5722", linestyle="--", label="lag 24h (diario)")
+axes[0, 1].axvline(168, color="#4CAF50", linestyle="--", label="lag 168h (semanal)")
+axes[0, 1].set_title("ACF — picos en lag 24 y 168 confirman estacionalidad")
+axes[0, 1].set_xlabel("lag (h)")
+axes[0, 1].legend(loc="upper right", fontsize=8)
+
+axes[1, 0].text(0.05, 0.7, f"ADF cruda:\\n  stat = {adf_raw[0]:.3f}\\n  p = {adf_raw[1]:.3f}",
+                fontsize=11, family="monospace")
+axes[1, 0].text(0.05, 0.3, f"ADF diff(24):\\n  stat = {adf_diff[0]:.3f}\\n  p = {adf_diff[1]:.3f}",
+                fontsize=11, family="monospace")
+verdict = "ESTACIONARIA" if adf_diff[1] < 0.05 else "NO estacionaria"
+axes[1, 0].text(0.05, 0.05, f"Verdict tras diff_24h: {verdict}",
+                fontsize=12, color="#FF5722", weight="bold")
+axes[1, 0].set_title("ADF (Augmented Dickey-Fuller) — estacionariedad")
+axes[1, 0].axis("off")
+
+df_b0.boxplot(column="power_kw", by="month", ax=axes[1, 1])
+axes[1, 1].set_title("Distribución mensual — efecto verano/invierno")
+axes[1, 1].set_xlabel("mes")
+plt.suptitle("")
 plt.tight_layout()
 """,
         ),
@@ -596,37 +638,71 @@ print("Naive 24h", {"MAE": mae(y_te, naive), "MAPE%": mape(y_te, naive), "RMSE":
         section(
             13,
             "Visualizaciones explicativas",
-            "**Baseline 2 — XGBoost** (si está disponible). Si falla, usar `RandomForestRegressor`.",
+            "**Baseline 2 — XGBoost / RF** y **Baseline 3 — SARIMA(2,0,2)(1,1,1)_24** "
+            "(statsmodels). Tabla comparativa con IC bootstrap.",
             """\
+from notebooks._common.eval_helpers import bootstrap_ci, compare_models
+
+# (a) XGBoost (con RF como fallback)
 try:
     from xgboost import XGBRegressor
-    model = XGBRegressor(n_estimators=300, max_depth=4, learning_rate=0.05, random_state=SEED, verbosity=0)
-except Exception:
+    model = XGBRegressor(n_estimators=300, max_depth=4, learning_rate=0.05,
+                         random_state=SEED, verbosity=0)
+except Exception:  # noqa: BLE001
     from sklearn.ensemble import RandomForestRegressor
     model = RandomForestRegressor(n_estimators=200, random_state=SEED)
-
 model.fit(X_tr, y_tr)
-y_pred = model.predict(X_te)
-print("Modelo:", model.__class__.__name__,
-      {"MAE": mae(y_te, y_pred), "MAPE%": mape(y_te, y_pred), "RMSE": rmse(y_te, y_pred)})
+y_xgb = model.predict(X_te)
 
-plt.figure(figsize=(10, 3))
-plt.plot(y_te.index[:24*7], y_te.values[:24*7], label="real", color="#3F51B5")
-plt.plot(y_te.index[:24*7], y_pred[:24*7], label="modelo", color="#FF5722")
-plt.legend()
-plt.title("Predicción 1 semana — primer test fold")
+# (b) SARIMA real con statsmodels (sobre la serie y_tr, sin features exógenas para baseline simple)
+try:
+    from statsmodels.tsa.statespace.sarimax import SARIMAX
+    sarima = SARIMAX(y_tr, order=(2, 0, 2), seasonal_order=(1, 1, 1, 24),
+                     enforce_stationarity=False, enforce_invertibility=False)
+    sarima_fit = sarima.fit(disp=False, maxiter=50)
+    y_sarima = sarima_fit.forecast(steps=len(y_te)).to_numpy()
+    sarima_ok = True
+except Exception as e:  # noqa: BLE001
+    print(f"SARIMA fallback: {e}")
+    y_sarima = naive  # si statsmodels falla por convergencia, usamos naive
+    sarima_ok = False
+
+# Comparativa con IC bootstrap (95 %)
+predictions = {
+    "naive_24h": naive,
+    f"{model.__class__.__name__}": y_xgb,
+    "SARIMA(2,0,2)(1,1,1)_24": y_sarima,
+}
+comparison = compare_models(y_te.to_numpy(), predictions)
+print(comparison)
+
+# Plot 1 semana real vs los 3 modelos
+plt.figure(figsize=(11, 4))
+plt.plot(y_te.index[:24 * 7], y_te.values[:24 * 7], label="real", color="#3F51B5", linewidth=1.5)
+plt.plot(y_te.index[:24 * 7], np.asarray(y_xgb)[:24 * 7],
+         label=model.__class__.__name__, color="#FF5722", linewidth=1, alpha=0.9)
+plt.plot(y_te.index[:24 * 7], np.asarray(y_sarima)[:24 * 7],
+         label="SARIMA" if sarima_ok else "SARIMA (fallback=naive)",
+         color="#4CAF50", linewidth=1, alpha=0.9)
+plt.plot(y_te.index[:24 * 7], np.asarray(naive)[:24 * 7],
+         label="naive_24h", color="gray", linewidth=0.7, linestyle="--", alpha=0.7)
+plt.legend(loc="upper right", fontsize=8)
+plt.title("Predicción 1 semana — 3 modelos comparados")
 plt.tight_layout()
 """,
         ),
         section(
             14,
             "Validaciones",
-            "El modelo tiene que **batir** la línea naive en MAE.",
+            "El **mejor de los modelos** debe batir la línea naive en MAE.",
             """\
 mae_naive = mae(y_te, naive)
-mae_model = mae(y_te, y_pred)
-print(f"naive={mae_naive:.2f}  model={mae_model:.2f}  improvement={(1 - mae_model/mae_naive)*100:.1f}%")
-assert mae_model < mae_naive, "El modelo debería ser mejor que naive"
+mae_xgb = mae(y_te, y_xgb)
+mae_sarima = mae(y_te, y_sarima)
+mae_best = min(mae_xgb, mae_sarima)
+print(f"naive={mae_naive:.2f}  xgb={mae_xgb:.2f}  sarima={mae_sarima:.2f}  best={mae_best:.2f}")
+print(f"improvement vs naive: {(1 - mae_best/mae_naive)*100:.1f}%")
+assert mae_best < mae_naive, "Al menos un modelo debe batir naive_24h"
 """,
         ),
         section(

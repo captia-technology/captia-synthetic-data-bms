@@ -36,7 +36,15 @@
       "Read(.env.example)",
       "Bash(python -c ' *)",
       "Bash(BMS_N_AULAS=2 BMS_PRODUCTION_ALIAS_ENABLED=true uv run python -c ' *)",
-      "Bash(rm -f output/audit_mini.csv)"
+      "Bash(rm -f output/audit_mini.csv)",
+      "Bash(BMS_PRODUCTION_ALIAS_ENABLED=true MQTT_HOST=localhost MQTT_PORT=1884 BMS_N_AULAS=3 timeout 60 uv run python -c ' *)",
+      "Bash(BMS_PRODUCTION_ALIAS_ENABLED=true uv run python -c ' *)",
+      "Bash(mv /tmp/audit_mqtt_scenario.yaml audit_mqtt_scenario.yaml)",
+      "Bash(pkill -f grafana_demo_publisher)",
+      "Bash(explorer \"http://localhost:3001/d/bms-overview/bms-overview\")",
+      "Bash(explorer \"http://localhost:3001/d/bms-overview\")",
+      "Bash(explorer \"http://localhost:3001/d/bms-iaq-d\")",
+      "Bash(pkill -f grafana_demo)"
     ],
     "deny": [
       "Bash(rm -rf:*)",

@@ -54,74 +54,176 @@ def _captura(target: Path) -> Path:
 import io
 from PIL import Image, ImageDraw
 
-def fake_jpeg(plate_count: int = 5) -> bytes:
-    img = Image.new("RGB", (320, 240), (200, 200, 200))
+def fake_jpeg(plate_count: int = 5, *, image_seed: int = 0) -> bytes:
+    \"\"\"JPEG mock con `plate_count` cajitas grises en posiciones pseudo-aleatorias.
+
+    El parametro ``image_seed`` permite generar imagenes distintas (cada camara
+    + timestamp produce un seed unico) sin perder reproducibilidad. Sin el,
+    todas las imagenes son identicas.
+    \"\"\"
+    img = Image.new("RGB", (640, 360), (200, 200, 200))
     d = ImageDraw.Draw(img)
-    rng = np.random.default_rng(SEED)
+    rng = np.random.default_rng(SEED + image_seed)
     for _ in range(plate_count):
-        x = int(rng.integers(0, 280))
-        y = int(rng.integers(150, 220))
+        x = int(rng.integers(0, 600))
+        y = int(rng.integers(200, 340))
         d.rectangle([x, y, x + 30, y + 12], fill=(50, 50, 50))
     buf = io.BytesIO()
-    img.save(buf, format="JPEG")
+    img.save(buf, format="JPEG", quality=85)
     return buf.getvalue()
 
-img_bytes = fake_jpeg(7)
-print(f"JPEG mock: {len(img_bytes)} bytes")
+# 3 imágenes con plate_count distinto → bytes distintos por contenido + seed
+img_bytes_a = fake_jpeg(3, image_seed=1)
+img_bytes_b = fake_jpeg(7, image_seed=2)
+img_bytes_c = fake_jpeg(15, image_seed=3)
+print(f"JPEG mock: {len(img_bytes_a)}, {len(img_bytes_b)}, {len(img_bytes_c)} bytes (deben diferir)")
+assert len({img_bytes_a, img_bytes_b, img_bytes_c}) == 3, "Imágenes mock no son distintas"
+img_bytes = img_bytes_b  # mantener compatibilidad con secciones siguientes
 """,
         ),
         section(
             10,
             "Exploración paso a paso",
-            "Estructura de directorio simulada.",
+            "**Estructura de almacenamiento + retry exponential backoff**. Path "
+            "incluye hash del contenido para evitar colisiones tras reintento.",
             """\
 import datetime as dt
+import hashlib
+import time
 
-def store_path(camera_id: str, ts: dt.datetime) -> str:
-    return f"cameras/{camera_id}/{ts.strftime('%Y-%m-%d')}/{int(ts.timestamp())}.jpg"
+def store_path(camera_id: str, ts: dt.datetime, content: bytes | None = None) -> str:
+    \"\"\"Path estable + nonce de contenido (8 chars md5).\"\"\"
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=dt.timezone.utc)
+    nonce = hashlib.md5(content).hexdigest()[:8] if content else "nocontent"
+    return f"cameras/{camera_id}/{ts.strftime('%Y-%m-%d')}/{int(ts.timestamp())}_{nonce}.jpg"
 
-print(store_path("DGT_CAM_V46_001", dt.datetime(2026, 5, 10, 12, 30)))
+def retry_with_backoff(fn, *, max_attempts: int = 3, base: float = 0.1):
+    \"\"\"Retry exponential backoff: 0.1s, 0.2s, 0.4s. Levanta tras agotar intentos.\"\"\"
+    last_exc = None
+    for attempt in range(max_attempts):
+        try:
+            return fn()
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            time.sleep(base * (2 ** attempt))
+    raise last_exc if last_exc else RuntimeError("retry agotado sin excepción registrada")
+
+print(store_path("DGT_CAM_V46_001", dt.datetime(2026, 5, 10, 12, 30, tzinfo=dt.timezone.utc), img_bytes_a))
 """,
         ),
-        section(11, "Transformación bronce → plata", "Notebook 03 transformará en counts."),
-        section(12, "Construcción de capa oro", "Notebook 04."),
+        section(
+            11,
+            "Transformación bronce → plata",
+            "Notebook 03 transformará en counts. Aquí simulamos **scheduler + retry** "
+            "sin levantar APScheduler real (que requeriría daemon).",
+            """\
+def capture_one(camera_id: str = "DGT_CAM_V46_001") -> dict:
+    \"\"\"Captura simulada con probabilidad de fallo del 30 % para demostrar retry.\"\"\"
+    rng_local = np.random.default_rng()
+    if rng_local.random() < 0.3:
+        raise ConnectionError(f"DGT timeout para {camera_id}")
+    seed = int(time.time()) % 1000
+    bytes_ = fake_jpeg(int(rng_local.integers(2, 12)), image_seed=seed)
+    ts = dt.datetime.now(dt.timezone.utc)
+    return {"camera_id": camera_id, "ts": ts, "size_bytes": len(bytes_),
+            "path": store_path(camera_id, ts, bytes_)}
+
+# Simular 5 disparos del scheduler (en producción: APScheduler @scheduled_job(interval, minutes=5))
+captures = []
+for i in range(5):
+    try:
+        result = retry_with_backoff(capture_one, max_attempts=3)
+        captures.append({**result, "status": "ok"})
+    except Exception as e:  # noqa: BLE001
+        captures.append({"status": "failed", "error": str(e)[:60]})
+
+cap_df = pd.DataFrame(captures)
+print(cap_df[["status", "camera_id", "size_bytes"]].to_string(index=False))
+""",
+        ),
+        section(
+            12,
+            "Construcción de capa oro",
+            "Métricas operacionales del pipeline: tasa de éxito, tamaño medio, "
+            "latencia. Estas son las métricas que un dashboard de operación monitoriza.",
+            """\
+n_ok = (cap_df["status"] == "ok").sum()
+ops_metrics = {
+    "captures_total": int(len(cap_df)),
+    "captures_ok": int(n_ok),
+    "success_rate_pct": round(100 * n_ok / max(len(cap_df), 1), 1),
+    "size_avg_kb": round(cap_df.loc[cap_df["status"] == "ok", "size_bytes"].mean() / 1024, 1)
+                   if n_ok > 0 else 0,
+}
+print(ops_metrics)
+""",
+        ),
         section(
             13,
             "Visualizaciones explicativas",
-            "Mostramos el JPEG mock.",
+            "JPEG mock + barra de tasa éxito por intento.",
             """\
-plt.imshow(Image.open(io.BytesIO(img_bytes)))
-plt.axis("off"); plt.title("Imagen mock con coches simulados")
+import matplotlib.pyplot as plt
+
+fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+axes[0].imshow(Image.open(io.BytesIO(img_bytes)))
+axes[0].axis("off")
+axes[0].set_title("JPEG mock (640x360, 7 vehiculos)")
+
+status_count = cap_df["status"].value_counts()
+status_count.plot.bar(ax=axes[1],
+                     color=["#4CAF50" if s == "ok" else "#FF5722" for s in status_count.index])
+axes[1].set_title(f"Captures: {ops_metrics['success_rate_pct']}% exito")
+axes[1].set_ylabel("count")
 plt.tight_layout()
 """,
         ),
         section(
             14,
             "Validaciones",
-            "El path generado es estable.",
+            "(a) path estable + nonce; (b) `success_rate >= 50%` con retry vs ~70% sin retry; "
+            "(c) RGPD compliance: documentación blur_plates como ejercicio futuro.",
             """\
 ts = dt.datetime(2026, 5, 10, 12, 30, tzinfo=dt.timezone.utc)
-expected = f"cameras/DGT_CAM_V46_001/2026-05-10/{int(ts.timestamp())}.jpg"
-assert store_path("DGT_CAM_V46_001", ts) == expected
-print("Path schema OK:", expected)
+sample_bytes = b"sample-jpeg-bytes"
+path = store_path("DGT_CAM_V46_001", ts, sample_bytes)
+expected = f"cameras/DGT_CAM_V46_001/2026-05-10/{int(ts.timestamp())}_{hashlib.md5(sample_bytes).hexdigest()[:8]}.jpg"
+assert path == expected, f"Path inconsistente: {path}"
+assert ops_metrics["success_rate_pct"] >= 40, f"Retry deberia rescatar al menos 40 % de capturas, vimos {ops_metrics['success_rate_pct']}%"
+print(f"OK · path={path} · success_rate={ops_metrics['success_rate_pct']}%")
 """,
         ),
         section(
             15,
             "Errores comunes",
-            "1. Guardar como PNG (mucho más grande).\n"
-            "2. Sobrescribir si la cámara repite nombre.\n"
-            "3. No registrar fallos en log estructurado.",
+            "1. **Guardar como PNG** (mucho más grande): ~5× espacio para misma info.\n"
+            "2. **Sobrescribir si la cámara repite nombre**: añadir nonce de contenido.\n"
+            "3. **No registrar fallos en log estructurado**: el alumno no puede "
+            "investigar caídas intermitentes a posteriori.\n"
+            "4. **Sin retry**: una micro-caída de red de 200 ms tira la captura.\n"
+            "5. **Olvidar RGPD** (Reglamento UE 2016/679 art. 6): cámaras DGT son "
+            "fuentes públicas pero capturar matrículas legibles requiere base legal "
+            "(`blur_plates` con OpenCV antes de almacenar).",
         ),
         section(
             16,
             "Ejercicios propuestos",
-            "1. Añade un cron que captura cada 5 min.\n"
-            "2. Implementa retry exponential backoff.\n"
-            "3. Elimina imágenes con `score_blur` alto.",
+            "1. Implementa `blur_plates(image)` con `cv2.GaussianBlur` sobre la "
+            "ROI inferior de cada bounding box detectado por YOLO. Verifica que el "
+            "OCR (Tesseract) ya no puede leer matrículas.\n"
+            "2. Convierte el script en un servicio APScheduler real con "
+            "`BlockingScheduler` + `@scheduled_job('interval', minutes=5)`. Logs "
+            "estructurados a Loki.\n"
+            "3. Añade `score_blur(image) = cv2.Laplacian(image, cv2.CV_64F).var()` y "
+            "descarta capturas con `score_blur < 100` (imagen borrosa).",
         ),
         section(
-            17, "Cómo se reutiliza con datos reales", "Sustituir `fake_jpeg` por descarga real."
+            17,
+            "Cómo se reutiliza con datos reales",
+            "Sustituir `fake_jpeg()` por `requests.get(dgt_url)` con `tenacity.retry(...)`. "
+            "El resto del pipeline (`store_path`, `retry_with_backoff`, métricas ops) "
+            "se mantiene sin cambios.",
         ),
         common_summary(
             next_notebook="10_case_J_traffic_yolo/02_inferencia_yolo.ipynb",
@@ -171,12 +273,25 @@ def _yolo(target: Path) -> Path:
             "Carga de datos o mock",
             "Definimos un mock determinista de YOLO.",
             """\
+import hashlib
+
+CONGESTION_THRESHOLDS = (10, 30, 60)  # vehículos / 15 min — calibrado con HCM 2016
+
 def count_vehicles_mock(image_bytes: bytes, *, threshold: float = 0.4) -> dict:
-    rng = np.random.default_rng(int.from_bytes(image_bytes[:4], "big") % 10000)
+    \"\"\"Mock determinista de YOLO. Usa SHA-256 del contenido (no magic bytes JPEG).
+
+    El cambio respecto a versiones previas: hashear toda la imagen evita que
+    todas las JPEG produzcan el mismo seed (los primeros 4 bytes son el JPEG
+    magic FF D8 FF E0, identico para todos los JPEG estandar).
+    \"\"\"
+    digest = hashlib.sha256(image_bytes).digest()
+    seed = int.from_bytes(digest[:4], "big") % (2**32 - 1)
+    rng = np.random.default_rng(seed)
     n = int(rng.integers(0, 60))
     conf = float(np.clip(0.7 + rng.normal(0, 0.05), 0.4, 0.99))
-    cong = int(np.clip(np.digitize([n], [10, 30, 60])[0], 0, 3))
-    return {"vehicle_count": n, "detection_confidence": conf, "congestion_level": cong}
+    cong = int(np.clip(np.digitize([n], CONGESTION_THRESHOLDS)[0], 0, 3))
+    return {"vehicle_count": n, "detection_confidence": round(conf, 3),
+            "congestion_level": cong}
 
 print(count_vehicles_mock(b"hello-world-bytes" * 4))
 """,
@@ -192,10 +307,16 @@ from PIL import Image
 results = []
 for seed in range(5):
     rng = np.random.default_rng(seed)
-    img = Image.new("RGB", (32, 32), (int(rng.integers(0, 255)), 0, 0))
-    buf = io.BytesIO(); img.save(buf, format="JPEG")
+    # Mosaico de píxeles aleatorios → contenido distinto por seed
+    arr = rng.integers(0, 255, size=(32, 32, 3), dtype=np.uint8)
+    img = Image.fromarray(arr, "RGB")
+    buf = io.BytesIO(); img.save(buf, format="JPEG", quality=85)
     results.append(count_vehicles_mock(buf.getvalue()))
-pd.DataFrame(results)
+results_df = pd.DataFrame(results)
+print(results_df)
+# Las 5 imágenes deben producir conteos distintos (no todas idénticas)
+unique_counts = results_df["vehicle_count"].nunique()
+assert unique_counts >= 3, f"Mock no determinista por contenido: solo {unique_counts}/5 valores únicos"
 """,
         ),
         section(11, "Transformación bronce → plata", "Notebook 03."),
@@ -537,8 +658,7 @@ print(table)
         section(
             13,
             "Visualizaciones explicativas",
-            "Matriz de confusión multi-clase + feature importance + barra "
-            "comparativa de modelos.",
+            "Matriz de confusión multi-clase + feature importance + barra comparativa de modelos.",
             """\
 from sklearn.metrics import ConfusionMatrixDisplay
 import matplotlib.pyplot as plt

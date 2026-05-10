@@ -316,17 +316,70 @@ muestras[0]
         section(
             12,
             "Construcción de capa oro",
-            "No aplica para este notebook (capa plata es el objetivo).",
+            "**Publicación real** con `paho-mqtt` si el broker está disponible. Si no, "
+            "registramos en memoria y medimos el throughput de generación. En ambos "
+            "modos reportamos `msgs/s`.",
+            """\
+import os, time
+
+published = []
+mqtt_status = "in_memory"
+broker_host = os.environ.get("MQTT_HOST", "localhost")
+broker_port = int(os.environ.get("MQTT_PORT_HOST", os.environ.get("MQTT_PORT", "1884")))
+
+t0 = time.perf_counter()
+try:
+    import paho.mqtt.client as mqtt
+    client = mqtt.Client(client_id="captia-bms-notebook-a02",
+                         callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
+    client.connect(broker_host, broker_port, keepalive=30)
+    client.loop_start()
+    for topic, payload in muestras:
+        client.publish(topic, json.dumps(payload), qos=1)
+        published.append((topic, payload))
+    # Pequeña espera para drenar el buffer in-flight
+    time.sleep(0.2)
+    client.loop_stop()
+    client.disconnect()
+    mqtt_status = f"published_to_{broker_host}:{broker_port}"
+except (ImportError, ConnectionRefusedError, OSError) as e:
+    # Fallback: simulamos sin broker
+    for topic, payload in muestras:
+        published.append((topic, payload))
+    mqtt_status = f"in_memory_fallback ({type(e).__name__})"
+
+import json  # asegurar import si fallback se usó antes
+elapsed = time.perf_counter() - t0
+throughput = len(published) / max(elapsed, 1e-3)
+print(f"{len(published)} mensajes en {elapsed:.3f}s = {throughput:.0f} msg/s · status={mqtt_status}")
+""",
         ),
         section(
             13,
             "Visualizaciones explicativas",
-            "Distribución de mensajes por variable (debe ser uniforme: 8 variables × 25 filas = 200).",
+            "**3 paneles**: distribución por variable, timeline de publicación y "
+            "throughput acumulado vs teórico (CENTINELA+ real ≈ 308 msg/s).",
             """\
 import collections
-counts = collections.Counter(t.split("/")[-1] for t, _ in muestras)
-pd.Series(counts).sort_values().plot.barh(color="#3F51B5", figsize=(7, 3))
-plt.title("Mensajes MQTT por variable")
+import matplotlib.pyplot as plt
+
+fig, axes = plt.subplots(1, 3, figsize=(13, 4))
+
+counts = collections.Counter(t.split("/")[-1] for t, _ in published)
+pd.Series(counts).sort_values().plot.barh(ax=axes[0], color="#3F51B5")
+axes[0].set_title(f"Mensajes por variable (total {len(published)})")
+
+ts_seq = [pd.Timestamp(p["ts_ns"], unit="ns") for _, p in published]
+axes[1].eventplot([t.timestamp() for t in ts_seq], color="#FF5722", lineoffsets=1)
+axes[1].set_title("Timeline ts_ns publicaciones")
+axes[1].set_yticks([])
+
+# Throughput acumulado
+n_per_s = pd.Series(1, index=range(len(published))).cumsum()
+axes[2].plot(n_per_s.index, n_per_s.values, color="#4CAF50", label="acumulado")
+axes[2].axhline(308, color="gray", linestyle="--", label="lambda teorico CENTINELA+ (308 msg/s)")
+axes[2].set_title(f"Throughput medido: {throughput:.0f} msg/s")
+axes[2].set_xlabel("nº mensaje"); axes[2].legend(loc="lower right", fontsize=8)
 plt.tight_layout()
 """,
         ),

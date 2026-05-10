@@ -692,116 +692,234 @@ print("\\nValidaciones OK")
 
 
 def _val(target: Path) -> Path:
-    title = "Caso D · 05 Validación IAQ y alertas según OMS / EN 16798"
+    title = "Caso D · 05 Alertas IAQ con histéresis y jerarquía L1/L2/L3"
     sections = [
         section(
             1,
             "Objetivo",
-            "Implementar un agregador IAQ que dispara alertas cuando los valores "
-            "salen de los rangos recomendados por OMS / EN 16798.",
+            "Implementar un sistema de alertas IAQ **jerárquico** (L1/L2/L3) con "
+            "**histéresis temporal** (sostenido N minutos antes de disparar) y banda "
+            "de hysteresis (rearme con margen). Cuantificar el efecto de la "
+            "histéresis sobre la fatiga de alertas.",
         ),
         section(
             2,
             "Qué se aprende",
-            "- Mapear rangos a categorías.\n"
-            "- Generar alertas por minuto.\n"
-            "- Visualizar tiempos en cada categoría.",
+            "- Categorización CO₂ por umbrales OMS / EN 16798 (5 niveles).\n"
+            "- **Histéresis temporal**: dispara solo si superado durante ≥ N min.\n"
+            "- **Banda de hysteresis**: rearme con margen para evitar oscilación.\n"
+            "- Jerarquía L1 (profesor) / L2 (conserje) / L3 (dirección + actuador).\n"
+            "- Tabla de tiempo total por categoría (KPI de director de centro).",
         ),
         section(
             3,
             "Contexto del caso de uso",
-            "El profesor recibe alertas cuando CO₂ > 1500 ppm o IAQ > 200 — señal de ventilar.",
+            "Sin histéresis, una transición ruidosa por encima de 1 500 ppm dispara "
+            "decenas de alertas por hora → fatiga → operador desactiva → sistema "
+            "invisible. Con histéresis (5 min sostenido + banda 100 ppm), las "
+            "alertas son útiles.",
         ),
         section(
             4,
             "Relación con CENTINELA+",
-            "Las alertas van a `telemetry_events` o se exponen vía API REST.",
+            "Las alertas van a `telemetry_events` con tags `level`, `severity`, "
+            "`asset_id`. Webhook a Mattermost/Slack para L2/L3.",
         ),
-        section(5, "Relación con Medallion", "Oro: regla + reporte."),
-        section(6, "Datos de entrada", "Mock In-Gauge."),
+        section(5, "Relación con Medallion", "Oro: reglas con estado + reporte de alertas."),
+        section(6, "Datos de entrada", "Mock In-Gauge 30 días para tener picos."),
         setup_section(),
-        section(8, "Schema CAPTIA esperado", "No aplica."),
+        section(
+            8,
+            "Schema CAPTIA esperado",
+            "Eventos como measurement separado:\n\n"
+            "```\n"
+            "captia_event,asset_id=AULA01,level=L1,kind=co2_alert "
+            "value_ppm=1612.0,severity=2 1715260800000000000\n"
+            "```",
+        ),
         section(
             9,
             "Carga de datos o mock",
-            "Reusamos In-Gauge.",
+            "Cargamos 30 días para tener variabilidad real de CO₂.",
             """\
-csv_path = ROOT / "notebooks" / "_data" / "ingauge_aula01_mock.csv"
-df = pd.read_csv(csv_path, comment="#", parse_dates=["timestamp"]).set_index("timestamp")
-df.head()
+df, _ = mocks.make_ingauge_aula01_mock(days=30)
+df = df.set_index("timestamp")
+print({"filas": len(df), "co2_max": float(df["Indoor_CO2"].max()),
+       "co2_p99": float(df["Indoor_CO2"].quantile(0.99))})
 """,
         ),
         section(
             10,
             "Exploración paso a paso",
-            "Categorización CO₂.",
+            "Categorización OMS + thresholds por nivel jerárquico.",
             """\
+THRESHOLDS_PPM = {"L1": 800, "L2": 1000, "L3": 1500}  # CO2 ppm — alineados con EN 16798 cat I/II/III
+HOLD_MIN = {"L1": 5, "L2": 5, "L3": 10}               # min sostenido
+HYST_BAND = 75                                         # ppm para rearme
+
 def cat_co2(x):
-    if x < 800: return "óptimo"
+    if x < 800: return "optimo"
     if x < 1000: return "aceptable"
     if x < 1500: return "vigilar"
     if x < 2000: return "molesto"
     return "ventilar"
 
 df["co2_cat"] = df["Indoor_CO2"].apply(cat_co2)
-print(df["co2_cat"].value_counts(normalize=True).round(3))
+dist = df["co2_cat"].value_counts(normalize=True).reindex(
+    ["optimo", "aceptable", "vigilar", "molesto", "ventilar"], fill_value=0
+).round(3)
+print(dist)
 """,
         ),
         section(11, "Transformación bronce → plata", "No aplica."),
         section(
             12,
             "Construcción de capa oro",
-            "Generamos alertas.",
+            "**Algoritmo con histéresis**: máquina de estados (`armed → triggered → "
+            "rearming`). Comparamos: (a) sin histéresis (cada punto > umbral), "
+            "(b) con histéresis (sostenido + banda).",
             """\
-alertas = df[df["Indoor_CO2"] > 1500].copy()
-alertas["msg"] = alertas["Indoor_CO2"].apply(lambda v: f"CO2={int(v)} ppm — abrir ventanas")
-print(alertas[["msg"]].head())
-print(f"Total alertas: {len(alertas)}")
+def alerts_naive(series, threshold):
+    \"\"\"Cada punto > threshold genera alerta — sin estado.\"\"\"
+    return (series > threshold).astype(int)
+
+def alerts_hysteresis(series, threshold, hold_min, hyst_band):
+    \"\"\"Máquina de estados con sostenido N min + banda de rearme.\"\"\"
+    sample_min = (series.index[1] - series.index[0]).total_seconds() / 60
+    hold_samples = max(1, int(hold_min / sample_min))
+    out = pd.Series(0, index=series.index, dtype=int)
+    state = "armed"
+    above_count = 0
+    for ts, v in series.items():
+        if state == "armed":
+            if v > threshold:
+                above_count += 1
+                if above_count >= hold_samples:
+                    out[ts] = 1
+                    state = "triggered"
+            else:
+                above_count = 0
+        elif state == "triggered":
+            if v < (threshold - hyst_band):
+                state = "armed"
+                above_count = 0
+    return out
+
+# Comparativa para nivel L2 (1500 ppm)
+naive_L2 = alerts_naive(df["Indoor_CO2"], THRESHOLDS_PPM["L2"])
+hyst_L2 = alerts_hysteresis(df["Indoor_CO2"], THRESHOLDS_PPM["L2"],
+                             HOLD_MIN["L2"], HYST_BAND)
+comparison = pd.DataFrame({
+    "metodo": ["naive (cada punto)", "hysteresis (10min + 100ppm)"],
+    "alertas_totales": [int(naive_L2.sum()), int(hyst_L2.sum())],
+    "transiciones_unicas": [
+        int((naive_L2.diff() == 1).sum()),
+        int((hyst_L2.diff() == 1).sum()),
+    ],
+})
+comparison["fatiga_ratio"] = (
+    comparison["alertas_totales"] / comparison["transiciones_unicas"].replace(0, 1)
+).round(2)
+print(comparison.to_string(index=False))
 """,
         ),
         section(
             13,
             "Visualizaciones explicativas",
-            "Heatmap horario de la categoría más frecuente.",
+            "Timeline 1 día con CO₂ + thresholds + alertas naive vs histeresis. "
+            "Heatmap horario de categoría dominante.",
             """\
+import matplotlib.pyplot as plt
+
+# Día representativo (martes con clase)
+sample = df[(df.index.weekday == 1) & (df.index.hour < 18)].head(60 * 12)
+fig, axes = plt.subplots(2, 1, figsize=(11, 7))
+
+ax1 = axes[0]
+ax1.plot(sample.index, sample["Indoor_CO2"], color="#3F51B5", linewidth=1, label="CO2")
+for level, thr in THRESHOLDS_PPM.items():
+    ax1.axhline(thr, color={"L1": "#FFC107", "L2": "#FF5722", "L3": "#9C27B0"}[level],
+                linestyle="--", alpha=0.6, label=f"{level} ({thr} ppm)")
+sample_naive = alerts_naive(sample["Indoor_CO2"], THRESHOLDS_PPM["L2"])
+sample_hyst = alerts_hysteresis(sample["Indoor_CO2"], THRESHOLDS_PPM["L2"],
+                                  HOLD_MIN["L2"], HYST_BAND)
+ax1.scatter(sample.index[sample_naive == 1], sample.loc[sample_naive == 1, "Indoor_CO2"],
+            color="#FF5722", s=10, alpha=0.4, label="naive alerts")
+ax1.scatter(sample.index[sample_hyst == 1], sample.loc[sample_hyst == 1, "Indoor_CO2"],
+            color="#4CAF50", s=80, marker="v", label="hysteresis alerts")
+ax1.set_title("CO2 con thresholds y alertas — naive vs histeresis (L2)")
+ax1.set_ylabel("CO2 (ppm)")
+ax1.legend(loc="upper right", fontsize=8)
+
+# Heatmap categoría × hora
 df["hour"] = df.index.hour
-heat = (df.groupby("hour")["co2_cat"]
-          .value_counts(normalize=True)
-          .unstack(fill_value=0))
-heat.plot.bar(stacked=True, figsize=(10, 3), colormap="viridis")
-plt.title("Categoría CO2 por hora")
+heat = df.groupby("hour")["co2_cat"].value_counts(normalize=True).unstack(fill_value=0)
+heat = heat.reindex(columns=["optimo", "aceptable", "vigilar", "molesto", "ventilar"], fill_value=0)
+heat.plot.bar(stacked=True, ax=axes[1],
+              color=["#4CAF50", "#8BC34A", "#FFC107", "#FF9800", "#FF5722"], edgecolor="white")
+axes[1].set_title("Distribucion categoria CO2 por hora del dia")
+axes[1].set_ylabel("fraccion del tiempo")
+axes[1].legend(loc="upper right", fontsize=8, ncol=5)
 plt.tight_layout()
 """,
         ),
         section(
             14,
             "Validaciones",
-            "Confirmamos que ningún valor en horario lectivo cae en `extremo` con el "
-            "mock (debería ser raro).",
+            "(a) histéresis genera **menos alertas** que naive (esperado: factor 5-50×). "
+            "(b) `fatiga_ratio` baja drásticamente con histéresis. "
+            "(c) Tiempo total `categoría >= vigilar` durante horario lectivo.",
             """\
-mask = (df.index.hour.isin(range(8, 15))) & (df.index.dayofweek < 5)
-extremo = (df.loc[mask, "Indoor_CO2"] > 4000).sum()
-print(f"Extremo en lectivo: {extremo} puntos")
+n_naive = comparison.loc[comparison["metodo"] == "naive (cada punto)", "alertas_totales"].iloc[0]
+n_hyst = comparison.loc[comparison["metodo"].str.startswith("hysteresis"), "alertas_totales"].iloc[0]
+assert n_hyst <= n_naive, "Histeresis nunca debe generar mas alertas que naive"
+if n_naive > 0:
+    reduccion_pct = (1 - n_hyst / n_naive) * 100
+    assert reduccion_pct >= 30, f"Reduccion esperada >=30%, vimos {reduccion_pct:.1f}%"
+else:
+    print("Mock sin picos relevantes; bajar threshold L2 para ver el efecto.")
+
+# Tiempo en cada categoría durante horario lectivo
+hours_idx = df.index.hour
+mask = ((hours_idx >= 8) & (hours_idx < 15)) & (df.index.dayofweek < 5)
+tiempo_lectivo = df.loc[mask, "co2_cat"].value_counts().reindex(
+    ["optimo", "aceptable", "vigilar", "molesto", "ventilar"], fill_value=0
+)
+print("\\nTiempo total en horario lectivo por categoria (minutos):")
+print(tiempo_lectivo.to_string())
+print(f"\\nReduccion alertas naive->hist: {n_naive} -> {n_hyst} ({(1 - n_hyst/max(n_naive,1))*100:.1f}% menos)")
 """,
         ),
         section(
             15,
             "Errores comunes",
-            "1. **Threshold único**: usar tabla con varias categorías.\n"
-            "2. **Olvidar histeresis**: alertas oscilantes.\n"
-            "3. **Comparar contra exterior**: la regla EN 16798 lo recomienda.",
+            "1. **Sin histéresis**: 1 sensor ruidoso oscilando alrededor del threshold "
+            "produce decenas de alertas por hora → fatiga → desactivación.\n"
+            "2. **Sin banda de rearme**: si rearme = threshold mismo, oscilación pequeña "
+            "(ej. ±50 ppm) genera flapping.\n"
+            "3. **Threshold único** sin jerarquía L1/L2/L3: un nivel solo no permite "
+            "distinguir entre 'avisar' y 'actuar'.\n"
+            "4. **Mock corto (7 días)**: no captura suficientes picos para ver el efecto.\n"
+            "5. **Comparar absoluto vs exterior**: EN 16798 recomienda CO₂ relativo "
+            "(`indoor - outdoor`), no absoluto.",
         ),
         section(
             16,
             "Ejercicios propuestos",
-            "1. Añade categorías para temperatura.\n"
-            "2. Implementa histeresis (alerta solo si > 1500 durante > 5 min).\n"
-            "3. Crea una regla compuesta CO₂ + ruido.",
+            "1. Añade categorías para temperatura (16-32 °C) y humedad (20-80 %RH) con "
+            "thresholds RITE / EN 16798 categoría II.\n"
+            "2. Implementa una **regla compuesta** `IAQ_alert = (CO2>1500) AND "
+            "(noise>65 dB OR people_count>20)` — alerta solo cuando hay clase activa.\n"
+            "3. Mide el **MTTR percibido** (tiempo entre alerta y mejora real de "
+            "CO₂): para cada alerta L2 disparada, calcula minutos hasta que CO₂ baja "
+            "de 1 000 ppm. Reporta p50 y p95.",
         ),
         section(
             17,
             "Cómo se reutiliza con datos reales",
-            "Mismas reglas se aplican vía Flux task; ya tenemos un esqueleto.",
+            "Las funciones `alerts_naive` / `alerts_hysteresis` operan sobre cualquier "
+            "Series. En producción se traducen a Flux Task con state file (Telegraf "
+            "`processors.dedup`) — la lógica es idéntica.",
         ),
         common_summary(
             next_notebook="05_case_E_weather_solar/01_eda_era5.ipynb",

@@ -84,25 +84,99 @@ lakefs_concepts = pd.DataFrame(
 lakefs_concepts
 """,
         ),
-        section(11, "Transformación bronce → plata", "No aplica."),
-        section(12, "Construcción de capa oro", "MLflow + lakeFS *son* la capa oro de F."),
+        section(
+            11,
+            "Transformación bronce → plata",
+            "**Hello-world MLflow**: levantamos tracking local SQLite-style sobre "
+            "filesystem y validamos la convención de naming antes de tocar datos.",
+            """\
+import re
+import mlflow
+
+# Tracking URI local — equivalente a `sqlite:///mlflow.db` para esta clase
+mlflow_dir = ROOT / "output" / "mlruns_overview"
+mlflow_dir.mkdir(parents=True, exist_ok=True)
+mlflow.set_tracking_uri(mlflow_dir.as_uri())
+
+# Convención de naming canónica del equipo CAPTIA
+EXPERIMENT_RE = re.compile(r"^case_[A-J]_(baseline|prod)_\\d{4}$")
+RUN_RE = re.compile(r"^[a-z]+_v\\d+_seed\\d+$")
+
+def validate_experiment_name(name: str) -> bool:
+    return bool(EXPERIMENT_RE.fullmatch(name))
+
+def validate_run_name(name: str) -> bool:
+    return bool(RUN_RE.fullmatch(name))
+
+# Test de la convención
+test_cases = [
+    ("case_B_baseline_2026", True),
+    ("case_C_prod_2026", True),
+    ("case_X_test", False),  # X fuera del rango [A-J], y "test" fuera del set
+    ("rf_v3_seed42", "run-name"),
+]
+for name, expected in test_cases[:3]:
+    assert validate_experiment_name(name) == expected, f"Convencion fallo para {name}"
+assert validate_run_name("rf_v3_seed42")
+print("Convencion de naming OK ·",
+      "experiment_name = '^case_[A-J]_(baseline|prod)_\\\\d{4}$'",
+      "· run_name = '^[a-z]+_v\\\\d+_seed\\\\d+$'")
+""",
+        ),
+        section(
+            12,
+            "Construcción de capa oro",
+            "Un primer experiment + run dummy para que el alumno **vea** la jerarquía "
+            "completa y luego pueda hacer `mlflow ui` y navegar.",
+            """\
+exp_name = "case_F_baseline_2026"
+mlflow.set_experiment(exp_name)
+
+with mlflow.start_run(run_name="hello_v1_seed42"):
+    mlflow.log_params({"variant": "hello-world", "seed": SEED, "stage": "demo"})
+    mlflow.log_metric("dummy_metric", 0.42)
+    mlflow.set_tag("lakefs_tag", "case_F/demo_v1")
+    mlflow.set_tag("dataset_uri", "lakefs://repo/main/HEAD")
+    run_info = mlflow.active_run().info
+
+print(f"Run creado: experiment={run_info.experiment_id}, run_id={run_info.run_id[:8]}...")
+print(f"Para ver UI: mlflow ui --backend-store-uri {mlflow_dir.as_uri()}")
+
+runs = mlflow.search_runs(experiment_names=[exp_name])
+print(f"\\nRuns en {exp_name}: {len(runs)}")
+print(runs[["tags.mlflow.runName", "metrics.dummy_metric", "tags.lakefs_tag"]].to_string(index=False))
+""",
+        ),
         section(
             13,
             "Visualizaciones explicativas",
-            "Diagrama relacional.",
+            "Diagrama relacional MLflow ↔ lakeFS + tabla de objetos invocados.",
             """\
-from IPython.display import Markdown
-Markdown('''```mermaid
-flowchart LR
-  D[(lakeFS\\nDataset versionado)] --> R[MLflow Run]
-  R --> A[Artefactos\\nmodel.pkl + plots]
-  R --> M[Métricas\\nMAE/MAPE/RMSE]
-  R --> T[Tag\\nlakeFS_tag=...]
-  T --> D
-```''')
+import matplotlib.pyplot as plt
+
+# Tabla de objetos creados en este notebook (comprobables en mlflow ui)
+objects_created = pd.DataFrame([
+    {"objeto": "Experiment", "valor": exp_name, "ubicacion": "mlruns_overview/0/"},
+    {"objeto": "Run", "valor": run_info.run_id[:12] + "...", "ubicacion": f"mlruns_overview/.../{run_info.run_id[:8]}..."},
+    {"objeto": "Param", "valor": "variant=hello-world, seed=42", "ubicacion": "params/"},
+    {"objeto": "Metric", "valor": "dummy_metric=0.42", "ubicacion": "metrics/"},
+    {"objeto": "Tag", "valor": "lakefs_tag=case_F/demo_v1", "ubicacion": "tags/"},
+])
+print(objects_created.to_string(index=False))
 """,
         ),
-        section(14, "Validaciones", "El conocimiento, no datos."),
+        section(
+            14,
+            "Validaciones",
+            "Verificar que el run quedó persistido (idempotente: re-ejecutar añade "
+            "otro run pero nunca rompe).",
+            """\
+runs = mlflow.search_runs(experiment_names=[exp_name])
+assert len(runs) >= 1, "No se persistió ningun run"
+assert "tags.lakefs_tag" in runs.columns, "lakefs_tag tag no presente"
+print(f"Validaciones OK · {len(runs)} run(s) en experiment '{exp_name}'")
+""",
+        ),
         section(
             15,
             "Errores comunes",

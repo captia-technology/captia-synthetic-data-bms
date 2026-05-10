@@ -200,13 +200,44 @@ print(query_influxdb("temperature_01", aggregation="max"))
             "Construcción de capa oro",
             "Tools 2 y 3.",
             """\
-def compare_periods(variable: str, p1: tuple[str, str], p2: tuple[str, str], aggregation: str = "mean") -> dict:
-    return {
-        "variable": variable,
-        "p1": query_influxdb(variable, start=p1[0], aggregation=aggregation)["value"],
-        "p2": query_influxdb(variable, start=p2[0], aggregation=aggregation)["value"],
-        "diff": None,
-    }
+def _parse_relative_period(start: str) -> pd.Timedelta | None:
+    \"\"\"Convierte '-7d', '-1h', '-30m' a Timedelta. None para 'now'.\"\"\"
+    if start in ("now", "0s", ""):
+        return pd.Timedelta(0)
+    if start.startswith("-"):
+        return -pd.Timedelta(start[1:])
+    return pd.Timedelta(start)
+
+def _query_window(variable: str, start: str, end: str = "now",
+                  aggregation: str = "mean", asset_id: str = "AULA01") -> float | None:
+    \"\"\"Filtra el mock por (start, end) relativos a 'now' del dataset.\"\"\"
+    var_to_csv = {"co2": "Indoor_CO2", "temperature_01": "Indoor_Temp",
+                  "luminosity": "Indoor_Lux", "people_count": "People_Count"}
+    col = var_to_csv.get(variable)
+    if col is None:
+        return None
+    now = df.index.max()
+    t_start = now + _parse_relative_period(start)
+    t_end = now + _parse_relative_period(end)
+    s = df.loc[(df.index >= t_start) & (df.index <= t_end), col]
+    if len(s) == 0:
+        return None
+    agg = {"mean": s.mean, "max": s.max, "min": s.min, "last": lambda: s.iloc[-1]}.get(aggregation, s.mean)
+    return float(agg())
+
+def compare_periods(variable: str, p1: tuple[str, str], p2: tuple[str, str],
+                    aggregation: str = "mean") -> dict:
+    \"\"\"Compara una variable entre dos ventanas (start, end) relativas. Devuelve diff.\"\"\"
+    v1 = _query_window(variable, p1[0], p1[1], aggregation)
+    v2 = _query_window(variable, p2[0], p2[1], aggregation)
+    if v1 is None or v2 is None:
+        return {"variable": variable, "p1_value": v1, "p2_value": v2,
+                "diff_abs": None, "diff_pct": None, "error": "ventanas vacías"}
+    diff_abs = v2 - v1
+    diff_pct = (diff_abs / v1 * 100) if v1 != 0 else None
+    return {"variable": variable, "p1_value": round(v1, 3), "p2_value": round(v2, 3),
+            "diff_abs": round(diff_abs, 3),
+            "diff_pct": round(diff_pct, 2) if diff_pct is not None else None}
 
 def get_building_state(asset_id: str = "AULA01") -> dict:
     res = {
@@ -307,21 +338,56 @@ def _mocks(target: Path) -> Path:
             "Carga de datos o mock",
             "Implementamos.",
             """\
+_mock_rng = np.random.default_rng(SEED)
+
 def get_weather_prediction(variable: str, horizon_hours: int = 24) -> dict:
-    base = {"temperature_outdoor": 22.0, "solar_irradiance": 350.0, "precipitation": 0.0}.get(variable, 0.0)
+    \"\"\"Mock con estacionalidad diaria + ruido + intervalos de incertidumbre.
+
+    Devuelve cuantiles p10/p50/p90 — cualquier modelo real (XGB, ARIMA) puede
+    devolver estos mismos campos sin cambiar la firma.
+    \"\"\"
+    base = {"temperature_outdoor": 18.0, "solar_irradiance": 0.0,
+            "precipitation": 0.5}.get(variable, 0.0)
+    # Hora del día implícita: añadimos un ciclo diurnal a `temperature_outdoor`
+    diurnal = 6 * np.sin(2 * np.pi * (horizon_hours % 24 - 6) / 24) if variable == "temperature_outdoor" else 0
+    solar = 800 * max(0, np.sin(2 * np.pi * (horizon_hours % 24 - 6) / 24)) if variable == "solar_irradiance" else 0
+    sigma = {"temperature_outdoor": 1.5, "solar_irradiance": 80, "precipitation": 0.8}.get(variable, 0.5)
+    p50 = base + diurnal + solar + float(_mock_rng.normal(0, sigma * 0.3))
+    p10 = p50 - 1.28 * sigma  # cuantil 10 % bajo asunción gaussiana
+    p90 = p50 + 1.28 * sigma
+    if variable in ("solar_irradiance", "precipitation"):
+        p10, p50, p90 = max(0, p10), max(0, p50), max(0, p90)
     return {"variable": variable, "horizon_h": horizon_hours,
-            "value": base + horizon_hours * 0.1, "source": "mock"}
+            "value": round(p50, 2), "p10": round(p10, 2), "p90": round(p90, 2),
+            "uncertainty_sigma": sigma, "source": "mock"}
 
 def get_consumption_prediction(asset_id: str = "AULA01", horizon_hours: int = 24) -> dict:
+    \"\"\"Mock consumo con ciclo diario + heterogeneidad por aula + bandas IC.\"\"\"
+    asset_offset = (hash(asset_id) % 7)  # +0..+6 kWh por aula
+    diurnal = 8 * max(0, np.sin(2 * np.pi * (horizon_hours % 24 - 6) / 24))  # pico mediodía
+    sigma_kwh = 1.2
+    p50 = 4 + asset_offset + diurnal + float(_mock_rng.normal(0, sigma_kwh * 0.2))
+    p50 = max(0, p50)
     return {"asset_id": asset_id, "horizon_h": horizon_hours,
-            "value_kwh": 12.5 + horizon_hours * 0.5, "source": "mock"}
+            "value_kwh": round(p50, 2),
+            "p10_kwh": round(max(0, p50 - 1.28 * sigma_kwh), 2),
+            "p90_kwh": round(p50 + 1.28 * sigma_kwh, 2),
+            "source": "mock"}
 
 def check_hvac_anomaly(asset_id: str = "AULA01") -> dict:
-    return {"asset_id": asset_id, "score": 0.12, "is_anomaly": False, "source": "mock"}
+    \"\"\"Mock anomalía: 1 de cada 7 assets es anómalo (determinista por nombre).\"\"\"
+    score = 0.1 + 0.7 * ((hash(asset_id) % 7) == 0) + float(_mock_rng.normal(0, 0.04))
+    score = float(np.clip(score, 0.0, 1.0))
+    return {"asset_id": asset_id, "score": round(score, 3),
+            "is_anomaly": bool(score > 0.5),
+            "fault_type_likely": "valve_stuck" if score > 0.5 else None,
+            "source": "mock"}
 
+# Verificación visible: 3 invocaciones distintas → 3 outputs distintos
 print(get_weather_prediction("temperature_outdoor", 6))
 print(get_consumption_prediction(horizon_hours=12))
-print(check_hvac_anomaly())
+print(check_hvac_anomaly("AULA01"))
+print(check_hvac_anomaly("AULA07"))  # podría ser anómalo
 """,
         ),
         section(10, "Exploración paso a paso", "Test de firma."),
@@ -481,8 +547,10 @@ expected_map = {
     "¿Qué normativa española aplica a la calidad del aire en aulas?": "09_normativa_aulas_espana",
     "¿Qué es el índice IAQ?": "06_indice_iaq",
     "¿Qué es un IsolationForest?": "08_isolation_forest",
-    "¿Qué es el bucket telemetry_1h?": "04_buckets_y_retenciones",
+    "¿Para qué sirve un dump de InfluxDB?": "04_buckets_y_retenciones",
+    "¿Qué quiere decir 'bool_state'?": "03_schema_canonico_captia",
 }
+assert len(expected_map) == 13, "expected_map debe tener exactamente 13 entradas únicas"
 
 gs = pd.read_csv(ROOT / "notebooks/_data/chatbot_golden_set.csv", comment="#")
 gs_rag = gs[gs["expected_mechanism"] == "rag"].copy()
@@ -639,9 +707,9 @@ print(gs["category"].value_counts())
             """\
 def route(question: str) -> str:
     q = question.lower()
-    if any(k in q for k in ["mañana", "predicción", "predicción"]):
+    if any(k in q for k in ["mañana", "predicción", "predicción meteo", "habrá", "hará", "ola de calor"]):
         return "tool:get_weather_prediction"
-    if any(k in q for k in ["consumirá", "consumirá", "kwh"]):
+    if any(k in q for k in ["consumirá", "kwh", "energía"]):
         return "tool:get_consumption_prediction"
     if "anomalía" in q or "fallo" in q or "válvula" in q or "ventilador" in q:
         return "tool:check_hvac_anomaly"

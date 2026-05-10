@@ -65,7 +65,9 @@ def _enrich_bdg2(df: pd.DataFrame) -> pd.DataFrame:
     df["dow"] = ts.dt.dayofweek
     df["hour"] = ts.dt.hour
     df["is_weekend"] = (df["dow"] >= 5).astype(int)
-    df["is_school_hours"] = ((ts.dt.hour >= 8) & (ts.dt.hour < 18) & (df["is_weekend"] == 0)).astype(int)
+    df["is_school_hours"] = (
+        (ts.dt.hour >= 8) & (ts.dt.hour < 18) & (df["is_weekend"] == 0)
+    ).astype(int)
     df["season"] = pd.cut(
         df["month"],
         bins=[0, 2, 5, 8, 11, 12],
@@ -92,7 +94,9 @@ def _enrich_era5(df: pd.DataFrame) -> pd.DataFrame:
     decl = 23.45 * np.sin(np.radians(360 / 365 * (284 + ts.dt.dayofyear)))
     decl_rad = np.radians(decl)
     hour_angle = np.radians(15 * (ts.dt.hour - 12))
-    cos_zenith = np.sin(lat_rad) * np.sin(decl_rad) + np.cos(lat_rad) * np.cos(decl_rad) * np.cos(hour_angle)
+    cos_zenith = np.sin(lat_rad) * np.sin(decl_rad) + np.cos(lat_rad) * np.cos(decl_rad) * np.cos(
+        hour_angle
+    )
     df["solar_zenith_deg"] = np.degrees(np.arccos(np.clip(cos_zenith, -1, 1))).round(1)
     return df
 
@@ -108,8 +112,10 @@ def _enrich_ingauge(df: pd.DataFrame) -> pd.DataFrame:
     df["comfort_pmv"] = (0.0875 * t - 1.95).round(2)  # rango típico [-3, +3]
     # Power consumption proxy (W) — para Caso B
     df["power_w"] = (
-        80 + 180 * df["CoolingState"].astype(int) + 8 * df["People_Count"].astype(int)
-    ).round(0).astype(int)
+        (80 + 180 * df["CoolingState"].astype(int) + 8 * df["People_Count"].astype(int))
+        .round(0)
+        .astype(int)
+    )
     return df
 
 
@@ -145,7 +151,11 @@ def _enrich_traffic(df: pd.DataFrame, rng: np.random.Generator) -> pd.DataFrame:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--include-bms", action="store_true", help="Exportar dump del generador BMS si stack está vivo")
+    parser.add_argument(
+        "--include-bms",
+        action="store_true",
+        help="Exportar dump del generador BMS si stack está vivo",
+    )
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
@@ -156,12 +166,18 @@ def main() -> int:
     # 1. BDG2 educacional 36 meses
     df_bdg2, _ = make_bdg2_education_subset(months=36, seed=args.seed)
     df_bdg2 = _enrich_bdg2(df_bdg2)
-    _save_gz(df_bdg2, "bdg2_education_subset_3y", "BDG2 educacional 6 edif × 36 meses horarios + calendario + estación")
+    _save_gz(
+        df_bdg2,
+        "bdg2_education_subset_3y",
+        "BDG2 educacional 6 edif × 36 meses horarios + calendario + estación",
+    )
 
     # 2. ERA5 Xátiva 3 años (1095 días horarios)
     df_era5, _ = make_era5_xativa_mock(days=1095, seed=args.seed)
     df_era5 = _enrich_era5(df_era5)
-    _save_gz(df_era5, "era5_xativa_3y", "ERA5 Xátiva 3 años horarios + dew_point + solar_zenith + RH")
+    _save_gz(
+        df_era5, "era5_xativa_3y", "ERA5 Xátiva 3 años horarios + dew_point + solar_zenith + RH"
+    )
 
     # 3. In-Gauge AULA01 3 años a 1min (granularidad nativa del dataset real)
     # 1095 days × 24h × 60 = 1 576 800 rows
@@ -171,7 +187,11 @@ def main() -> int:
     df_ingauge = _enrich_ingauge(df_ingauge)
     # Downsample a 5 min para reducir tamaño en repo (~5 MB vs ~25 MB).
     df_ingauge = df_ingauge.iloc[::5].reset_index(drop=True)
-    _save_gz(df_ingauge, "ingauge_aula01_3y", "In-Gauge AULA01 3 años × 5 min + IAQ index + PMV + power_w")
+    _save_gz(
+        df_ingauge,
+        "ingauge_aula01_3y",
+        "In-Gauge AULA01 3 años × 5 min + IAQ index + PMV + power_w",
+    )
 
     # 4. LBNL FDD 3 años con fallos a 1min, downsample a 5 min para repo
     df_lbnl, _ = make_lbnl_fdd_rtu_mock(days=1095, seed=args.seed)
@@ -182,7 +202,9 @@ def main() -> int:
     # 5. Traffic 3 años, 5 cámaras
     df_traffic, _ = make_traffic_camera_mock(days=1095, seed=args.seed)
     df_traffic = _enrich_traffic(df_traffic, np.random.default_rng(args.seed))
-    _save_gz(df_traffic, "traffic_camera_3y", "DGT cámaras 3 años × 15 min + categorías + congestión")
+    _save_gz(
+        df_traffic, "traffic_camera_3y", "DGT cámaras 3 años × 15 min + categorías + congestión"
+    )
 
     if args.include_bms:
         print()
