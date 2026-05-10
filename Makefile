@@ -255,3 +255,31 @@ dump-caseD:  ## Generate Caso D dump (3 months IAQ at 1min)
 .PHONY: vendor-update
 vendor-update:  ## Re-vendor synthetic-generator from CAPTIA_CONNECT_PATH (maintainers)
 	bash scripts/update_vendor.sh
+
+# -----------------------------------------------------------------------------
+# Notebooks didácticos y documentación web
+# -----------------------------------------------------------------------------
+
+.PHONY: notebooks-data
+notebooks-data:  ## Regenerate deterministic mock CSVs for the didactic notebooks
+	uv run python scripts/build_notebook_data.py
+
+.PHONY: notebooks-build
+notebooks-build: notebooks-data  ## Regenerate the 45 didactic notebooks (idempotent)
+	uv run python -m scripts.build_notebooks
+
+.PHONY: notebooks-test
+notebooks-test:  ## Run notebook integrity audit (JSON, schema, no secrets)
+	uv run pytest tests/integration/test_notebooks_integrity.py -q --no-header
+
+.PHONY: notebooks-lab
+notebooks-lab:  ## Open Jupyter Lab pointing at notebooks/ (auto-installs jupyterlab)
+	uv run --with jupyterlab --with ipykernel jupyter lab notebooks/
+
+.PHONY: docs-build
+docs-build:  ## Build the MkDocs Material site
+	uv run --with mkdocs-material mkdocs build
+
+.PHONY: docs-serve
+docs-serve:  ## Serve the MkDocs Material site locally on :8000
+	uv run --with mkdocs-material mkdocs serve --dev-addr 0.0.0.0:8000
