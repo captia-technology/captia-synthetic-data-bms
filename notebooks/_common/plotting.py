@@ -47,7 +47,13 @@ def plot_timeseries(
     if ax is None:
         _, ax = plt.subplots()
     for i, col in enumerate(value_cols):
-        ax.plot(df[time_col], df[col], color=CAPTIA_PALETTE[i % len(CAPTIA_PALETTE)], label=col, linewidth=1.0)
+        ax.plot(
+            df[time_col],
+            df[col],
+            color=CAPTIA_PALETTE[i % len(CAPTIA_PALETTE)],
+            label=col,
+            linewidth=1.0,
+        )
     ax.set_title(title)
     ax.set_xlabel(time_col)
     ax.legend(loc="upper right", fontsize=8)
@@ -55,7 +61,12 @@ def plot_timeseries(
 
 
 def plot_distribution(
-    df: pd.DataFrame, *, column: str, by: str | None = None, bins: int = 30, title: str | None = None
+    df: pd.DataFrame,
+    *,
+    column: str,
+    by: str | None = None,
+    bins: int = 30,
+    title: str | None = None,
 ) -> Any:
     """Histograma simple, opcionalmente por categoría ``by``."""
     import matplotlib.pyplot as plt

@@ -43,7 +43,11 @@ def main() -> None:
     _save(df_ingauge, "ingauge_aula01_mock.csv", "sintético In-Gauge AULA01 (1 semana × 1min)")
 
     df_bdg2, _ = make_bdg2_education_subset()
-    _save(df_bdg2, "bdg2_education_subset_mock.csv", "sintético BDG2 educacional (6 edif × 12m horarios)")
+    _save(
+        df_bdg2,
+        "bdg2_education_subset_mock.csv",
+        "sintético BDG2 educacional (6 edif × 12m horarios)",
+    )
 
     df_lbnl, _ = make_lbnl_fdd_rtu_mock()
     _save(df_lbnl, "lbnl_fdd_rtu_mock.csv", "sintético LBNL FDD RTU (14 días × 1min con 4 fallos)")

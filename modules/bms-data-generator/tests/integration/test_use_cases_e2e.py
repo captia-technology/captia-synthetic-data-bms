@@ -74,6 +74,7 @@ def _run_scenario(scenario_path: Path) -> int:
     """Build runner from scenario, execute, return total points emitted."""
     os.environ["BMS_PRODUCTION_ALIAS_ENABLED"] = "true"
     from bms_data_generator.config import reset_settings_cache
+
     reset_settings_cache()
     from bms_data_generator.services.runner_service import _build_runner
 
@@ -103,7 +104,8 @@ def test_caseB_consumption_backfill_emits_production_names(tmp_path: Path) -> No
     output_csv = tmp_path / "caseB.csv"
     scen = _localize_scenario(
         SCENARIOS_DIR / "bms_v1_caseB_consumption.yaml",
-        tmp_path, output_csv,
+        tmp_path,
+        output_csv,
         start="2026-01-15T00:00:00",
         end="2026-01-15T01:00:00",
         n_aulas=2,
@@ -132,7 +134,8 @@ def test_caseB_energy_is_monotonically_increasing(tmp_path: Path) -> None:
     output_csv = tmp_path / "caseB_mono.csv"
     scen = _localize_scenario(
         SCENARIOS_DIR / "bms_v1_caseB_consumption.yaml",
-        tmp_path, output_csv,
+        tmp_path,
+        output_csv,
         start="2026-01-15T00:00:00",
         end="2026-01-15T02:00:00",  # 2h = 24 samples at 5min
         n_aulas=2,
@@ -164,7 +167,8 @@ def test_caseB_power_within_physical_range(tmp_path: Path) -> None:
     output_csv = tmp_path / "caseB_range.csv"
     scen = _localize_scenario(
         SCENARIOS_DIR / "bms_v1_caseB_consumption.yaml",
-        tmp_path, output_csv,
+        tmp_path,
+        output_csv,
         start="2026-01-15T08:00:00",
         end="2026-01-15T10:00:00",
         n_aulas=2,
@@ -187,12 +191,14 @@ def test_caseC_faults_disabled_emits_no_fault_variables(tmp_path: Path) -> None:
     """Caso C SIN BMS_FAULTS_ENABLED no emite variables fault.<tipo>."""
     os.environ["BMS_FAULTS_ENABLED"] = "false"
     from bms_data_generator.config import reset_settings_cache
+
     reset_settings_cache()
 
     output_csv = tmp_path / "caseC_no_faults.csv"
     scen = _localize_scenario(
         SCENARIOS_DIR / "bms_v1_caseC_faults.yaml",
-        tmp_path, output_csv,
+        tmp_path,
+        output_csv,
         start="2026-01-15T00:00:00",
         end="2026-01-15T06:00:00",
         n_aulas=2,
@@ -245,14 +251,21 @@ def _build_scenario_with_high_prob_faults(
     projects_dir.mkdir(parents=True, exist_ok=True)
 
     scenario = {
-        "project": {"namespace": "captia", "site_id": "ies_simarro",
-                    "modo": "synthetic", "schema_version": "v0.1"},
-        "simulation": {"timezone": "Europe/Madrid", "seed": 42,
-                       "start": "2026-01-15T00:00:00",
-                       "end": "2026-01-22T00:00:00",  # 7 días = 7×n_aulas×0.5 = ~7 events sensor_drift
-                       "freq": "5min", "n_aulas": n_aulas},
-        "domain": {"id": "bms_classrooms",
-                   "config_path": str(domains_dir / "domain.yaml")},
+        "project": {
+            "namespace": "captia",
+            "site_id": "ies_simarro",
+            "modo": "synthetic",
+            "schema_version": "v0.1",
+        },
+        "simulation": {
+            "timezone": "Europe/Madrid",
+            "seed": 42,
+            "start": "2026-01-15T00:00:00",
+            "end": "2026-01-22T00:00:00",  # 7 días = 7×n_aulas×0.5 = ~7 events sensor_drift
+            "freq": "5min",
+            "n_aulas": n_aulas,
+        },
+        "domain": {"id": "bms_classrooms", "config_path": str(domains_dir / "domain.yaml")},
         "phases": {"backfill": {"enabled": True}, "live": {"enabled": False}},
         "anomalies": {"p_missing": 0.0, "p_outlier": 0.0},
         "sinks": [{"type": "file", "config": {"path": str(output_csv), "format": "csv_long"}}],
@@ -271,6 +284,7 @@ def test_caseC_faults_enabled_emits_fault_events(tmp_path: Path) -> None:
     os.environ["BMS_FAULTS_ENABLED"] = "true"
     os.environ["BMS_PRODUCTION_ALIAS_ENABLED"] = "true"
     from bms_data_generator.config import reset_settings_cache
+
     reset_settings_cache()
 
     output_csv = tmp_path / "caseC_faults.csv"
@@ -280,6 +294,7 @@ def test_caseC_faults_enabled_emits_fault_events(tmp_path: Path) -> None:
     finally:
         os.environ.pop("BMS_FAULTS_ENABLED", None)
         from bms_data_generator.config import reset_settings_cache as _rsc
+
         _rsc()
 
     rows = _read_csv_rows(output_csv)
@@ -299,6 +314,7 @@ def test_caseC_fault_events_have_canonical_schema(tmp_path: Path) -> None:
     """Los DataPoints fault.<tipo> cumplen schema canonical CAPTIA."""
     os.environ["BMS_FAULTS_ENABLED"] = "true"
     from bms_data_generator.config import reset_settings_cache
+
     reset_settings_cache()
 
     output_csv = tmp_path / "caseC_schema.csv"
@@ -308,6 +324,7 @@ def test_caseC_fault_events_have_canonical_schema(tmp_path: Path) -> None:
     finally:
         os.environ.pop("BMS_FAULTS_ENABLED", None)
         from bms_data_generator.config import reset_settings_cache as _rsc
+
         _rsc()
 
     rows = _read_csv_rows(output_csv)
@@ -335,7 +352,8 @@ def test_caseD_iaq_emits_1min_freq_with_air_quality_vars(tmp_path: Path) -> None
     output_csv = tmp_path / "caseD.csv"
     scen = _localize_scenario(
         SCENARIOS_DIR / "bms_v1_caseD_iaq.yaml",
-        tmp_path, output_csv,
+        tmp_path,
+        output_csv,
         start="2026-04-15T08:00:00",
         end="2026-04-15T09:00:00",  # 1h @ 1min = 60 timestamps
         n_aulas=2,
@@ -345,8 +363,7 @@ def test_caseD_iaq_emits_1min_freq_with_air_quality_vars(tmp_path: Path) -> None
     emitted = {r["variable"] for r in rows}
 
     # Variables IAQ clave (production names)
-    iaq_vars = {"co2", "temperature_01", "relative-humidity",
-                "iaq-index", "people-count"}
+    iaq_vars = {"co2", "temperature_01", "relative-humidity", "iaq-index", "people-count"}
     missing = iaq_vars - emitted
     assert not missing, f"variables IAQ faltantes: {missing}"
 
@@ -363,7 +380,8 @@ def test_caseD_co2_within_realistic_range(tmp_path: Path) -> None:
     output_csv = tmp_path / "caseD_co2.csv"
     scen = _localize_scenario(
         SCENARIOS_DIR / "bms_v1_caseD_iaq.yaml",
-        tmp_path, output_csv,
+        tmp_path,
+        output_csv,
         start="2026-04-15T08:00:00",
         end="2026-04-15T09:00:00",
         n_aulas=2,
@@ -391,6 +409,7 @@ def test_alias_sink_passes_through_fault_events_unchanged(tmp_path: Path) -> Non
     os.environ["BMS_FAULTS_ENABLED"] = "true"
     os.environ["BMS_PRODUCTION_ALIAS_ENABLED"] = "true"
     from bms_data_generator.config import reset_settings_cache
+
     reset_settings_cache()
 
     output_csv = tmp_path / "alias_fault_interaction.csv"
@@ -400,6 +419,7 @@ def test_alias_sink_passes_through_fault_events_unchanged(tmp_path: Path) -> Non
     finally:
         os.environ.pop("BMS_FAULTS_ENABLED", None)
         from bms_data_generator.config import reset_settings_cache as _rsc
+
         _rsc()
 
     rows = _read_csv_rows(output_csv)
@@ -409,7 +429,11 @@ def test_alias_sink_passes_through_fault_events_unchanged(tmp_path: Path) -> Non
 
     # Confirmar que TODOS los fault rows mantienen prefijo `fault.` literal.
     fault_types = {r["variable"] for r in fault_rows}
-    valid_types = {"fault.sensor_drift", "fault.valve_stuck",
-                   "fault.fan_failure", "fault.refrigerant_low"}
+    valid_types = {
+        "fault.sensor_drift",
+        "fault.valve_stuck",
+        "fault.fan_failure",
+        "fault.refrigerant_low",
+    }
     invalid = fault_types - valid_types
     assert not invalid, f"fault types renombrados (no esperado): {invalid}"

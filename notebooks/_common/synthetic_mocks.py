@@ -12,7 +12,6 @@ from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
-
 from notebooks._common.captia_schema import DEFAULT_SEED
 
 
@@ -34,13 +33,13 @@ def _school_calendar_mask(index: pd.DatetimeIndex) -> pd.Series:
     hour_ok = (index.hour >= 8) & (index.hour < 15)
     not_holiday = ~(
         ((index.month == 12) & (index.day >= 22))  # Navidad inicio
-        | ((index.month == 1) & (index.day <= 7))   # Navidad fin
+        | ((index.month == 1) & (index.day <= 7))  # Navidad fin
         | ((index.month == 3) & (index.day >= 14) & (index.day <= 19))  # Fallas
-        | ((index.month == 4) & (index.day >= 4) & (index.day <= 12))   # Sem Santa
+        | ((index.month == 4) & (index.day >= 4) & (index.day <= 12))  # Sem Santa
         | ((index.month == 6) & (index.day >= 20))  # Verano
         | (index.month == 7)
         | (index.month == 8)
-        | ((index.month == 9) & (index.day < 7))    # Verano fin
+        | ((index.month == 9) & (index.day < 7))  # Verano fin
     )
     return pd.Series(weekday_ok & hour_ok & not_holiday, index=index)
 
@@ -84,7 +83,9 @@ def make_ingauge_aula01_mock(
     rh = np.clip(rh, 25, 80)
 
     # Sonido y luz
-    noise = np.where(in_class, 60 + rng.normal(0, 6, size=len(idx)), 35 + rng.normal(0, 3, size=len(idx)))
+    noise = np.where(
+        in_class, 60 + rng.normal(0, 6, size=len(idx)), 35 + rng.normal(0, 3, size=len(idx))
+    )
     noise = np.clip(noise, 30, 95)
     sun_above = np.clip(np.sin(2 * np.pi * (hours - 6) / 24), 0, 1)
     lux = (sun_above * 1200) + np.where(in_class, 350, 0) + rng.normal(0, 30, size=len(idx))
@@ -147,9 +148,15 @@ def make_bdg2_education_subset(
         summer = (idx.month >= 7) & (idx.month <= 8)
         power = np.where(summer, power * 0.45, power)
         # Outdoor temp síncrona
-        t_out = 12 + 12 * np.sin(2 * np.pi * (idx.dayofyear - 80) / 365) + rng.normal(0, 2, size=len(idx))
+        t_out = (
+            12
+            + 12 * np.sin(2 * np.pi * (idx.dayofyear - 80) / 365)
+            + rng.normal(0, 2, size=len(idx))
+        )
         ghi = np.clip(
-            900 * np.maximum(0, np.sin(2 * np.pi * (hours - 6) / 24)) * (0.7 + 0.3 * rng.normal(0, 1, size=len(idx))),
+            900
+            * np.maximum(0, np.sin(2 * np.pi * (hours - 6) / 24))
+            * (0.7 + 0.3 * rng.normal(0, 1, size=len(idx))),
             0,
             1100,
         )
@@ -187,7 +194,9 @@ def make_lbnl_fdd_rtu_mock(
     idx = pd.date_range("2024-06-01", periods=days * 24 * 60, freq=freq, tz="UTC")
     n = len(idx)
 
-    t_out = 22 + 8 * np.sin(2 * np.pi * (idx.hour + idx.minute / 60) / 24) + rng.normal(0, 0.5, size=n)
+    t_out = (
+        22 + 8 * np.sin(2 * np.pi * (idx.hour + idx.minute / 60) / 24) + rng.normal(0, 0.5, size=n)
+    )
     occ = ((idx.hour >= 8) & (idx.hour < 18) & (idx.weekday < 5)).astype(int)
 
     # Setpoint 22 °C
@@ -331,7 +340,9 @@ def make_traffic_camera_mock(
                     "camera_id": cam,
                     "vehicle_count": np.clip(count, 0, None).round(0).astype(int),
                     "congestion_level": congestion.astype(int),
-                    "detection_confidence": np.clip(0.85 + rng.normal(0, 0.04, size=n), 0.5, 1.0).round(3),
+                    "detection_confidence": np.clip(
+                        0.85 + rng.normal(0, 0.04, size=n), 0.5, 1.0
+                    ).round(3),
                     "precip_mm": rain.round(2),
                 }
             )
@@ -352,10 +363,22 @@ def make_chatbot_golden_set(seed: int = DEFAULT_SEED) -> pd.DataFrame:
         ("data_lookup", "¿Cuántos kWh consumió AULA01 la semana pasada?", "tool:query_influxdb"),
         ("data_compare", "¿Fue más caluroso enero 2024 o enero 2023?", "tool:compare_periods"),
         ("data_compare", "¿Cuándo hubo más CO₂, lunes o miércoles?", "tool:compare_periods"),
-        ("forecast", "¿Cuánto consumirá AULA01 mañana entre 9 y 12?", "tool:get_consumption_prediction"),
-        ("forecast", "¿Cuál será la temperatura exterior mañana a mediodía?", "tool:get_weather_prediction"),
+        (
+            "forecast",
+            "¿Cuánto consumirá AULA01 mañana entre 9 y 12?",
+            "tool:get_consumption_prediction",
+        ),
+        (
+            "forecast",
+            "¿Cuál será la temperatura exterior mañana a mediodía?",
+            "tool:get_weather_prediction",
+        ),
         ("anomaly", "¿Hay alguna anomalía en el HVAC ahora mismo?", "tool:check_hvac_anomaly"),
-        ("anomaly", "Muéstrame los últimos 3 fallos detectados en el HVAC.", "tool:check_hvac_anomaly"),
+        (
+            "anomaly",
+            "Muéstrame los últimos 3 fallos detectados en el HVAC.",
+            "tool:check_hvac_anomaly",
+        ),
         ("state", "¿Está encendido el AC de AULA01?", "tool:get_building_state"),
         ("state", "¿Cuántas personas hay ahora en AULA01?", "tool:get_building_state"),
         ("rag", "¿Por qué sube el CO₂ en un aula cerrada?", "rag"),
@@ -367,7 +390,11 @@ def make_chatbot_golden_set(seed: int = DEFAULT_SEED) -> pd.DataFrame:
         ("data_lookup", "¿Cuál fue el pico de luminosidad ayer?", "tool:query_influxdb"),
         ("data_lookup", "¿Cuántos kW pico ha tenido AULA01 esta semana?", "tool:query_influxdb"),
         ("data_compare", "¿Hay más ruido en horario lectivo o en recreo?", "tool:compare_periods"),
-        ("forecast", "¿Cuánto durará la próxima ola de calor en Xàtiva?", "tool:get_weather_prediction"),
+        (
+            "forecast",
+            "¿Cuánto durará la próxima ola de calor en Xàtiva?",
+            "tool:get_weather_prediction",
+        ),
         ("anomaly", "¿Sospechas alguna válvula atascada?", "tool:check_hvac_anomaly"),
         ("state", "¿Qué iluminación está encendida ahora en AULA01?", "tool:get_building_state"),
         ("rag", "¿Qué normativa española aplica a la calidad del aire en aulas?", "rag"),
@@ -376,7 +403,11 @@ def make_chatbot_golden_set(seed: int = DEFAULT_SEED) -> pd.DataFrame:
         ("rag", "¿Qué es un IsolationForest?", "rag"),
         ("data_lookup", "¿Cuántas transiciones de AC ha habido este lunes?", "tool:query_influxdb"),
         ("data_lookup", "¿Cuál fue la humedad relativa media el viernes?", "tool:query_influxdb"),
-        ("data_compare", "¿Consumimos más electricidad el martes o el jueves?", "tool:compare_periods"),
+        (
+            "data_compare",
+            "¿Consumimos más electricidad el martes o el jueves?",
+            "tool:compare_periods",
+        ),
         ("forecast", "¿Cuánto sol haremos mañana al mediodía?", "tool:get_weather_prediction"),
         ("anomaly", "¿Está el ventilador funcionando como debe?", "tool:check_hvac_anomaly"),
         ("state", "¿En qué velocidad está el ventilador 1 ahora?", "tool:get_building_state"),
@@ -386,7 +417,11 @@ def make_chatbot_golden_set(seed: int = DEFAULT_SEED) -> pd.DataFrame:
         ("rag", "¿Por qué los topics MQTT son jerárquicos?", "rag"),
         ("data_lookup", "Pico máximo de t_voc esta semana en AULA01.", "tool:query_influxdb"),
         ("data_compare", "Compara el consumo entre mayo y junio.", "tool:compare_periods"),
-        ("forecast", "Predicción de consumo total para mañana en AULA01.", "tool:get_consumption_prediction"),
+        (
+            "forecast",
+            "Predicción de consumo total para mañana en AULA01.",
+            "tool:get_consumption_prediction",
+        ),
         ("anomaly", "¿La temperatura de retorno se ha disparado hoy?", "tool:check_hvac_anomaly"),
     ]
     df = pd.DataFrame(questions, columns=["category", "question", "expected_mechanism"])
