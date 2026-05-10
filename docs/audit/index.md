@@ -15,9 +15,10 @@
 | 5 | [Validación E2E](E2E_VALIDATION_REPORT.md) | 10 escenarios E2E + 8 físicos PASS contra stack live; +H-21, +H-22 | ✅ |
 | 6 | [Realismo físico](PHYSICAL_REALISM_REPORT.md) | Score 0.94; top 10 gaps (F-1..F-10); +H-23 jitter setpoint | ✅ |
 | 7 | (correcciones aplicadas — patches 002/003/004) | 3 patches al vendor + 15 tests nuevos pasando, 194/194 suite | ✅ |
-| 8 | (este sitio) | Reestructuración `docs/` como web | 🟡 en curso |
-| 9 | GitHub Pages workflow | despliegue automático | ⚪ pendiente |
+| 8 | (este sitio) | Reestructuración `docs/` como web | ✅ |
+| 9 | GitHub Pages workflow | despliegue automático | ✅ |
 | 10 | [Plan de acción](ACTION_PLAN.md) | priorización MoSCoW; 27 hallazgos abiertos (3 alta · 11 media · 13 baja) + roadmap | ✅ |
+| 11 | [Matriz casos uso](USE_CASE_MATRIX.md) · [Plan notebooks](NOTEBOOK_PLAN.md) · [Reporte docs](DOCS_REPORT.md) | 45 notebooks + 28 docs web nuevos | ✅ |
 
 ## Hallazgos consolidados
 
