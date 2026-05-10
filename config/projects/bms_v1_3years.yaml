@@ -1,0 +1,60 @@
+# =============================================================================
+# BMS v1 — Backfill 3 años completos (2023-2025) IES Simarro
+# Genera el dataset histórico "ground-truth" para entrenamiento ML serio,
+# benchmarks de Big Data (Caso I) y validación de modelos LSTM/Transformer
+# que requieren ≥ 2 años de histórico para capturar estacionalidad anual.
+#
+# Volumen estimado:
+#   - 10 aulas × 22 variables × 3 años × 365 días × 24 h × 12 (5 min) = ~232 M puntos
+#   - En CSV long-format gz: ~5-7 GB sin compresión, ~600-900 MB comprimido
+#   - Sugerencia: usar subconjunto exportado a Parquet para producción
+#
+# Para volúmenes manejables en notebooks (CSV hourly):
+#   232 M / 12 (5min→hourly) = 19.4 M filas (~2 GB)
+#   232 M / 60 (5min→hourly per aula) = ~3.2 M / aula → manejable
+# =============================================================================
+
+project:
+  namespace: "captia"
+  site_id: "ies_simarro"
+  modo: "synthetic"
+  schema_version: "v0.1"
+
+simulation:
+  timezone: "Europe/Madrid"
+  seed: 42
+  start: "2023-01-01T00:00:00"
+  end: "2025-12-31T23:59:59"
+  freq: "5min"
+  n_aulas: 10
+
+domain:
+  id: "bms_classrooms"
+  config_path: "/app/config/domains/bms_classrooms/domain.yaml"
+
+phases:
+  backfill:
+    enabled: true
+    chunk_days: 30        # procesa por chunks de 30 días para no saturar RAM
+  live:
+    enabled: false
+
+perturbations:
+  jitter_ms: 0.0
+  duplicate_probability: 0.0
+  out_of_order_probability: 0.0
+
+anomalies:
+  p_missing: 0.001
+  p_outlier: 0.0005
+
+sinks:
+  - type: file
+    config:
+      path: "/app/output/bms_simarro_3years.lp"
+      format: "csv_long"
+
+output:
+  format: "long"
+  include_quality: true
+  include_mqtt: false
