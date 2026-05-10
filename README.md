@@ -321,6 +321,245 @@ Lista completa con `make help`.
 
 ---
 
+## Generación de datasets sintéticos
+
+Este repo soporta **dos vías** para producir datasets:
+
+1. **Mocks didácticos** (`notebooks/_data/`) — generados con `numpy` desde
+   `notebooks/_common/synthetic_mocks.py`, ligeros, sin necesidad de stack.
+2. **Datasets canónicos del generador BMS** (`notebooks/_data/3y/`) —
+   producidos por el generador hexagonal (`vendor/synthetic-generator/`)
+   ejecutando los escenarios YAML, con schema canónico CAPTIA.
+
+### A. Mocks didácticos (1 año, sin stack)
+
+Para reproducir los mocks que están en `notebooks/_data/*.csv`:
+
+```bash
+uv run python scripts/build_notebook_data.py
+```
+
+Genera 6 ficheros (~5 MB total) en menos de 5 segundos. Re-ejecuciones
+son **bit-a-bit idénticas** (`seed=42`).
+
+| Mock | Caso ML | Periodo | Granularidad |
+|---|---|---|---|
+| `ingauge_aula01_mock.csv` | A, D | 1 semana | 1 min |
+| `bdg2_education_subset_mock.csv` | B, I | 12 meses | horaria |
+| `lbnl_fdd_rtu_mock.csv` | C, G | 14 días | 1 min |
+| `era5_xativa_mock.csv` | E | 30 días | horaria |
+| `traffic_camera_mock.csv` | J | 7 días | 15 min |
+| `chatbot_golden_set.csv` | H | n/a | 40 preguntas |
+
+### B. Mocks enriquecidos de 3 años
+
+Para casos avanzados (SARIMA estacional, LSTM, benchmark Spark) hay
+**versiones extendidas comprimidas con gzip** en `notebooks/_data/3y/`:
+
+```bash
+# Local (sin stack):
+uv run python scripts/build_3year_datasets.py
+
+# Con export del generador BMS canónico (requiere stack vivo + .env):
+uv run python scripts/build_3year_datasets.py --include-bms
+```
+
+| Dataset | Filas | Tamaño | Columnas extra vs 1 año |
+|---|---|---|---|
+| `bdg2_education_subset_3y.csv.gz` | 155 520 | 1.7 MB | year/month/dow/hour/season/is_weekend/is_school_hours |
+| `era5_xativa_3y.csv.gz` | 26 280 | 0.45 MB | dew_point_c (Magnus)/RH/solar_zenith_deg (lat 38.99°N) |
+| `ingauge_aula01_3y.csv.gz` | 315 360 | 5.1 MB | iaq_index (EPA-like)/comfort_pmv (Fanger)/power_w |
+| `lbnl_fdd_rtu_3y.csv.gz` | 315 360 | 2.3 MB | fault_label/fault_severity siempre presentes |
+| `traffic_camera_3y.csv.gz` | 210 240 | 1.3 MB | cars/trucks/motorbikes/bicycles + congestion_level |
+
+> **Por qué 3 años**: SARIMA estacional anual necesita ≥ 2 años para varianza
+> estacional; LSTM y Transformer 2-3 años para validación rolling robusta;
+> benchmarks Big Data Spark necesitan > 1 M filas para salir del rango
+> pandas-friendly. Detalle en
+> [`notebooks/_data/3y/README.md`](notebooks/_data/3y/README.md).
+
+### C. Dataset BMS canónico (output real del generador)
+
+⭐ **Esta es la salida real del generador hexagonal** que está en
+`vendor/synthetic-generator/`, idéntica bit-a-bit a la que produce el
+stack de producción CAPTIA.
+
+#### Producirlo end-to-end (requiere stack vivo)
+
+```bash
+# 1. Levantar el stack
+make demo
+
+# 2. Lanzar export via API (POST /v1/datasets/export)
+TOKEN=$(grep ^BMS_API_TOKEN= .env | cut -d= -f2-)
+curl -X POST http://localhost:8121/v1/datasets/export \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "config_path": "/app/config/projects/bms_v1_caseB_consumption.yaml",
+    "format": "csv_long",
+    "months": 12,
+    "include_faults": false
+  }'
+# → {"job_id":"abc123...","output_path":"/app/output/ies_simarro_12m_abc123.csv"}
+
+# 3. Esperar a que termine (~30-90 s para 12 meses, 10 aulas, 5min)
+sleep 60
+curl -fsS -H "Authorization: Bearer $TOKEN" \
+  http://localhost:8121/v1/datasets/jobs/<job_id>
+
+# 4. Copiar output del contenedor al host
+docker cp captia-bms-generator:/app/output/ies_simarro_12m_<job_id>.csv ./output/
+
+# 5. Comprimir (380 MB → ~15 MB con gzip-9)
+gzip -9 output/ies_simarro_12m_<job_id>.csv
+
+# 6. (Opcional) mover al área de notebooks
+mv output/ies_simarro_12m_<job_id>.csv.gz \
+   notebooks/_data/3y/bms_simarro_canonical_12m.csv.gz
+```
+
+#### Schema canónico CAPTIA producido
+
+12 columnas, equivalente directo al InfluxDB measurement `captia_point`:
+
+```csv
+timestamp,domain_id,site_id,asset_id,variable,value,unit,data_type,point_type,quality,origin,pvn
+2025-09-01T00:00:00+02:00,bms_classrooms,ies_simarro,AULA01,temperature_01,21.4463,°C,float,sensor,OK,synthetic,AULA01__temperature_01
+```
+
+| Columna | Significado |
+|---|---|
+| `timestamp` | ISO 8601 con TZ Europe/Madrid |
+| `domain_id` | `bms_classrooms` (canónico) |
+| `site_id` | `ies_simarro` (canónico) |
+| `asset_id` | `AULA01..AULA10` |
+| `variable` | 22 variables (`temperature_01`, `co2`, `relative-humidity`, ...) |
+| `value` | Field canónico (float) |
+| `unit` | `°C`, `ppm`, `%`, `W`, etc. |
+| `data_type` | `float`, `boolean`, `int` |
+| `point_type` | `sensor`, `actuator`, `derived` |
+| `quality` | `OK`, `BAD`, `STALE` |
+| `origin` | `synthetic` (este repo) o `simarro-prod` (real) |
+| `pvn` | Process Variable Name = `${asset_id}__${variable}` |
+
+#### Escenarios disponibles (`config/projects/`)
+
+| YAML | Periodo | Granularidad | Aulas | Faults | Tamaño esperado |
+|---|---|---|---|---|---|
+| `bms_v1_demo.yaml` | 30 días | 5 min | 10 | no | ~25 MB CSV |
+| `bms_v1_caseA_e2e_host.yaml` | live | 5 s | 10 | no | continuo |
+| `bms_v1_caseB_consumption.yaml` ⭐ | **12 meses** | 5 min | 10 | no | **380 MB CSV → 15 MB gz** |
+| `bms_v1_caseC_faults.yaml` | 6 meses | 5 min | 10 | sí (4 tipos) | ~190 MB CSV → 8 MB gz |
+| `bms_v1_caseD_iaq.yaml` | 3 meses | 1 min | 10 | no | ~480 MB CSV → 20 MB gz |
+| `bms_v1_3years.yaml` | **3 años** | 5 min | 10 | no | ~1.1 GB CSV → ~45 MB gz (excede límite GitHub 100 MB; ejecutar bajo demanda) |
+
+#### Atajos `make` para los casos más comunes
+
+```bash
+make dump-caseB    # 12 meses consumo eléctrico (Caso B forecast)
+make dump-caseC    # 6 meses con averías HVAC (Caso C anomalies)
+make dump-caseD    # 3 meses calidad aire @ 1 min (Caso D IAQ)
+```
+
+Estos targets:
+1. Verifican que el stack está vivo (si no, `make demo` automático).
+2. Lanzan `POST /v1/datasets/export` con el config correspondiente.
+3. Esperan al `phase: completed` del job.
+4. Copian el output del contenedor al host (`./output/`).
+5. Imprimen path final + tamaño.
+
+#### Personalización
+
+Para crear un escenario propio, copia uno existente y ajusta:
+
+```yaml
+# config/projects/mi_escenario.yaml
+simulation:
+  timezone: "Europe/Madrid"
+  seed: 42                          # determinismo bit-a-bit
+  start: "2025-01-01T00:00:00"
+  end: "2025-12-31T23:59:59"
+  freq: "5min"                      # 5s | 1min | 5min | 15min | 1h
+  n_aulas: 10                       # 1..70
+
+phases:
+  backfill:
+    enabled: true
+    chunk_days: 30                  # procesa por chunks (no satura RAM)
+  live:
+    enabled: false
+
+anomalies:
+  p_missing: 0.001                  # 0.1 % missing aleatorio
+  p_outlier: 0.0005                 # 0.05 % outliers
+
+sinks:
+  - type: file
+    config:
+      path: "/app/output/mi_dataset.csv"
+      format: "csv_long"            # o "line_protocol" para Influx
+```
+
+Después:
+
+```bash
+curl -X POST http://localhost:8121/v1/datasets/export \
+  -H "Authorization: Bearer $BMS_API_TOKEN" \
+  -d '{"config_path":"/app/config/projects/mi_escenario.yaml",
+       "format":"csv_long","months":12}'
+```
+
+> **Inyectar fallos HVAC etiquetados** para Caso C: `BMS_FAULTS_ENABLED=true`
+> en `.env` antes de `make demo`. Cada fault aparece como serie en
+> `state_events` con `variable=fault.<tipo>` (4 tipos disponibles:
+> `sensor_drift`, `valve_stuck`, `fan_failure`, `refrigerant_low`).
+
+### D. Cargar datasets en notebooks
+
+```python
+import pandas as pd
+
+# Mock 1 año (CSV plano)
+df_mock = pd.read_csv(
+    "../_data/ingauge_aula01_mock.csv",
+    comment="#",                     # ignora cabecera "MOCK — sintético"
+    parse_dates=["timestamp"],
+)
+
+# Dataset 3 años (gzip)
+df_3y = pd.read_csv(
+    "../_data/3y/ingauge_aula01_3y.csv.gz",
+    comment="#",
+    parse_dates=["timestamp"],
+)
+
+# Dataset BMS canónico (long format → wide para forecasting)
+df_bms = pd.read_csv(
+    "../_data/3y/bms_simarro_canonical_12m.csv.gz",
+    parse_dates=["timestamp"],
+)
+wide = df_bms[df_bms.variable == "power_01"].pivot(
+    index="timestamp", columns="asset_id", values="value"
+).resample("1H").mean()
+```
+
+### E. Determinismo y reproducibilidad
+
+Todos los datasets cumplen:
+
+- **`seed=42`** propagado a todo el pipeline (`numpy.random.default_rng(seed)`).
+- **Bit-a-bit reproducible**: mismo input → mismo output exacto, sin variación
+  entre runs ni entre máquinas (verificado en `tests/test_determinism.py`).
+- **Sin PII**: 100 % datos sintéticos, alineado con GDPR.
+- **Schema canónico inviolable**: 5 tags + measurement + field `value`
+  validados por `tests/integration/test_telegraf_canonical_schema.py`.
+
+Documento operacional completo: [`docs/operations/`](docs/operations/) y
+[`notebooks/_data/3y/README.md`](notebooks/_data/3y/README.md).
+
+---
+
 ## Troubleshooting express
 
 | Síntoma | Causa más probable | Fix |
