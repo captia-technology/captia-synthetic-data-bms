@@ -16,12 +16,11 @@ is down those notebooks are skipped (marked SKIP).
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -166,7 +165,7 @@ def main() -> int:
         notebooks = [nb for nb in notebooks if args.filter in str(nb)]
     print(f"Found {len(notebooks)} notebooks", flush=True)
 
-    started_at = datetime.now(timezone.utc)
+    started_at = datetime.now(UTC)
     results: list[dict] = []
     for i, nb in enumerate(notebooks, 1):
         rel = nb.relative_to(REPO_ROOT)
