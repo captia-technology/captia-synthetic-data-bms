@@ -1,9 +1,9 @@
 # Auditoría extrema — STATUS
 
 **Fecha de inicio**: 2026-05-09
-**Repo principal**: `C:\CAPTIA\CAPTIA-SYNTHETIC-DATA-BMS\`
-**Repo de referencia (contratos)**: `C:\CAPTIA\CAPTIA-CONNECT\captia-connect`
-**Repo de referencia (estilo docs)**: `C:\CAPTIA\CAPTIA.AI\captia.ai\docs`
+**Repo principal**: `captia-synthetic-data-bms` (este repositorio).
+**Repo de referencia (contratos)**: `captia-connect` (interno).
+**Repo de referencia (estilo docs)**: `captia.ai` (interno).
 
 ## Objetivo
 

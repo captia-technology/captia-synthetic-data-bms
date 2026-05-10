@@ -1,6 +1,6 @@
 # Auditoría — Plan de reestructuración de `docs/` como sitio web
 
-> Basado en el análisis del estilo y framework de `C:\CAPTIA\CAPTIA.AI\captia.ai\docs\` (subagente, 2026-05-09).
+> Basado en el análisis del estilo y framework de `captia.ai` (interno, subagente, 2026-05-09).
 
 ## Decisión: MkDocs + Material for MkDocs
 

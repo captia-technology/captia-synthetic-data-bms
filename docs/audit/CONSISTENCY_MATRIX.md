@@ -1,8 +1,8 @@
 # Auditoría — Matriz de consistencia BMS ↔ CAPTIA-connect
 
 > Generado por el subagente comparador el 2026-05-09 leyendo:
-> - `C:\CAPTIA\CAPTIA-SYNTHETIC-DATA-BMS\` (repo principal)
-> - `C:\CAPTIA\CAPTIA-CONNECT\captia-connect\` (referencia upstream)
+> - `captia-synthetic-data-bms` (repo principal — este repositorio)
+> - `captia-connect` (referencia upstream — interno)
 
 ## Resumen ejecutivo
 

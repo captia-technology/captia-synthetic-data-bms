@@ -25,7 +25,7 @@ docker compose logs -f --tail=200
 Asegúrate de ejecutar Jupyter desde la raíz del repo:
 
 ```bash
-cd C:\CAPTIA\CAPTIA-SYNTHETIC-DATA-BMS
+cd /path/to/captia-synthetic-data-bms        # raíz del repo
 uv run --with jupyterlab jupyter lab notebooks/
 ```
 

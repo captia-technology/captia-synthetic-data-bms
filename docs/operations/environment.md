@@ -83,9 +83,12 @@ sed -i 's/CHANGE_ME_USE_OPENSSL_RAND/'$(openssl rand -hex 32)'/g' .env
 ### Producción (esquema)
 
 ```bash
-INFLUXDB_URL=https://influx.simarro-prod.captiatechnology.com
-INFLUXDB_TOKEN=<edu-token-simarro>
-INFLUXDB_ORG=captia
+INFLUXDB_URL=https://<your-influxdb-host>     # ej. https://influx.<tu-tenant>.example.com
+INFLUXDB_TOKEN=<your-influxdb-token>          # gestionar vía secret manager
+INFLUXDB_ORG=<your-org>
 CAPTIA_ENV=prod
-CAPTIA_SITE=ies_simarro
+CAPTIA_SITE=<your-site-id>
 ```
+
+> Las URL y tokens de cualquier despliegue real (ej. el del piloto IES Simarro)
+> se gestionan en el secret manager corporativo y **no** se commitean al repo.
