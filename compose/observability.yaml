@@ -71,14 +71,18 @@ services:
   # MQTTX Web — SPA cliente MQTT servida en HTTP. Conecta vía WebSocket
   # desde el navegador del usuario al broker en ws://localhost:9102/mqtt.
   # No conecta server-side: solo sirve assets estáticos.
+  # Montamos el JSON de import en /app para servirlo en
+  # http://localhost:${MQTTX_WEB_PORT_HOST}/captia-bms-mqttx-config.json
   mqttx-web:
     image: emqx/mqttx-web:v1.13.0
     container_name: captia-bms-mqttx-web
     restart: unless-stopped
     ports:
       - "${MQTTX_WEB_PORT_HOST:-8083}:80"
+    volumes:
+      - ../infra/mqttx/captia-bms-mqttx-config.json:/app/captia-bms-mqttx-config.json:ro
     # http-server escucha en IPv4 0.0.0.0:80; localhost resuelve a ::1 (no
-     # responde). Usar 127.0.0.1 explícito.
+    # responde). Usar 127.0.0.1 explícito.
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ | grep -q MQTT || exit 1"]
       interval: 30s
