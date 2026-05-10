@@ -217,7 +217,11 @@ class _MetricsCountingSink:
     def emit_batch(self, points: Any) -> int:
         # Materializa para poder contar y delegar.
         materialized = list(points) if not isinstance(points, list) else points
-        n = self.real_sink.emit_batch(materialized) if hasattr(self.real_sink, "emit_batch") else None
+        n = (
+            self.real_sink.emit_batch(materialized)
+            if hasattr(self.real_sink, "emit_batch")
+            else None
+        )
         if n is None:
             for p in materialized:
                 self.real_sink.emit(p)
@@ -390,14 +394,18 @@ def _maybe_wrap_with_alias(sinks: list, config_path: Path, domain_id: str) -> li
         LOG.info(
             "production_alias enabled but no aliases or derivations found "
             "(variables.yaml=%s, derivations.yaml=%s) — skipping wrap",
-            variables_yaml, derivations_yaml,
+            variables_yaml,
+            derivations_yaml,
         )
         return sinks
 
     LOG.info(
-        "wrapping %d sink(s) with AliasSinkAdapter "
-        "(%d aliases from %s, %d derivations from %s)",
-        len(sinks), len(aliases), variables_yaml, n_derivations, derivations_yaml,
+        "wrapping %d sink(s) with AliasSinkAdapter (%d aliases from %s, %d derivations from %s)",
+        len(sinks),
+        len(aliases),
+        variables_yaml,
+        n_derivations,
+        derivations_yaml,
     )
     return [AliasSinkAdapter(s, aliases, derivations) for s in sinks]
 

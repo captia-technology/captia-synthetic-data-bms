@@ -30,6 +30,7 @@ Exit codes:
   1   error (config missing, influx down, write failed)
   130 SIGINT
 """
+
 from __future__ import annotations
 
 import argparse
@@ -76,15 +77,28 @@ DOMAIN_SITE_MAP: dict[str, dict[str, str]] = {
 # Display names ES (fallback to title-cased name).
 DISPLAY_NAMES_ES: dict[str, str] = {
     # Vendor names
-    "temperature": "Temperatura", "humidity": "Humedad", "co2": "CO₂",
-    "iaq_index": "Índice IAQ", "noise": "Ruido", "illuminance": "Iluminancia",
-    "occupancy": "Ocupación", "presence_pir": "Presencia PIR",
-    "outdoor_temp": "Temp. Exterior", "daylight_lux": "Luz Natural",
-    "thermostat_setpoint": "Consigna Termostato", "hvac_mode": "Modo HVAC",
-    "hvac_enable": "HVAC Habilitado", "heating_valve_pos": "Pos. Válvula Calef.",
-    "scene_mode": "Modo Escena", "scene": "Escena",
-    "relay_1": "Relé 1", "relay_2": "Relé 2", "relay_3": "Relé 3", "relay_4": "Relé 4",
-    "power": "Potencia", "energy": "Energía",
+    "temperature": "Temperatura",
+    "humidity": "Humedad",
+    "co2": "CO₂",
+    "iaq_index": "Índice IAQ",
+    "noise": "Ruido",
+    "illuminance": "Iluminancia",
+    "occupancy": "Ocupación",
+    "presence_pir": "Presencia PIR",
+    "outdoor_temp": "Temp. Exterior",
+    "daylight_lux": "Luz Natural",
+    "thermostat_setpoint": "Consigna Termostato",
+    "hvac_mode": "Modo HVAC",
+    "hvac_enable": "HVAC Habilitado",
+    "heating_valve_pos": "Pos. Válvula Calef.",
+    "scene_mode": "Modo Escena",
+    "scene": "Escena",
+    "relay_1": "Relé 1",
+    "relay_2": "Relé 2",
+    "relay_3": "Relé 3",
+    "relay_4": "Relé 4",
+    "power": "Potencia",
+    "energy": "Energía",
     # Production names (alias canonical)
     "temperature_01": "Temperatura (canal 01)",
     "temperature_01_sp": "Consigna Temperatura (canal 01)",
@@ -348,6 +362,7 @@ def ensure_bucket(client: InfluxDBClient, org: str) -> None:
         logger.error("Org '%s' not found", org)
         sys.exit(1)
     from influxdb_client.domain.bucket_retention_rules import BucketRetentionRules
+
     bapi.create_bucket(
         bucket_name=METADATA_BUCKET,
         org_id=orgs[0].id,
@@ -427,7 +442,10 @@ def run_diagnose(args: argparse.Namespace, all_lines: list[str]) -> int:
             return 1
         write_api = client.write_api(write_options=SYNCHRONOUS)
         write_api.write(
-            bucket=METADATA_BUCKET, org=args.org, record=[all_lines[0]], write_precision=WritePrecision.NS
+            bucket=METADATA_BUCKET,
+            org=args.org,
+            record=[all_lines[0]],
+            write_precision=WritePrecision.NS,
         )
         logger.info("Test write OK. Querying back...")
         qapi = client.query_api()
@@ -457,8 +475,14 @@ def main() -> int:
     p.add_argument("--n-aulas", type=int, default=int(os.environ.get("BMS_N_AULAS", "10")))
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--purge-old", action="store_true")
-    p.add_argument("--force", action="store_true", help="purge + rewrite (overrides --skip-if-exists)")
-    p.add_argument("--skip-if-exists", action="store_true", help="exit 0 if metadata already present (default in deploy)")
+    p.add_argument(
+        "--force", action="store_true", help="purge + rewrite (overrides --skip-if-exists)"
+    )
+    p.add_argument(
+        "--skip-if-exists",
+        action="store_true",
+        help="exit 0 if metadata already present (default in deploy)",
+    )
     p.add_argument("--diagnose", action="store_true")
     args = p.parse_args()
 
@@ -510,7 +534,10 @@ def main() -> int:
     )
     n_derived = (
         sum(
-            len((derivations_cfg.get("asset_types", {}).get(at, {}) or {}).get("derivations", []) or [])
+            len(
+                (derivations_cfg.get("asset_types", {}).get(at, {}) or {}).get("derivations", [])
+                or []
+            )
             for at in (derivations_cfg.get("asset_types") or {})
         )
         if derivations_cfg
@@ -519,7 +546,12 @@ def main() -> int:
     logger.info(
         "Built: 1 captia_domain_meta + %d captia_point_meta = %d lines "
         "(per asset: %d vendor + %d derived = %d vars × %d aulas)",
-        len(var_lines), len(all_lines), n_vendor, n_derived, n_vendor + n_derived, args.n_aulas,
+        len(var_lines),
+        len(all_lines),
+        n_vendor,
+        n_derived,
+        n_vendor + n_derived,
+        args.n_aulas,
     )
 
     if args.dry_run:
@@ -551,7 +583,9 @@ def main() -> int:
                 logger.info("✓ Metadata already exists for env='%s'. Skip.", args.env)
                 client.close()
                 return 0
-            logger.warning("⚠ Metadata exists for env='%s'. Will write duplicates (use --force).", args.env)
+            logger.warning(
+                "⚠ Metadata exists for env='%s'. Will write duplicates (use --force).", args.env
+            )
 
     if args.force or args.purge_old:
         try:
@@ -559,7 +593,9 @@ def main() -> int:
         except Exception as e:
             logger.warning("Purge failed (continuing): %s", e)
 
-    logger.info("Writing %d lines to bucket='%s' org='%s'...", len(all_lines), METADATA_BUCKET, args.org)
+    logger.info(
+        "Writing %d lines to bucket='%s' org='%s'...", len(all_lines), METADATA_BUCKET, args.org
+    )
     try:
         write_api = client.write_api(write_options=SYNCHRONOUS)
         n = write_in_batches(write_api, METADATA_BUCKET, args.org, all_lines)

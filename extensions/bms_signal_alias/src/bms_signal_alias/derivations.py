@@ -161,7 +161,9 @@ def load_derivations_yaml(yaml_path: Path) -> dict[str, list[Derivation]]:
             if transform not in _TRANSFORMS:
                 LOG.warning(
                     "Skipping derivation %r: unknown transform %r (known: %s)",
-                    name, transform, sorted(_TRANSFORMS.keys()),
+                    name,
+                    transform,
+                    sorted(_TRANSFORMS.keys()),
                 )
                 continue
             d = Derivation(
@@ -176,7 +178,9 @@ def load_derivations_yaml(yaml_path: Path) -> dict[str, list[Derivation]]:
     total = sum(len(v) for v in by_source.values())
     LOG.info(
         "Loaded %d derivations from %s, indexed by %d source vars",
-        total, yaml_path, len(by_source),
+        total,
+        yaml_path,
+        len(by_source),
     )
     return by_source
 
