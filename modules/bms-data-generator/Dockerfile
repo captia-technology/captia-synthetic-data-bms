@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.6
-FROM python:3.12-slim AS builder
+FROM python:3.14-slim AS builder
 # CRÍTICO: WORKDIR debe coincidir entre builder y runtime para que los
 # `_editable_impl_*.pth` (creados por `uv pip install -e`) apunten a paths
 # que existen en runtime. Si difieren (/build vs /app), import falla con
@@ -22,7 +22,7 @@ RUN uv venv /opt/venv && \
         -e extensions/bms_signal_alias \
         -e modules/bms-data-generator
 
-FROM python:3.12-slim AS runtime
+FROM python:3.14-slim AS runtime
 WORKDIR /app
 RUN apt-get update && \
     apt-get install -y --no-install-recommends curl && \
