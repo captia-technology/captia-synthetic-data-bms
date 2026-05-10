@@ -2,7 +2,7 @@
 
 # CAPTIA-SYNTHETIC-DATA-BMS
 
-**Get Started — levanta el stack BMS en 5 pasos y visualiza datos en menos de 10 minutos**
+**Get Started | levanta el stack BMS en 5 pasos y visualiza datos en menos de 10 minutos**
 
 [![Documentation Site](https://img.shields.io/badge/docs-captia--technology.github.io-2451FF.svg?logo=materialformkdocs&logoColor=white)](https://captia-technology.github.io/captia-synthetic-data-bms/)
 [![CI](https://github.com/captia-technology/captia-synthetic-data-bms/actions/workflows/ci.yml/badge.svg)](https://github.com/captia-technology/captia-synthetic-data-bms/actions/workflows/ci.yml)
