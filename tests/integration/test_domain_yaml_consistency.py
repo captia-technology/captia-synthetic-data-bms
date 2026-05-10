@@ -16,7 +16,16 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DOMAIN_YAML = REPO_ROOT / "config" / "domains" / "bms_classrooms" / "domain.yaml"
-PHYSICS_DIR = REPO_ROOT / "vendor" / "synthetic-generator" / "src" / "synthetic_generator" / "domains" / "bms_classrooms" / "physics"
+PHYSICS_DIR = (
+    REPO_ROOT
+    / "vendor"
+    / "synthetic-generator"
+    / "src"
+    / "synthetic_generator"
+    / "domains"
+    / "bms_classrooms"
+    / "physics"
+)
 
 
 def _yaml_physics_keys() -> set[str]:
@@ -80,16 +89,16 @@ def test_critical_physics_keys_are_overridable_via_yaml() -> None:
     """Las claves físicas más sensibles (térmica, CO2, HVAC) deben tener override yaml."""
     yaml_keys = _yaml_physics_keys()
     critical = {
-        "tau_minutes",                          # térmica RC
-        "occupancy_heat_gain_c_per_person",     # ganancia personas
-        "outdoor_ppm",                          # CO2 baseline
-        "gen_ppm_per_min_per_person",           # tasa generación CO2
-        "vent_k_per_min",                       # ventilación HVAC
-        "leak_k_per_min",                       # leak natural
-        "setpoint_class",                       # setpoint clase
-        "setpoint_out_of_hours",                # setpoint OOH
-        "mean_annual",                          # T_outdoor anual
-        "amplitude",                            # T_outdoor amplitud
+        "tau_minutes",  # térmica RC
+        "occupancy_heat_gain_c_per_person",  # ganancia personas
+        "outdoor_ppm",  # CO2 baseline
+        "gen_ppm_per_min_per_person",  # tasa generación CO2
+        "vent_k_per_min",  # ventilación HVAC
+        "leak_k_per_min",  # leak natural
+        "setpoint_class",  # setpoint clase
+        "setpoint_out_of_hours",  # setpoint OOH
+        "mean_annual",  # T_outdoor anual
+        "amplitude",  # T_outdoor amplitud
     }
     missing = critical - yaml_keys
     assert not missing, (

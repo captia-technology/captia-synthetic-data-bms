@@ -35,7 +35,9 @@ def test_legacy_signature_preserved(long_run) -> None:
     index, outdoor, occ = long_run
     rng = np.random.default_rng(42)
     h = simulate_humidity(
-        index, outdoor, occ,
+        index,
+        outdoor,
+        occ,
         cfg_h={"outdoor_mean": 55.0, "occupancy_gain_per_person": 0.08},
         rng=rng,
     )
@@ -57,7 +59,7 @@ def test_cooling_lowers_humidity_vs_no_hvac(long_run) -> None:
     cfg = {
         "outdoor_mean": 55.0,
         "occupancy_gain_per_person": 0.08,
-        "tau_minutes": 30,            # tau corto para que el efecto se vea en 1 h
+        "tau_minutes": 30,  # tau corto para que el efecto se vea en 1 h
         "cooling_dehum_delta": 8.0,
     }
 
@@ -97,9 +99,7 @@ def test_heating_does_not_dehumidify(long_run) -> None:
     h_off = simulate_humidity(index, outdoor, occ, cfg, rng_b, enable_off, mode_off)
 
     delta = abs(float(h_heat.iloc[-1] - h_off.iloc[-1]))
-    assert delta < 1.0, (
-        f"Heating no debería afectar humidity: Δ={delta:.2f} %RH (esperado ≈ 0)"
-    )
+    assert delta < 1.0, f"Heating no debería afectar humidity: Δ={delta:.2f} %RH (esperado ≈ 0)"
 
 
 @pytest.mark.integration
@@ -108,13 +108,17 @@ def test_tau_minutes_configurable(long_run) -> None:
     index, outdoor, occ = long_run
     rng_a = np.random.default_rng(42)
     h_fast = simulate_humidity(
-        index, outdoor, occ,
+        index,
+        outdoor,
+        occ,
         cfg_h={"outdoor_mean": 55.0, "occupancy_gain_per_person": 0.08, "tau_minutes": 10},
         rng=rng_a,
     )
     rng_b = np.random.default_rng(42)
     h_slow = simulate_humidity(
-        index, outdoor, occ,
+        index,
+        outdoor,
+        occ,
         cfg_h={"outdoor_mean": 55.0, "occupancy_gain_per_person": 0.08, "tau_minutes": 600},
         rng=rng_b,
     )
@@ -141,7 +145,7 @@ def test_cooling_dehum_delta_zero_disables(long_run) -> None:
         "outdoor_mean": 55.0,
         "occupancy_gain_per_person": 0.08,
         "tau_minutes": 30,
-        "cooling_dehum_delta": 0.0,   # escape hatch
+        "cooling_dehum_delta": 0.0,  # escape hatch
     }
 
     rng_a = np.random.default_rng(42)
@@ -151,6 +155,4 @@ def test_cooling_dehum_delta_zero_disables(long_run) -> None:
     h_off = simulate_humidity(index, outdoor, occ, cfg, rng_b, enable_off, mode_off)
 
     delta = abs(float(h_cool.iloc[-1] - h_off.iloc[-1]))
-    assert delta < 0.5, (
-        f"Con dehum_delta=0 el cooling no debería afectar: Δ={delta:.2f} %RH"
-    )
+    assert delta < 0.5, f"Con dehum_delta=0 el cooling no debería afectar: Δ={delta:.2f} %RH"

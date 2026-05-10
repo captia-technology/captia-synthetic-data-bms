@@ -14,14 +14,16 @@ def _nb_00_arquitectura(target: Path) -> Path:
     title = "Arquitectura Medallion aplicada a CAPTIA Synthetic Data BMS"
     sections = [
         section(
-            1, "Objetivo",
+            1,
+            "Objetivo",
             "Entender en 30 minutos cómo se organizan los datos del proyecto en las "
             "tres capas Medallion (bronce → plata → oro), por qué CAPTIA tiene una "
             "capa plata canónica (`captia_point` + 5 tags + `value`) y cómo encaja "
             "cada caso de uso del proyecto en esta arquitectura.",
         ),
         section(
-            2, "Qué se aprende",
+            2,
+            "Qué se aprende",
             "- Definición precisa de cada capa Medallion.\n"
             "- Diferencia entre Medallion estricto, distribuido e híbrido.\n"
             "- Por qué el InfluxDB de simarro-prod ya es **una capa plata**.\n"
@@ -29,7 +31,8 @@ def _nb_00_arquitectura(target: Path) -> Path:
             "- Vocabulario que usaremos en todos los demás notebooks.",
         ),
         section(
-            3, "Contexto del caso de uso",
+            3,
+            "Contexto del caso de uso",
             "El proyecto del Curso de Especialización IA & Big Data del IES Simarro "
             "trabaja con datos de edificios inteligentes. La estrategia de datos "
             "adoptada (mayo 2026) es **Medallion híbrida**: cada equipo construye "
@@ -38,7 +41,8 @@ def _nb_00_arquitectura(target: Path) -> Path:
             "sin reescribir el código.",
         ),
         section(
-            4, "Relación con CENTINELA+",
+            4,
+            "Relación con CENTINELA+",
             "CENTINELA+ ya tiene resuelto el paso bronce → plata para sensores reales: "
             "los sensores publican payloads MQTT que Telegraf normaliza y escribe en "
             "InfluxDB con el schema canónico. Cuando los datos del IES Simarro estén "
@@ -47,7 +51,8 @@ def _nb_00_arquitectura(target: Path) -> Path:
             "código).",
         ),
         section(
-            5, "Relación con Medallion",
+            5,
+            "Relación con Medallion",
             "Diagrama:\n\n"
             "```mermaid\n"
             "flowchart LR\n"
@@ -59,12 +64,14 @@ def _nb_00_arquitectura(target: Path) -> Path:
             "```\n",
         ),
         section(
-            6, "Datos de entrada",
+            6,
+            "Datos de entrada",
             "Este notebook es **conceptual**: no carga ningún dataset. Visualizaremos "
             "tablas comparando capas y un Mermaid resumen de los 11 casos.",
         ),
         section(
-            7, "Schema CAPTIA esperado",
+            7,
+            "Schema CAPTIA esperado",
             "Aunque no hagamos ETL, fijamos las constantes que aparecerán en todos "
             "los notebooks siguientes.",
             """\
@@ -75,7 +82,8 @@ print("BUCKETS:", list(DEFAULT_BUCKET_RETENTIONS.keys()))
         ),
         setup_section(),
         section(
-            9, "Carga de datos o mock",
+            9,
+            "Carga de datos o mock",
             "Construimos en memoria una tabla resumen con los 11 casos para guiar el "
             "resto del proyecto. No hay descargas externas.",
             """\
@@ -99,7 +107,8 @@ casos
 """,
         ),
         section(
-            10, "Exploración paso a paso",
+            10,
+            "Exploración paso a paso",
             "Comparamos las características de las tres capas en una tabla.",
             """\
 capas = pd.DataFrame(
@@ -126,7 +135,8 @@ capas
 """,
         ),
         section(
-            11, "Transformación bronce → plata",
+            11,
+            "Transformación bronce → plata",
             "Un fragmento muestra cómo construiríamos una línea de line-protocol "
             "desde un sensor mock; reaparecerá en notebooks operacionales.",
             """\
@@ -147,13 +157,15 @@ print(linea)
 """,
         ),
         section(
-            12, "Construcción de capa oro",
+            12,
+            "Construcción de capa oro",
             "La capa oro es **caso-específica**: features ML para forecasting, "
             "embeddings para RAG, datasets etiquetados para detección de anomalías. "
             "No la construimos aquí — cada caso le dedica un notebook propio.",
         ),
         section(
-            13, "Visualizaciones explicativas",
+            13,
+            "Visualizaciones explicativas",
             "Visualizamos cuántos notebooks tiene cada caso (mostraremos el plan de "
             "ejecución del proyecto).",
             """\
@@ -173,7 +185,8 @@ plt.tight_layout()
 """,
         ),
         section(
-            14, "Validaciones",
+            14,
+            "Validaciones",
             "Comprobamos que las constantes están bien expuestas y que los buckets "
             "esperados aparecen.",
             """\
@@ -184,7 +197,8 @@ print("Schema canónico OK")
 """,
         ),
         section(
-            15, "Errores comunes",
+            15,
+            "Errores comunes",
             "1. **Modificar el measurement.** Cambiar `captia_point` rompe Telegraf y los dashboards.\n"
             "2. **Usar `value_<tipo>`.** Solo existe el field `value` (float).\n"
             "3. **Cardinalidad alta de tags.** Los 5 tags son indexados; añadir un sexto causa explosión de series.\n"
@@ -192,13 +206,15 @@ print("Schema canónico OK")
             "5. **Hardcodear tokens.** Siempre usar `.env`.",
         ),
         section(
-            16, "Ejercicios propuestos",
+            16,
+            "Ejercicios propuestos",
             "1. Para cada caso de la tabla `casos`, identifica un dataset público alternativo válido.\n"
             "2. Construye un line-protocol para `power_01` con valor 850 W.\n"
             "3. Explica por qué `state_events` tiene 90 días y `telemetry` solo 14.",
         ),
         section(
-            17, "Cómo se reutiliza con datos reales",
+            17,
+            "Cómo se reutiliza con datos reales",
             "Cuando CAPTIA proporcione un dump real de InfluxDB, el cambio para "
             "todos los notebooks es:\n\n"
             "1. `influx restore` del dump en el bucket `telemetry`.\n"
@@ -226,13 +242,15 @@ def _nb_01_schema(target: Path) -> Path:
     title = "Schema canónico CAPTIA en InfluxDB — measurement, tags, field, buckets"
     sections = [
         section(
-            1, "Objetivo",
+            1,
+            "Objetivo",
             "Aprender a leer y construir el schema canónico CAPTIA: measurement "
             "`captia_point`, 5 tags indexados, field `value` y los 7 buckets con "
             "sus retenciones. Trabajar con line protocol y validar la cardinalidad.",
         ),
         section(
-            2, "Qué se aprende",
+            2,
+            "Qué se aprende",
             "- Estructura de InfluxDB 2.7 (measurement, tag, field).\n"
             "- Por qué CAPTIA usa **un solo measurement** en lugar de uno por variable.\n"
             "- Cómo se mapea un payload MQTT a una línea de line protocol.\n"
@@ -240,30 +258,35 @@ def _nb_01_schema(target: Path) -> Path:
             "- Cómo validar el schema con `validate_canonical_tags`.",
         ),
         section(
-            3, "Contexto del caso de uso",
+            3,
+            "Contexto del caso de uso",
             "Toda la telemetría continua de CENTINELA+ vive en `captia_point`. La "
             "variable que se mide se identifica por el tag `variable`, no por el "
             "nombre del field. Esta decisión mantiene la cardinalidad baja y permite "
             "añadir variables nuevas sin tocar el schema.",
         ),
         section(
-            4, "Relación con CENTINELA+",
+            4,
+            "Relación con CENTINELA+",
             "El gateway BMS de AULA01 publica cada 5 segundos en topics como "
             "`captia/prod/default/ies_simarro/AULA01/telemetry/co2`. Telegraf parsea "
             "el topic con una regex de 5 grupos y emite a InfluxDB la línea correspondiente.",
         ),
         section(
-            5, "Relación con Medallion",
+            5,
+            "Relación con Medallion",
             "Este notebook es la **especificación operacional de la capa plata**. "
             "Toda transformación bronce → plata produce líneas como las de aquí.",
         ),
         section(
-            6, "Datos de entrada",
+            6,
+            "Datos de entrada",
             "Construiremos manualmente 3 puntos sintéticos para AULA01 y los "
             "imprimiremos en line protocol.",
         ),
         section(
-            7, "Schema CAPTIA esperado",
+            7,
+            "Schema CAPTIA esperado",
             "Importamos las constantes del repo y mostramos los 7 buckets.",
             """\
 import json
@@ -275,7 +298,8 @@ print(json.dumps(DEFAULT_BUCKET_RETENTIONS, indent=2))
         ),
         setup_section(),
         section(
-            9, "Carga de datos o mock",
+            9,
+            "Carga de datos o mock",
             "Generamos 3 puntos: CO₂ a 712 ppm, T_indoor a 22.4 °C y un `ac_state` "
             "que se enrutará a `state_events`.",
             """\
@@ -306,7 +330,8 @@ puntos_mock
 """,
         ),
         section(
-            10, "Exploración paso a paso",
+            10,
+            "Exploración paso a paso",
             "Convertimos cada punto en line protocol y validamos los tags.",
             """\
 def to_line(p):
@@ -326,7 +351,8 @@ for p in puntos_mock:
 """,
         ),
         section(
-            11, "Transformación bronce → plata",
+            11,
+            "Transformación bronce → plata",
             "Las señales `_state` viajan por el mismo topic pero Telegraf las "
             "duplica al bucket `state_events` con dedup (solo en cambios de valor). "
             "Mostramos cómo se decide.",
@@ -341,11 +367,13 @@ for p in puntos_mock:
 """,
         ),
         section(
-            12, "Construcción de capa oro",
+            12,
+            "Construcción de capa oro",
             "No aplica para este notebook (focalizado en la capa plata).",
         ),
         section(
-            13, "Visualizaciones explicativas",
+            13,
+            "Visualizaciones explicativas",
             "Pintamos un diagrama de cardinalidad para mostrar cómo crecen las "
             "series cuando añadimos un nuevo `asset_id`.",
             """\
@@ -363,7 +391,8 @@ plt.tight_layout()
 """,
         ),
         section(
-            14, "Validaciones",
+            14,
+            "Validaciones",
             "Confirmamos que el schema construido cumple las invariantes del repo.",
             """\
 assert MEASUREMENT_TELEMETRY == "captia_point"
@@ -376,7 +405,8 @@ print("Schema OK:", linea)
 """,
         ),
         section(
-            15, "Errores comunes",
+            15,
+            "Errores comunes",
             "1. **Tag faltante**: si Telegraf falla al parsear el topic, ese punto se "
             "descarta silenciosamente. Verificar con `select(stat=count)` por aula.\n"
             "2. **Tipos inconsistentes**: si una variable se publica a veces como int "
@@ -386,14 +416,16 @@ print("Schema OK:", linea)
             "4. **Topic incorrecto**: omitir `/telemetry/` en el medio invalida el routing.",
         ),
         section(
-            16, "Ejercicios propuestos",
+            16,
+            "Ejercicios propuestos",
             "1. Construye line protocol para una variable nueva `air_change_per_hour`.\n"
             "2. Modifica `validate_canonical_tags` para hacer la advertencia de tags "
             "extras un error duro.\n"
             "3. Escribe una función `parse_topic(topic)` que extraiga los 5 tags.",
         ),
         section(
-            17, "Cómo se reutiliza con datos reales",
+            17,
+            "Cómo se reutiliza con datos reales",
             "Para `simarro-prod` los tags son idénticos; solo cambia `captia_env=prod`. "
             "Las queries Flux que escribiremos en notebooks posteriores funcionan tal cual.",
         ),
@@ -417,13 +449,15 @@ def _nb_02_conexion(target: Path) -> Path:
     title = "Conexión a InfluxDB con variables de entorno y `.env`"
     sections = [
         section(
-            1, "Objetivo",
+            1,
+            "Objetivo",
             "Disponer de una plantilla reutilizable para conectar con InfluxDB "
             "leyendo `.env`. Sin secretos en código. Un fallback claro para clase si "
             "el stack no está levantado.",
         ),
         section(
-            2, "Qué se aprende",
+            2,
+            "Qué se aprende",
             "- Cómo cargar `.env` con `python-dotenv` (o nuestro fallback).\n"
             "- Patrón `client = get_influx_client()` con el helper del repo.\n"
             "- Cómo distinguir modo offline (mock) y online (real).\n"
@@ -431,30 +465,35 @@ def _nb_02_conexion(target: Path) -> Path:
             "- Por qué nunca commitear el `.env`.",
         ),
         section(
-            3, "Contexto del caso de uso",
+            3,
+            "Contexto del caso de uso",
             "Cualquier notebook posterior asume que esta conexión funciona. Si "
             "estás en clase sin Influx levantado, declara `INFLUX_OFFLINE=true` y los "
             "notebooks `needs-stack` mostrarán datos mockeados.",
         ),
         section(
-            4, "Relación con CENTINELA+",
+            4,
+            "Relación con CENTINELA+",
             "El cliente que usaremos es **idéntico** al que usará CENTINELA+ contra "
             "`simarro-prod`. La única diferencia entre desarrollo y producción es la "
             "URL y el token. Esto es el corazón de la regla *cambio de credenciales, "
             "no reescritura*.",
         ),
         section(
-            5, "Relación con Medallion",
+            5,
+            "Relación con Medallion",
             "Este notebook es la **puerta de entrada a la capa plata**. Sin esta "
             "conexión nadie puede leer ni escribir.",
         ),
         section(
-            6, "Datos de entrada",
+            6,
+            "Datos de entrada",
             "El `.env` del repo (`.env.example` como referencia). Variables esperadas: "
             "`INFLUXDB_URL`, `INFLUXDB_TOKEN`, `INFLUXDB_ORG`, `INFLUXDB_BUCKET`.",
         ),
         section(
-            7, "Schema CAPTIA esperado",
+            7,
+            "Schema CAPTIA esperado",
             "El cliente solo se conecta al servidor; no escribe nada en este notebook. "
             "Las variables anteriores son del entorno, no del schema.",
         ),
@@ -463,7 +502,8 @@ def _nb_02_conexion(target: Path) -> Path:
             "disponible (si no, usamos el parser propio).",
         ),
         section(
-            9, "Carga de datos o mock",
+            9,
+            "Carga de datos o mock",
             "Inspeccionamos las variables clave (sin imprimir el token completo).",
             """\
 import os
@@ -480,7 +520,8 @@ print("OFFLINE MODE:", os.environ.get("INFLUX_OFFLINE", "false"))
 """,
         ),
         section(
-            10, "Exploración paso a paso",
+            10,
+            "Exploración paso a paso",
             "Intentamos abrir un cliente; si no se puede (sin servicios o sin "
             "`influxdb_client` instalado), mostramos cómo continuaríamos en modo offline.",
             """\
@@ -493,15 +534,18 @@ else:
 """,
         ),
         section(
-            11, "Transformación bronce → plata",
+            11,
+            "Transformación bronce → plata",
             "No aplica — este notebook prepara la herramienta, no la usa.",
         ),
         section(
-            12, "Construcción de capa oro",
+            12,
+            "Construcción de capa oro",
             "No aplica.",
         ),
         section(
-            13, "Visualizaciones explicativas",
+            13,
+            "Visualizaciones explicativas",
             "Pintamos una pequeña gráfica de la disponibilidad de servicios para "
             "documentar visualmente nuestro estado de stack en clase.",
             """\
@@ -522,7 +566,8 @@ estado.to_frame()
 """,
         ),
         section(
-            14, "Validaciones",
+            14,
+            "Validaciones",
             "Comprobaciones mínimas que un alumno debería pasar antes de continuar.",
             """\
 url = os.environ.get("INFLUXDB_URL")
@@ -534,7 +579,8 @@ print("Validaciones OK")
 """,
         ),
         section(
-            15, "Errores comunes",
+            15,
+            "Errores comunes",
             "1. **`INFLUXDB_TOKEN=CHANGE_ME...`** sin reemplazar. Generar con "
             "`openssl rand -hex 32`.\n"
             "2. **Olvidar arrancar el stack** (`make demo` o `task up`).\n"
@@ -544,7 +590,8 @@ print("Validaciones OK")
             "5. **Commitear `.env`**. Está en `.gitignore` por algo.",
         ),
         section(
-            16, "Ejercicios propuestos",
+            16,
+            "Ejercicios propuestos",
             "1. Añade un decorador `@requires_influx` que redirija a una función "
             "fallback con mocks si `client is None`.\n"
             "2. Implementa una función `ping(url)` que compruebe `/health` con `httpx`.\n"
@@ -552,7 +599,8 @@ print("Validaciones OK")
             "ausencia de placeholders.",
         ),
         section(
-            17, "Cómo se reutiliza con datos reales",
+            17,
+            "Cómo se reutiliza con datos reales",
             "Para conectar a `simarro-prod` (producción CAPTIA): cambiar `INFLUXDB_URL` "
             "al endpoint LAN o Tailscale del IES, usar `edu-token-simarro` con permiso "
             "read-only, y dejar `INFLUX_OFFLINE` sin definir. El resto del código no "
@@ -561,7 +609,9 @@ print("Validaciones OK")
         common_summary(
             next_notebook="01_case_A_pipeline_iot/01_explicacion_pipeline_centinela.ipynb",
             docs_link="docs/operations/environment.md",
-            extra_bullets=("La política de secretos del repo está en `docs/operations/environment.md`.",),
+            extra_bullets=(
+                "La política de secretos del repo está en `docs/operations/environment.md`.",
+            ),
         ),
     ]
     return emit(

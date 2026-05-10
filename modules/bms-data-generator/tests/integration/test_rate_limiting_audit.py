@@ -9,8 +9,6 @@ Cierra el hallazgo H-03 (`AUDIT_REPORT.md`).
 
 from __future__ import annotations
 
-import os
-
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -32,6 +30,7 @@ def app(monkeypatch):
     monkeypatch.setenv("BMS_API_TOKEN", "")
     reset_settings_cache()
     from bms_data_generator.main import create_app
+
     yield create_app()
     reset_settings_cache()
 
@@ -82,9 +81,7 @@ async def test_control_start_rate_limited_after_10(app):
         f"Rate limit demasiado agresivo: 429 en los primeros 10 hits: {initial}"
     )
     later = statuses[10:]
-    assert any(s == 429 for s in later), (
-        f"No hubo 429 tras 10 hits/min: {statuses}"
-    )
+    assert any(s == 429 for s in later), f"No hubo 429 tras 10 hits/min: {statuses}"
 
 
 @pytest.mark.integration

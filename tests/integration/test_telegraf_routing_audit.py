@@ -61,10 +61,7 @@ def test_all_on_change_variables_match_telegraf_clone_tagpass() -> None:
         kind = var.get("metric_kind")
         # storage_mode explicit overrides metric_kind inference
         storage = var.get("storage_mode")
-        is_on_change = (
-            storage == "on_change" or
-            (kind in {"bool_state", "setpoint_step"})
-        )
+        is_on_change = storage == "on_change" or (kind in {"bool_state", "setpoint_step"})
         if is_on_change:
             # Use production_name if present (that's what gets emitted).
             emit_name = var.get("production_name") or var["name"]
@@ -127,10 +124,12 @@ def test_telegraf_has_two_mqtt_consumers() -> None:
     # Identify by topics
     telemetry_topics = consumers[0]["topics"]
     event_topics = consumers[1]["topics"]
-    assert any("telemetry" in t for t in telemetry_topics), \
+    assert any("telemetry" in t for t in telemetry_topics), (
         f"primer mqtt_consumer no escucha telemetry topics: {telemetry_topics}"
-    assert any("event" in t for t in event_topics), \
+    )
+    assert any("event" in t for t in event_topics), (
         f"segundo mqtt_consumer no escucha event topics: {event_topics}"
+    )
 
 
 @pytest.mark.integration

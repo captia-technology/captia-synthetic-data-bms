@@ -40,7 +40,9 @@ def _load_scenario(path: Path) -> dict:
 def test_at_least_4_scenarios_exist() -> None:
     """Caso A (demo + e2e_host) + B + C + D = al menos 4 scenarios."""
     scenarios = _all_scenarios()
-    assert len(scenarios) >= 4, f"esperado ≥4 scenarios, got {len(scenarios)}: {[p.name for p in scenarios]}"
+    assert len(scenarios) >= 4, (
+        f"esperado ≥4 scenarios, got {len(scenarios)}: {[p.name for p in scenarios]}"
+    )
 
 
 @pytest.mark.integration
@@ -64,10 +66,12 @@ def test_scenario_has_required_top_level_keys(scenario_path: Path) -> None:
 @pytest.mark.parametrize("scenario_path", _all_scenarios(), ids=lambda p: p.name)
 def test_scenario_uses_canonical_site_and_domain(scenario_path: Path) -> None:
     data = _load_scenario(scenario_path)
-    assert data["project"]["site_id"] == "ies_simarro", \
+    assert data["project"]["site_id"] == "ies_simarro", (
         f"{scenario_path.name} site_id != ies_simarro"
-    assert data["domain"]["id"] == "bms_classrooms", \
+    )
+    assert data["domain"]["id"] == "bms_classrooms", (
         f"{scenario_path.name} domain.id != bms_classrooms"
+    )
 
 
 @pytest.mark.integration
@@ -94,9 +98,10 @@ def test_scenario_specifies_domain_config_path(scenario_path: Path) -> None:
         "Sin esto, vendor carga su domain.yaml default y las holidays T-PV-09 no se aplican."
     )
     # Debe apuntar a config/domains/bms_classrooms/domain.yaml (host o docker path).
-    assert "config/domains/bms_classrooms/domain.yaml" in config_path or \
-           "config\\domains\\bms_classrooms\\domain.yaml" in config_path, \
-           f"{scenario_path.name}: config_path={config_path!r} no apunta a domain.yaml local"
+    assert (
+        "config/domains/bms_classrooms/domain.yaml" in config_path
+        or "config\\domains\\bms_classrooms\\domain.yaml" in config_path
+    ), f"{scenario_path.name}: config_path={config_path!r} no apunta a domain.yaml local"
 
 
 @pytest.mark.integration
@@ -104,12 +109,14 @@ def test_scenario_specifies_domain_config_path(scenario_path: Path) -> None:
 def test_scenario_has_at_least_one_sink(scenario_path: Path) -> None:
     data = _load_scenario(scenario_path)
     sinks = data["sinks"]
-    assert isinstance(sinks, list) and len(sinks) >= 1, \
+    assert isinstance(sinks, list) and len(sinks) >= 1, (
         f"{scenario_path.name}: sinks debe ser lista no vacía"
+    )
     for s in sinks:
         assert "type" in s, f"{scenario_path.name}: sink sin type"
-        assert s["type"] in {"mqtt", "file", "stdout"}, \
+        assert s["type"] in {"mqtt", "file", "stdout"}, (
             f"{scenario_path.name}: sink type no canónico: {s['type']}"
+        )
 
 
 @pytest.mark.integration
@@ -127,9 +134,9 @@ def test_scenario_caseC_has_faults_yaml_referenced() -> None:
     s = yaml.dump(data)
     # Either explicit fault config_path, faults section, or faults_enabled flag.
     has_fault_ref = (
-        "faults" in s.lower() or
-        "fault_" in s.lower() or
-        any("fault" in str(v).lower() for v in data.get("domain", {}).values())
+        "faults" in s.lower()
+        or "fault_" in s.lower()
+        or any("fault" in str(v).lower() for v in data.get("domain", {}).values())
     )
     assert has_fault_ref, "Caso C scenario sin referencia explícita a faults config"
 

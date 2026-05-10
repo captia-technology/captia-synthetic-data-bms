@@ -42,7 +42,16 @@ bms-data-generator = { workspace = true }
 target-version = "py312"
 line-length = 100
 src = ["modules/bms-data-generator/src", "extensions/bms_calibration/src", "extensions/bms_signal_alias/src", "vendor/synthetic-generator/src"]
-extend-exclude = ["vendor/synthetic-generator"]
+# Notebooks (.ipynb) tienen imports por celda y nombres definidos en celdas
+# previas que el linter estático no resuelve. scripts/build_notebooks/ es el
+# builder que materializa los notebooks — su estilo es libre por diseño.
+extend-exclude = [
+    "vendor/synthetic-generator",
+    "notebooks",
+    "scripts/build_notebooks",
+    "scripts/_nb_builder.py",
+    ".claude/skills",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "B", "UP"]

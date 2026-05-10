@@ -13,25 +13,39 @@ SPEC = "docs/specs/synthetic-bms/01-product-spec.md"
 def _arq(target: Path) -> Path:
     title = "Caso H · 01 Arquitectura del chatbot — tools sobre InfluxDB + RAG documental"
     sections = [
-        section(1, "Objetivo",
-                "Comprender el patrón **tools (datos numéricos) + RAG (conocimiento "
-                "general)** y definir el conjunto de herramientas mínimo del chatbot."),
-        section(2, "Qué se aprende",
-                "- Decisión: pregunta → tool o pregunta → RAG.\n"
-                "- 6 herramientas básicas (`query_influxdb`, `compare_periods`, ...).\n"
-                "- Cómo mockear modelos predictivos para no bloquearse.\n"
-                "- Cómo separar conocimiento factual de conocimiento documental."),
-        section(3, "Contexto del caso de uso",
-                "Equipo H construye el chatbot integrador: usa modelos B y C/E como tools."),
-        section(4, "Relación con CENTINELA+",
-                "El chatbot va a producción tras la integración de los modelos en semana 3."),
+        section(
+            1,
+            "Objetivo",
+            "Comprender el patrón **tools (datos numéricos) + RAG (conocimiento "
+            "general)** y definir el conjunto de herramientas mínimo del chatbot.",
+        ),
+        section(
+            2,
+            "Qué se aprende",
+            "- Decisión: pregunta → tool o pregunta → RAG.\n"
+            "- 6 herramientas básicas (`query_influxdb`, `compare_periods`, ...).\n"
+            "- Cómo mockear modelos predictivos para no bloquearse.\n"
+            "- Cómo separar conocimiento factual de conocimiento documental.",
+        ),
+        section(
+            3,
+            "Contexto del caso de uso",
+            "Equipo H construye el chatbot integrador: usa modelos B y C/E como tools.",
+        ),
+        section(
+            4,
+            "Relación con CENTINELA+",
+            "El chatbot va a producción tras la integración de los modelos en semana 3.",
+        ),
         section(5, "Relación con Medallion", "Consume plata; oro = tools + RAG."),
         section(6, "Datos de entrada", "Conceptual."),
         section(7, "Schema CAPTIA esperado", "No aplica."),
         setup_section(),
-        section(9, "Carga de datos o mock",
-                "Tabla pregunta → mecanismo.",
-                """\
+        section(
+            9,
+            "Carga de datos o mock",
+            "Tabla pregunta → mecanismo.",
+            """\
 mapping = pd.DataFrame(
     [
         ("Dato puntual histórico", "tool: query_influxdb"),
@@ -44,9 +58,13 @@ mapping = pd.DataFrame(
     columns=["pregunta", "mecanismo"],
 )
 mapping
-"""),
-        section(10, "Exploración paso a paso", "Diagrama Mermaid.",
-                """\
+""",
+        ),
+        section(
+            10,
+            "Exploración paso a paso",
+            "Diagrama Mermaid.",
+            """\
 from IPython.display import Markdown
 Markdown('''```mermaid
 flowchart LR
@@ -58,61 +76,98 @@ flowchart LR
   P --> A
   S --> A
 ```''')
-"""),
+""",
+        ),
         section(11, "Transformación bronce → plata", "No aplica."),
         section(12, "Construcción de capa oro", "Tools en notebooks 02-03; RAG en 04."),
-        section(13, "Visualizaciones explicativas", "Distribución del golden set por categoría.",
-                """\
+        section(
+            13,
+            "Visualizaciones explicativas",
+            "Distribución del golden set por categoría.",
+            """\
 golden = pd.read_csv(ROOT / "notebooks/_data/chatbot_golden_set.csv")
 golden["category"].value_counts().plot.bar(color="#3F51B5")
 plt.title("Golden set — preguntas por categoría")
 plt.tight_layout()
-"""),
+""",
+        ),
         section(14, "Validaciones", "Tabla cargada."),
-        section(15, "Errores comunes",
-                "1. Indexar valores numéricos en ElasticSearch (incorrecto: usar tool).\n"
-                "2. Mockear modelos sin firma estable (cambiar firma rompe integraciones).\n"
-                "3. No registrar la trazabilidad de qué tool eligió el agente."),
-        section(16, "Ejercicios propuestos",
-                "1. Añade una categoría 'control' y discute si requiere tool nueva.\n"
-                "2. Diseña una política de fallback si la tool falla.\n"
-                "3. Discute si los predictores deberían ir en MLflow Server."),
-        section(17, "Cómo se reutiliza con datos reales",
-                "Cambiar `INFLUXDB_*` y endpoints de modelos. La arquitectura es estable."),
-        common_summary(next_notebook="08_case_H_rag_chatbot/02_tools_influxdb.ipynb",
-                       docs_link="docs/use-cases/case-h-rag-chatbot.md"),
+        section(
+            15,
+            "Errores comunes",
+            "1. Indexar valores numéricos en ElasticSearch (incorrecto: usar tool).\n"
+            "2. Mockear modelos sin firma estable (cambiar firma rompe integraciones).\n"
+            "3. No registrar la trazabilidad de qué tool eligió el agente.",
+        ),
+        section(
+            16,
+            "Ejercicios propuestos",
+            "1. Añade una categoría 'control' y discute si requiere tool nueva.\n"
+            "2. Diseña una política de fallback si la tool falla.\n"
+            "3. Discute si los predictores deberían ir en MLflow Server.",
+        ),
+        section(
+            17,
+            "Cómo se reutiliza con datos reales",
+            "Cambiar `INFLUXDB_*` y endpoints de modelos. La arquitectura es estable.",
+        ),
+        common_summary(
+            next_notebook="08_case_H_rag_chatbot/02_tools_influxdb.ipynb",
+            docs_link="docs/use-cases/case-h-rag-chatbot.md",
+        ),
     ]
-    return emit(target=target, rel_path="08_case_H_rag_chatbot/01_arquitectura_rag_tools.ipynb",
-                title=title, case=CASE, layer="oro", spec=SPEC, sections=sections)
+    return emit(
+        target=target,
+        rel_path="08_case_H_rag_chatbot/01_arquitectura_rag_tools.ipynb",
+        title=title,
+        case=CASE,
+        layer="oro",
+        spec=SPEC,
+        sections=sections,
+    )
 
 
 def _tools(target: Path) -> Path:
     title = "Caso H · 02 Tools sobre InfluxDB"
     sections = [
-        section(1, "Objetivo",
-                "Implementar `query_influxdb`, `compare_periods` y `get_building_state` con "
-                "fallback mock. Probar con un par de preguntas del golden set."),
-        section(2, "Qué se aprende",
-                "- Estructura de una tool: input strict, output JSON.\n"
-                "- Cómo serializar respuestas de Flux.\n"
-                "- Cómo distinguir 'sin datos' de 'error'."),
-        section(3, "Contexto del caso de uso",
-                "Tools son el corazón del chatbot. Estables y rápidas."),
-        section(4, "Relación con CENTINELA+",
-                "Las tools también las consume el Dashboard Adapter."),
+        section(
+            1,
+            "Objetivo",
+            "Implementar `query_influxdb`, `compare_periods` y `get_building_state` con "
+            "fallback mock. Probar con un par de preguntas del golden set.",
+        ),
+        section(
+            2,
+            "Qué se aprende",
+            "- Estructura de una tool: input strict, output JSON.\n"
+            "- Cómo serializar respuestas de Flux.\n"
+            "- Cómo distinguir 'sin datos' de 'error'.",
+        ),
+        section(
+            3, "Contexto del caso de uso", "Tools son el corazón del chatbot. Estables y rápidas."
+        ),
+        section(
+            4, "Relación con CENTINELA+", "Las tools también las consume el Dashboard Adapter."
+        ),
         section(5, "Relación con Medallion", "Lee plata."),
         section(6, "Datos de entrada", "InfluxDB (real o mock)."),
         section(7, "Schema CAPTIA esperado", "5 tags y `value`."),
         setup_section(),
-        section(9, "Carga de datos o mock",
-                "Cargamos un mock simple para offline.",
-                """\
+        section(
+            9,
+            "Carga de datos o mock",
+            "Cargamos un mock simple para offline.",
+            """\
 df, _ = mocks.make_ingauge_aula01_mock(days=2)
 df = df.set_index("timestamp")
 df.head()
-"""),
-        section(10, "Exploración paso a paso", "Implementamos las 3 tools.",
-                """\
+""",
+        ),
+        section(
+            10,
+            "Exploración paso a paso",
+            "Implementamos las 3 tools.",
+            """\
 def query_influxdb(variable: str, start: str = "-1d", aggregation: str = "mean",
                    asset_id: str = "AULA01") -> dict:
     \"\"\"Query simple. Si no hay cliente, usa el mock In-Gauge.\"\"\"
@@ -135,11 +190,14 @@ import os
 
 print(query_influxdb("co2", aggregation="mean"))
 print(query_influxdb("temperature_01", aggregation="max"))
-"""),
+""",
+        ),
         section(11, "Transformación bronce → plata", "No aplica."),
-        section(12, "Construcción de capa oro",
-                "Tools 2 y 3.",
-                """\
+        section(
+            12,
+            "Construcción de capa oro",
+            "Tools 2 y 3.",
+            """\
 def compare_periods(variable: str, p1: tuple[str, str], p2: tuple[str, str], aggregation: str = "mean") -> dict:
     return {
         "variable": variable,
@@ -158,56 +216,94 @@ def get_building_state(asset_id: str = "AULA01") -> dict:
 
 print(compare_periods("co2", ("-7d", "-1d"), ("-1d", "now")))
 print(get_building_state())
-"""),
-        section(13, "Visualizaciones explicativas", "Demo plot del estado.",
-                """\
+""",
+        ),
+        section(
+            13,
+            "Visualizaciones explicativas",
+            "Demo plot del estado.",
+            """\
 state = get_building_state()
 pd.Series(state).drop("asset_id").plot.bar(color="#3F51B5", figsize=(6, 3))
 plt.title("Estado AULA01 (mock)")
 plt.tight_layout()
-"""),
-        section(14, "Validaciones",
-                "Output siempre dict serializable.",
-                """\
+""",
+        ),
+        section(
+            14,
+            "Validaciones",
+            "Output siempre dict serializable.",
+            """\
 import json
 json.dumps(query_influxdb("co2"))
-"""),
-        section(15, "Errores comunes",
-                "1. Devolver pandas en vez de tipos primitivos — no serializa.\n"
-                "2. No envolver Flux exceptions.\n"
-                "3. No registrar la firma exacta para que el LLM la entienda."),
-        section(16, "Ejercicios propuestos",
-                "1. Añade `aggregation='median'`.\n"
-                "2. Implementa caché en Redis con `functools.lru_cache`.\n"
-                "3. Convierte a Pydantic models el output."),
-        section(17, "Cómo se reutiliza con datos reales",
-                "Cliente real conectado; el resto se mantiene."),
-        common_summary(next_notebook="08_case_H_rag_chatbot/03_mock_tools_modelos_predictivos.ipynb",
-                       docs_link="docs/use-cases/case-h-rag-chatbot.md"),
+""",
+        ),
+        section(
+            15,
+            "Errores comunes",
+            "1. Devolver pandas en vez de tipos primitivos — no serializa.\n"
+            "2. No envolver Flux exceptions.\n"
+            "3. No registrar la firma exacta para que el LLM la entienda.",
+        ),
+        section(
+            16,
+            "Ejercicios propuestos",
+            "1. Añade `aggregation='median'`.\n"
+            "2. Implementa caché en Redis con `functools.lru_cache`.\n"
+            "3. Convierte a Pydantic models el output.",
+        ),
+        section(
+            17,
+            "Cómo se reutiliza con datos reales",
+            "Cliente real conectado; el resto se mantiene.",
+        ),
+        common_summary(
+            next_notebook="08_case_H_rag_chatbot/03_mock_tools_modelos_predictivos.ipynb",
+            docs_link="docs/use-cases/case-h-rag-chatbot.md",
+        ),
     ]
-    return emit(target=target, rel_path="08_case_H_rag_chatbot/02_tools_influxdb.ipynb",
-                title=title, case=CASE, layer="oro", spec=SPEC, sections=sections)
+    return emit(
+        target=target,
+        rel_path="08_case_H_rag_chatbot/02_tools_influxdb.ipynb",
+        title=title,
+        case=CASE,
+        layer="oro",
+        spec=SPEC,
+        sections=sections,
+    )
 
 
 def _mocks(target: Path) -> Path:
     title = "Caso H · 03 Tools mock para modelos predictivos"
     sections = [
-        section(1, "Objetivo",
-                "Implementar `get_weather_prediction`, `get_consumption_prediction` y "
-                "`check_hvac_anomaly` como mocks que respetan la firma final."),
-        section(2, "Qué se aprende",
-                "- Por qué se mockean modelos en semanas 1-2.\n"
-                "- Firma estable como contrato entre equipos.\n"
-                "- Cuándo y cómo sustituir mock por real."),
-        section(3, "Contexto del caso de uso",
-                "Modelos B/C/E llegan en semana 3. Mientras: mocks plausibles."),
+        section(
+            1,
+            "Objetivo",
+            "Implementar `get_weather_prediction`, `get_consumption_prediction` y "
+            "`check_hvac_anomaly` como mocks que respetan la firma final.",
+        ),
+        section(
+            2,
+            "Qué se aprende",
+            "- Por qué se mockean modelos en semanas 1-2.\n"
+            "- Firma estable como contrato entre equipos.\n"
+            "- Cuándo y cómo sustituir mock por real.",
+        ),
+        section(
+            3,
+            "Contexto del caso de uso",
+            "Modelos B/C/E llegan en semana 3. Mientras: mocks plausibles.",
+        ),
         section(4, "Relación con CENTINELA+", "Idéntico."),
         section(5, "Relación con Medallion", "Oro."),
         section(6, "Datos de entrada", "Funciones puras."),
         section(7, "Schema CAPTIA esperado", "No aplica."),
         setup_section(),
-        section(9, "Carga de datos o mock", "Implementamos.",
-                """\
+        section(
+            9,
+            "Carga de datos o mock",
+            "Implementamos.",
+            """\
 def get_weather_prediction(variable: str, horizon_hours: int = 24) -> dict:
     base = {"temperature_outdoor": 22.0, "solar_irradiance": 350.0, "precipitation": 0.0}.get(variable, 0.0)
     return {"variable": variable, "horizon_h": horizon_hours,
@@ -223,63 +319,101 @@ def check_hvac_anomaly(asset_id: str = "AULA01") -> dict:
 print(get_weather_prediction("temperature_outdoor", 6))
 print(get_consumption_prediction(horizon_hours=12))
 print(check_hvac_anomaly())
-"""),
+""",
+        ),
         section(10, "Exploración paso a paso", "Test de firma."),
         section(11, "Transformación bronce → plata", "No aplica."),
         section(12, "Construcción de capa oro", "Adaptador a modelo real."),
-        section(13, "Visualizaciones explicativas", "Curva mock predicción 24h.",
-                """\
+        section(
+            13,
+            "Visualizaciones explicativas",
+            "Curva mock predicción 24h.",
+            """\
 preds = [get_weather_prediction("temperature_outdoor", h)["value"] for h in range(1, 25)]
 plt.figure(figsize=(8, 3))
 plt.plot(range(1, 25), preds, marker="o", color="#FF5722")
 plt.xlabel("horas adelante"); plt.ylabel("°C"); plt.title("Mock T outdoor 24h")
 plt.tight_layout()
-"""),
-        section(14, "Validaciones",
-                "Output JSON-serializable.",
-                """\
+""",
+        ),
+        section(
+            14,
+            "Validaciones",
+            "Output JSON-serializable.",
+            """\
 import json
 for fn in (get_weather_prediction, get_consumption_prediction, check_hvac_anomaly):
     res = fn() if fn is not get_weather_prediction else fn("temperature_outdoor")
     json.dumps(res)
-"""),
-        section(15, "Errores comunes",
-                "1. Cambiar la firma cuando llegue el modelo real.\n"
-                "2. Devolver 0 en lugar de un valor plausible.\n"
-                "3. Mock estático que no varía con el horizonte."),
-        section(16, "Ejercicios propuestos",
-                "1. Añade ruido al mock para emular incertidumbre.\n"
-                "2. Sustituye el mock por el modelo del Caso B real.\n"
-                "3. Diseña un protocolo gRPC para servir el modelo."),
-        section(17, "Cómo se reutiliza con datos reales",
-                "Cambiar la implementación interna; firma idéntica."),
-        common_summary(next_notebook="08_case_H_rag_chatbot/04_rag_documental.ipynb",
-                       docs_link="docs/use-cases/case-h-rag-chatbot.md"),
+""",
+        ),
+        section(
+            15,
+            "Errores comunes",
+            "1. Cambiar la firma cuando llegue el modelo real.\n"
+            "2. Devolver 0 en lugar de un valor plausible.\n"
+            "3. Mock estático que no varía con el horizonte.",
+        ),
+        section(
+            16,
+            "Ejercicios propuestos",
+            "1. Añade ruido al mock para emular incertidumbre.\n"
+            "2. Sustituye el mock por el modelo del Caso B real.\n"
+            "3. Diseña un protocolo gRPC para servir el modelo.",
+        ),
+        section(
+            17,
+            "Cómo se reutiliza con datos reales",
+            "Cambiar la implementación interna; firma idéntica.",
+        ),
+        common_summary(
+            next_notebook="08_case_H_rag_chatbot/04_rag_documental.ipynb",
+            docs_link="docs/use-cases/case-h-rag-chatbot.md",
+        ),
     ]
-    return emit(target=target, rel_path="08_case_H_rag_chatbot/03_mock_tools_modelos_predictivos.ipynb",
-                title=title, case=CASE, layer="oro", spec=SPEC, sections=sections)
+    return emit(
+        target=target,
+        rel_path="08_case_H_rag_chatbot/03_mock_tools_modelos_predictivos.ipynb",
+        title=title,
+        case=CASE,
+        layer="oro",
+        spec=SPEC,
+        sections=sections,
+    )
 
 
 def _rag(target: Path) -> Path:
     title = "Caso H · 04 RAG documental — TF-IDF como sustituto ligero de embeddings"
     sections = [
-        section(1, "Objetivo",
-                "Implementar un RAG mínimo (TF-IDF + cosine) sobre los 12 docs CENTINELA+ / "
-                "OMS / Medallion del repo. Sin LLM ni ElasticSearch externos."),
-        section(2, "Qué se aprende",
-                "- Tokenización + TF-IDF.\n"
-                "- Retrieval top-k.\n"
-                "- Cómo evaluar Recall@k con un golden set."),
-        section(3, "Contexto del caso de uso",
-                "TF-IDF demuestra el patrón sin necesitar GPU ni API keys. Cuando llegue "
-                "Sentence-Transformers, basta con cambiar el vectorizador."),
+        section(
+            1,
+            "Objetivo",
+            "Implementar un RAG mínimo (TF-IDF + cosine) sobre los 12 docs CENTINELA+ / "
+            "OMS / Medallion del repo. Sin LLM ni ElasticSearch externos.",
+        ),
+        section(
+            2,
+            "Qué se aprende",
+            "- Tokenización + TF-IDF.\n"
+            "- Retrieval top-k.\n"
+            "- Cómo evaluar Recall@k con un golden set.",
+        ),
+        section(
+            3,
+            "Contexto del caso de uso",
+            "TF-IDF demuestra el patrón sin necesitar GPU ni API keys. Cuando llegue "
+            "Sentence-Transformers, basta con cambiar el vectorizador.",
+        ),
         section(4, "Relación con CENTINELA+", "Mismo retriever; otro vectorizador en prod."),
         section(5, "Relación con Medallion", "Bronce: docs markdown; Plata: vectores; Oro: tool."),
         section(6, "Datos de entrada", "12 .md en `notebooks/_data/docs_rag_seed/`."),
         section(7, "Schema CAPTIA esperado", "No aplica."),
         setup_section(),
-        section(9, "Carga de datos o mock", "Cargamos los 12 docs.",
-                """\
+        section(
+            9,
+            "Carga de datos o mock",
+            "Cargamos los 12 docs.",
+            """\
 docs_dir = ROOT / "notebooks" / "_data" / "docs_rag_seed"
 docs = []
 for p in sorted(docs_dir.glob("*.md")):
@@ -287,9 +421,13 @@ for p in sorted(docs_dir.glob("*.md")):
 df_docs = pd.DataFrame(docs)
 print("docs:", len(df_docs))
 df_docs.head(3)
-"""),
-        section(10, "Exploración paso a paso", "TF-IDF + cosine.",
-                """\
+""",
+        ),
+        section(
+            10,
+            "Exploración paso a paso",
+            "TF-IDF + cosine.",
+            """\
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -303,12 +441,15 @@ def retrieve(query: str, k: int = 3):
     return df_docs.iloc[order].assign(score=sims[order]).reset_index(drop=True)
 
 print(retrieve("¿Qué es CENTINELA+?")[["id", "score"]])
-"""),
+""",
+        ),
         section(11, "Transformación bronce → plata", "Vectorizamos."),
         section(12, "Construcción de capa oro", "La función retrieve es la tool RAG."),
-        section(13, "Visualizaciones explicativas",
-                "Heatmap docs × queries del golden set.",
-                """\
+        section(
+            13,
+            "Visualizaciones explicativas",
+            "Heatmap docs × queries del golden set.",
+            """\
 gs = pd.read_csv(ROOT / "notebooks/_data/chatbot_golden_set.csv")
 gs_rag = gs[gs["expected_mechanism"] == "rag"].head(8)
 sims_matrix = cosine_similarity(vec.transform(gs_rag["question"]), M)
@@ -319,55 +460,90 @@ plt.yticks(range(len(gs_rag)), gs_rag["question"].str[:30] + "...")
 plt.xticks(range(len(df_docs)), df_docs["id"], rotation=90, fontsize=8)
 plt.title("Cosine similarity preguntas RAG vs docs")
 plt.tight_layout()
-"""),
-        section(14, "Validaciones",
-                "Top-1 score > 0 para todas las preguntas RAG.",
-                """\
+""",
+        ),
+        section(
+            14,
+            "Validaciones",
+            "Top-1 score > 0 para todas las preguntas RAG.",
+            """\
 for q in gs_rag["question"]:
     r = retrieve(q, k=1)
     assert r["score"].iloc[0] > 0
 print("Retrieval OK")
-"""),
-        section(15, "Errores comunes",
-                "1. Usar TF-IDF sin n-gramas (frases multi-palabra fallan).\n"
-                "2. Olvidar lemmatización en español.\n"
-                "3. No filtrar duplicados antes de indexar."),
-        section(16, "Ejercicios propuestos",
-                "1. Añade un re-ranker BM25.\n"
-                "2. Sustituye TF-IDF por `sentence-transformers/multilingual-e5`.\n"
-                "3. Implementa eval Recall@5 sobre golden set."),
-        section(17, "Cómo se reutiliza con datos reales",
-                "Mismo retriever; producción usa Sentence-Transformers + ES."),
-        common_summary(next_notebook="08_case_H_rag_chatbot/05_evaluacion_chatbot.ipynb",
-                       docs_link="docs/use-cases/case-h-rag-chatbot.md"),
+""",
+        ),
+        section(
+            15,
+            "Errores comunes",
+            "1. Usar TF-IDF sin n-gramas (frases multi-palabra fallan).\n"
+            "2. Olvidar lemmatización en español.\n"
+            "3. No filtrar duplicados antes de indexar.",
+        ),
+        section(
+            16,
+            "Ejercicios propuestos",
+            "1. Añade un re-ranker BM25.\n"
+            "2. Sustituye TF-IDF por `sentence-transformers/multilingual-e5`.\n"
+            "3. Implementa eval Recall@5 sobre golden set.",
+        ),
+        section(
+            17,
+            "Cómo se reutiliza con datos reales",
+            "Mismo retriever; producción usa Sentence-Transformers + ES.",
+        ),
+        common_summary(
+            next_notebook="08_case_H_rag_chatbot/05_evaluacion_chatbot.ipynb",
+            docs_link="docs/use-cases/case-h-rag-chatbot.md",
+        ),
     ]
-    return emit(target=target, rel_path="08_case_H_rag_chatbot/04_rag_documental.ipynb",
-                title=title, case=CASE, layer="oro", spec=SPEC, sections=sections)
+    return emit(
+        target=target,
+        rel_path="08_case_H_rag_chatbot/04_rag_documental.ipynb",
+        title=title,
+        case=CASE,
+        layer="oro",
+        spec=SPEC,
+        sections=sections,
+    )
 
 
 def _eval(target: Path) -> Path:
     title = "Caso H · 05 Evaluación del chatbot con golden set"
     sections = [
-        section(1, "Objetivo",
-                "Evaluar end-to-end el chatbot: relevancia (¿elige la tool correcta?), "
-                "coherencia (¿la respuesta tiene sentido?) y hallucination (¿inventa?)."),
-        section(2, "Qué se aprende",
-                "- Diseñar un golden set.\n"
-                "- Evaluación automática vía heurísticas + retrieval score.\n"
-                "- Métricas con LLM (mock)."),
+        section(
+            1,
+            "Objetivo",
+            "Evaluar end-to-end el chatbot: relevancia (¿elige la tool correcta?), "
+            "coherencia (¿la respuesta tiene sentido?) y hallucination (¿inventa?).",
+        ),
+        section(
+            2,
+            "Qué se aprende",
+            "- Diseñar un golden set.\n"
+            "- Evaluación automática vía heurísticas + retrieval score.\n"
+            "- Métricas con LLM (mock).",
+        ),
         section(3, "Contexto del caso de uso", "Cierra el ciclo con G4 (caso nuevo)."),
         section(4, "Relación con CENTINELA+", "Tarea diaria de auditoría del bot."),
         section(5, "Relación con Medallion", "Oro."),
         section(6, "Datos de entrada", "Golden set + tools del notebook 02-04."),
         section(7, "Schema CAPTIA esperado", "No aplica."),
         setup_section(),
-        section(9, "Carga de datos o mock", "Cargamos golden set.",
-                """\
+        section(
+            9,
+            "Carga de datos o mock",
+            "Cargamos golden set.",
+            """\
 gs = pd.read_csv(ROOT / "notebooks/_data/chatbot_golden_set.csv")
 print(gs["category"].value_counts())
-"""),
-        section(10, "Exploración paso a paso", "Una función `route()` que decide tool/RAG.",
-                """\
+""",
+        ),
+        section(
+            10,
+            "Exploración paso a paso",
+            "Una función `route()` que decide tool/RAG.",
+            """\
 def route(question: str) -> str:
     q = question.lower()
     if any(k in q for k in ["mañana", "predicción", "predicción"]):
@@ -387,39 +563,70 @@ def route(question: str) -> str:
 gs["routed"] = gs["question"].map(route)
 acc = (gs["routed"] == gs["expected_mechanism"]).mean()
 print(f"Routing accuracy: {acc:.2%}")
-"""),
+""",
+        ),
         section(11, "Transformación bronce → plata", "No aplica."),
-        section(12, "Construcción de capa oro", "Reporte por categoría.",
-                """\
+        section(
+            12,
+            "Construcción de capa oro",
+            "Reporte por categoría.",
+            """\
 report = (gs.assign(ok=gs["routed"] == gs["expected_mechanism"])
             .groupby("category")["ok"].mean().round(3))
 report
-"""),
-        section(13, "Visualizaciones explicativas", "Bar chart accuracy.",
-                """\
+""",
+        ),
+        section(
+            13,
+            "Visualizaciones explicativas",
+            "Bar chart accuracy.",
+            """\
 report.plot.bar(color="#3F51B5", figsize=(7, 3))
 plt.ylim(0, 1.05); plt.title("Routing accuracy por categoría")
 plt.tight_layout()
-"""),
-        section(14, "Validaciones", "Accuracy global > 0.6.",
-                """\
+""",
+        ),
+        section(
+            14,
+            "Validaciones",
+            "Accuracy global > 0.6.",
+            """\
 assert acc > 0.55
-"""),
-        section(15, "Errores comunes",
-                "1. Routing por keywords frágil — sustituir por LLM.\n"
-                "2. Golden set pequeño y poco diverso.\n"
-                "3. Evaluar solo accuracy y no hallucination rate."),
-        section(16, "Ejercicios propuestos",
-                "1. Reemplaza `route()` con un LLM con system prompt explícito.\n"
-                "2. Añade 20 preguntas más al golden set.\n"
-                "3. Mide hallucination con BM25 sobre la respuesta."),
-        section(17, "Cómo se reutiliza con datos reales",
-                "El golden set crece con el uso real (logging del bot)."),
-        common_summary(next_notebook="09_case_I_spark_vs_pandas/01_bdg2_overview.ipynb",
-                       docs_link="docs/use-cases/case-h-rag-chatbot.md"),
+""",
+        ),
+        section(
+            15,
+            "Errores comunes",
+            "1. Routing por keywords frágil — sustituir por LLM.\n"
+            "2. Golden set pequeño y poco diverso.\n"
+            "3. Evaluar solo accuracy y no hallucination rate.",
+        ),
+        section(
+            16,
+            "Ejercicios propuestos",
+            "1. Reemplaza `route()` con un LLM con system prompt explícito.\n"
+            "2. Añade 20 preguntas más al golden set.\n"
+            "3. Mide hallucination con BM25 sobre la respuesta.",
+        ),
+        section(
+            17,
+            "Cómo se reutiliza con datos reales",
+            "El golden set crece con el uso real (logging del bot).",
+        ),
+        common_summary(
+            next_notebook="09_case_I_spark_vs_pandas/01_bdg2_overview.ipynb",
+            docs_link="docs/use-cases/case-h-rag-chatbot.md",
+        ),
     ]
-    return emit(target=target, rel_path="08_case_H_rag_chatbot/05_evaluacion_chatbot.ipynb",
-                title=title, case=CASE, layer="oro", spec=SPEC, sections=sections)
+    return emit(
+        target=target,
+        rel_path="08_case_H_rag_chatbot/05_evaluacion_chatbot.ipynb",
+        title=title,
+        case=CASE,
+        layer="oro",
+        spec=SPEC,
+        sections=sections,
+    )
 
 
 def build(target: Path) -> int:

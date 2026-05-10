@@ -88,14 +88,22 @@ def _run_awk_parser_only(env: str, domain: str, site: str, ts: str) -> str:
     if awk_bin is None:
         pytest.skip("awk no disponible")
     proc = subprocess.run(
-        [awk_bin,
-         "-v", f"env={env}",
-         "-v", f"domain={domain}",
-         "-v", f"site={site}",
-         "-v", f"ts={ts}",
-         awk_program,
-         str(VARIABLES_YAML)],
-        capture_output=True, text=True, encoding="utf-8",
+        [
+            awk_bin,
+            "-v",
+            f"env={env}",
+            "-v",
+            f"domain={domain}",
+            "-v",
+            f"site={site}",
+            "-v",
+            f"ts={ts}",
+            awk_program,
+            str(VARIABLES_YAML),
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
     )
     assert proc.returncode == 0, f"awk failed: {proc.stderr}"
     return proc.stdout
@@ -124,8 +132,9 @@ def test_metadata_bootstrap_emits_5_canonical_tags_plus_asset_type() -> None:
     line = output.strip().split("\n")[0]
     tag_block = line.split(" ")[0].split(",", 1)[1]
     tag_keys = {t.split("=")[0] for t in tag_block.split(",")}
-    assert tag_keys == {"captia_env", "domain_id", "site_id", "asset_type", "variable"}, \
+    assert tag_keys == {"captia_env", "domain_id", "site_id", "asset_type", "variable"}, (
         f"unexpected tag keys: {tag_keys}"
+    )
 
 
 @pytest.mark.integration
@@ -146,12 +155,17 @@ def test_metadata_bootstrap_storage_mode_inferred() -> None:
         is_bool_state = 'metric_kind="bool_state"' in line
         is_setpoint = 'metric_kind="setpoint_step"' in line
         if is_bool_state or is_setpoint:
-            assert 'storage_mode="on_change"' in line, \
+            assert 'storage_mode="on_change"' in line, (
                 f"on_change variable missing storage_mode: {line[:120]}"
-        elif 'metric_kind="analog_gauge"' in line or 'metric_kind="counter"' in line \
-                or 'metric_kind="bool_presence"' in line:
-            assert 'storage_mode="continuous"' in line, \
+            )
+        elif (
+            'metric_kind="analog_gauge"' in line
+            or 'metric_kind="counter"' in line
+            or 'metric_kind="bool_presence"' in line
+        ):
+            assert 'storage_mode="continuous"' in line, (
                 f"continuous variable missing storage_mode: {line[:120]}"
+            )
 
 
 @pytest.mark.integration
@@ -198,16 +212,18 @@ def test_metadata_bootstrap_includes_vendor_name_when_renamed() -> None:
     found = False
     for line in output.strip().split("\n"):
         if ",variable=temperature_01 " in line:
-            assert 'vendor_name="temperature"' in line, \
+            assert 'vendor_name="temperature"' in line, (
                 f"temperature_01 missing vendor_name: {line[:200]}"
+            )
             found = True
             break
     assert found, "no temperature_01 record found"
 
     for line in output.strip().split("\n"):
         if ",variable=co2 " in line:
-            assert "vendor_name=" not in line, \
+            assert "vendor_name=" not in line, (
                 f"co2 should not have vendor_name (no rename): {line[:200]}"
+            )
             break
 
 
@@ -219,6 +235,7 @@ def test_metadata_bootstrap_init_script_is_valid_bash() -> None:
         pytest.skip("bash no disponible")
     proc = subprocess.run(
         [bash_bin, "-n", str(INIT_SCRIPT)],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     assert proc.returncode == 0, f"bash syntax error: {proc.stderr}"

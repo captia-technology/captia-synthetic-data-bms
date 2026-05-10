@@ -30,7 +30,7 @@ def _make_step_inputs(n: int = 240, freq_seconds: int = 5):
     index = pd.date_range("2026-05-09T08:00:00Z", periods=n, freq=f"{freq_seconds}s")
     setp = pd.Series([21.0] * n, index=index, name="setpoint")
     indoor_vals = np.full(n, 21.0)
-    indoor_vals[n // 4 : n // 2] = 16.0   # err = +5
+    indoor_vals[n // 4 : n // 2] = 16.0  # err = +5
     indoor_vals[n // 2 : 3 * n // 4] = 26.0  # err = -5
     indoor = pd.Series(indoor_vals, index=index, name="indoor")
     mode = pd.Series(["heat"] * n, index=index, name="hvac_mode")
@@ -54,7 +54,9 @@ def test_rate_zero_is_escape_hatch() -> None:
     _, indoor, setp, mode = _make_step_inputs()
     out_legacy = heating_valve_position(indoor, setp, mode)
     out_zero = heating_valve_position(
-        indoor, setp, mode,
+        indoor,
+        setp,
+        mode,
         cfg_indoor={"valve_max_rate_per_min": 0.0},
     )
     np.testing.assert_array_equal(out_legacy.values, out_zero.values)
@@ -65,7 +67,9 @@ def test_rate_limiter_caps_consecutive_delta() -> None:
     """Con max_rate=60 %/min y dt=5 s (=0.0833 min), el max step es 5 %."""
     _, indoor, setp, mode = _make_step_inputs()
     out = heating_valve_position(
-        indoor, setp, mode,
+        indoor,
+        setp,
+        mode,
         cfg_indoor={"valve_max_rate_per_min": 60.0},
     )
     diffs = out.diff().abs().dropna()

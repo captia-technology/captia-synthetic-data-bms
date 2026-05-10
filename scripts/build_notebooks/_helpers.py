@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 from scripts._nb_builder import SETUP_BLOCK, header, write_notebook
 
@@ -33,7 +33,9 @@ def emit(
         ser ``""`` para secciones que solo son markdown.
     """
     full_path = target / rel_path
-    cells: list[tuple[str, str]] = [("md", header(kind=kind, title=title, case=case, layer=layer, spec=spec))]
+    cells: list[tuple[str, str]] = [
+        ("md", header(kind=kind, title=title, case=case, layer=layer, spec=spec))
+    ]
     for md, code in sections:
         cells.append(("md", md))
         if code.strip():

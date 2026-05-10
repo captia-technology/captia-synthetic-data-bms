@@ -132,6 +132,7 @@ def _build_runner(config_path: Path) -> tuple[Any, Any]:
     # para que sobreviva al close() interno del runner y permita al fault_hook
     # emitir DataPoints adicionales después de runner.run().
     from ..config import get_settings
+
     if get_settings().faults_enabled and faults_config:
         sink = _LateCloseSink(sink)
 

@@ -81,6 +81,5 @@ def test_canonical_schema_rule_is_traced() -> None:
     assert "R-INF-01" in text
     # Y debe enlazar a al menos uno de los tests de telegraf.
     assert (
-        "test_telegraf_canonical_schema.py" in text
-        or "test_telegraf_routing_audit.py" in text
+        "test_telegraf_canonical_schema.py" in text or "test_telegraf_routing_audit.py" in text
     ), "R-INF-01 sin test trazable a telegraf"

@@ -14,13 +14,15 @@ def _nb_01_pipeline(target: Path) -> Path:
     title = "Pipeline IoT CENTINELA+ — explicación de las 5 capas"
     sections = [
         section(
-            1, "Objetivo",
+            1,
+            "Objetivo",
             "Comprender de extremo a extremo cómo CENTINELA+ recibe un dato real "
             "(sensor → MQTT → Telegraf → InfluxDB → Grafana) y por qué este "
             "proyecto reproduce ese mismo flujo con un generador sintético.",
         ),
         section(
-            2, "Qué se aprende",
+            2,
+            "Qué se aprende",
             "- Las 5 capas de CENTINELA+ y la responsabilidad de cada una.\n"
             "- Por qué Mosquitto y Telegraf no se comunican con la BD directamente.\n"
             "- Cómo se garantiza la entrega de mensajes (QoS 1, durabilidad).\n"
@@ -28,30 +30,35 @@ def _nb_01_pipeline(target: Path) -> Path:
             "- Vocabulario para todos los notebooks de este caso.",
         ),
         section(
-            3, "Contexto del caso de uso",
+            3,
+            "Contexto del caso de uso",
             "Caso A es el único caso de uso del proyecto que reproduce el "
             "pipeline IoT completo. El resto de equipos puede insertar directamente "
             "en InfluxDB; este equipo simula como si fuesen sensores reales.",
         ),
         section(
-            4, "Relación con CENTINELA+",
+            4,
+            "Relación con CENTINELA+",
             "Cada componente de este notebook es **idéntico** al desplegado en el "
             "edge server del IES Simarro. Cuando los sensores reales generen datos "
             "suficientes, basta con reorientar Telegraf al Mosquitto del edificio.",
         ),
         section(
-            5, "Relación con Medallion",
+            5,
+            "Relación con Medallion",
             "El equipo del Caso A vive en la frontera **bronce → plata**. El "
             "payload MQTT que sale del sensor es bronce; lo que entra a InfluxDB es "
             "plata.",
         ),
         section(
-            6, "Datos de entrada",
+            6,
+            "Datos de entrada",
             "Conceptual: no cargamos datasets. Mostraremos un payload de ejemplo y "
             "explicaremos cómo viaja por las capas.",
         ),
         section(
-            7, "Schema CAPTIA esperado",
+            7,
+            "Schema CAPTIA esperado",
             "El topic MQTT y el payload JSON; la línea final en InfluxDB.",
             """\
 topic = build_topic(env="dev", tenant="default", site="ies_simarro",
@@ -63,7 +70,8 @@ print("payload:", payload)
         ),
         setup_section(),
         section(
-            9, "Carga de datos o mock",
+            9,
+            "Carga de datos o mock",
             "Construimos un dataframe `flujo` que enumera cada capa, su tecnología, "
             "su responsabilidad y el formato de los datos que la atraviesan.",
             """\
@@ -81,7 +89,8 @@ flujo
 """,
         ),
         section(
-            10, "Exploración paso a paso",
+            10,
+            "Exploración paso a paso",
             "Pintamos un diagrama Mermaid en una celda Markdown que se renderiza en "
             "Jupyter (con la extensión correspondiente) y también en MkDocs Material.",
             """\
@@ -98,7 +107,8 @@ flowchart LR
 """,
         ),
         section(
-            11, "Transformación bronce → plata",
+            11,
+            "Transformación bronce → plata",
             "Telegraf se configura con un único bloque `mqtt_consumer` y dos outputs "
             "(uno a `telemetry`, otro a `state_events`). Reproducimos una versión "
             "minimal del fichero TOML.",
@@ -123,12 +133,14 @@ print(telegraf_minimal)
 """,
         ),
         section(
-            12, "Construcción de capa oro",
+            12,
+            "Construcción de capa oro",
             "El equipo Caso A no construye capa oro: su entregable es el pipeline. "
             "El **valor** queda en los dashboards Grafana y en la documentación.",
         ),
         section(
-            13, "Visualizaciones explicativas",
+            13,
+            "Visualizaciones explicativas",
             "Pintamos un timeline ficticio de la latencia esperada por capa (ms).",
             """\
 latencias_ms = pd.Series(
@@ -141,7 +153,8 @@ plt.tight_layout()
 """,
         ),
         section(
-            14, "Validaciones",
+            14,
+            "Validaciones",
             "Confirmamos que el topic generado cumple el contrato (6 niveles, "
             "`telemetry` o `event`).",
             """\
@@ -153,20 +166,23 @@ print("Topic OK:", topic)
 """,
         ),
         section(
-            15, "Errores comunes",
+            15,
+            "Errores comunes",
             "1. **Cambiar el orden del topic**. Telegraf no parsea y el dato se descarta.\n"
             "2. **Olvidar `fieldpass = ['value']`**. Aparecen fields adicionales que rompen `count(_field=='value')`.\n"
             "3. **Publicar con QoS 0**. En entornos lossy los puntos se pierden silenciosamente.\n"
             "4. **No tener `captia_metadata` poblado**. Las tareas Flux de downsampling no emiten para esa variable.",
         ),
         section(
-            16, "Ejercicios propuestos",
+            16,
+            "Ejercicios propuestos",
             "1. Añade un nivel `floor` al topic y enumera los cambios necesarios en Telegraf.\n"
             "2. Diseña un payload alternativo `{value, ts}` con ISO 8601 y discute pros/contras.\n"
             "3. Calcula cuántos mensajes/segundo debe sostener Telegraf con 70 aulas y 22 variables.",
         ),
         section(
-            17, "Cómo se reutiliza con datos reales",
+            17,
+            "Cómo se reutiliza con datos reales",
             "Cuando los sensores físicos del IES Simarro publiquen, basta con apuntar "
             "Telegraf al Mosquitto del edge server (100.102.212.105) y Telegraf "
             "escribirá en el InfluxDB local. El código no cambia.",
@@ -191,40 +207,47 @@ def _nb_02_publicacion(target: Path) -> Path:
     title = "Publicación MQTT a InfluxDB — del CSV al broker en velocidad acelerada"
     sections = [
         section(
-            1, "Objetivo",
+            1,
+            "Objetivo",
             "Tomar el mock In-Gauge de AULA01 (1 semana × 1 minuto) y publicarlo "
             "vía MQTT con topic canónico, simulando los sensores reales de "
             "CENTINELA+. Comprobar que cada mensaje aterriza en `captia_point`.",
         ),
         section(
-            2, "Qué se aprende",
+            2,
+            "Qué se aprende",
             "- Cómo usar `paho-mqtt` para publicar en Mosquitto.\n"
             "- Estructura del payload `{value, ts_ns}`.\n"
             "- Velocidad acelerada vs tiempo real.\n"
             "- Cómo verificar la llegada con una query Flux.",
         ),
         section(
-            3, "Contexto del caso de uso",
+            3,
+            "Contexto del caso de uso",
             "Los datasets públicos tienen resolución de minutos o segundos. "
             "Esperar a que pase el tiempo real sería absurdo para una clase. La "
             "técnica habitual es **publicar tan rápido como permita el broker**, "
             "pero conservando los timestamps originales del dataset.",
         ),
         section(
-            4, "Relación con CENTINELA+",
+            4,
+            "Relación con CENTINELA+",
             "Reproducimos el papel del firmware del sensor. La diferencia es que "
             "publicamos a velocidad acelerada para no esperar 7 días de clase.",
         ),
         section(
-            5, "Relación con Medallion",
+            5,
+            "Relación con Medallion",
             "Capa **bronce** (CSV In-Gauge) → **plata** (`captia_point` en InfluxDB).",
         ),
         section(
-            6, "Datos de entrada",
+            6,
+            "Datos de entrada",
             "`notebooks/_data/ingauge_aula01_mock.csv` (1 semana × 1min, 9 columnas).",
         ),
         section(
-            7, "Schema CAPTIA esperado",
+            7,
+            "Schema CAPTIA esperado",
             "Para cada fila del CSV producimos varios topics MQTT (uno por variable). "
             "Mapping In-Gauge → CAPTIA según `docs/specs/synthetic-bms/02-domain-spec.md`.",
             """\
@@ -246,9 +269,9 @@ mapping_ingauge
             "definimos un cliente mock que registra los mensajes en memoria.",
         ),
         section(
-            9, "Carga de datos o mock",
-            "Cargamos el CSV mock (con la cabecera `# MOCK ...`) y mostramos las "
-            "primeras filas.",
+            9,
+            "Carga de datos o mock",
+            "Cargamos el CSV mock (con la cabecera `# MOCK ...`) y mostramos las primeras filas.",
             """\
 csv_path = ROOT / "notebooks" / "_data" / "ingauge_aula01_mock.csv"
 df = pd.read_csv(csv_path, comment="#", parse_dates=["timestamp"])
@@ -256,7 +279,8 @@ df.head()
 """,
         ),
         section(
-            10, "Exploración paso a paso",
+            10,
+            "Exploración paso a paso",
             "Resumen estadístico del dataset y conteo por hora.",
             """\
 print("Filas:", len(df), "  Variables CSV:", len(df.columns) - 1)
@@ -264,7 +288,8 @@ df.set_index("timestamp").resample("1h").mean(numeric_only=True).head()
 """,
         ),
         section(
-            11, "Transformación bronce → plata",
+            11,
+            "Transformación bronce → plata",
             "Construimos los mensajes MQTT (topic + payload) que vamos a publicar. "
             "Si tenemos `paho-mqtt` y el broker funciona, publicamos; si no, los "
             "ponemos en una lista en memoria que demuestra el flujo.",
@@ -287,11 +312,13 @@ muestras[0]
 """,
         ),
         section(
-            12, "Construcción de capa oro",
+            12,
+            "Construcción de capa oro",
             "No aplica para este notebook (capa plata es el objetivo).",
         ),
         section(
-            13, "Visualizaciones explicativas",
+            13,
+            "Visualizaciones explicativas",
             "Distribución de mensajes por variable (debe ser uniforme: 8 variables × 25 filas = 200).",
             """\
 import collections
@@ -302,7 +329,8 @@ plt.tight_layout()
 """,
         ),
         section(
-            14, "Validaciones",
+            14,
+            "Validaciones",
             "Comprobamos que: cada topic tiene 6 niveles, el payload tiene los 2 "
             "campos requeridos, los timestamps son monotónicos por variable.",
             """\
@@ -323,7 +351,8 @@ for topic, payload in muestras[:3]:
 """,
         ),
         section(
-            15, "Errores comunes",
+            15,
+            "Errores comunes",
             "1. **No esperar entre `connect` y `publish`** — el cliente puede no haber "
             "completado el handshake.\n"
             "2. **Publicar a 1 Hz pero el broker rechaza** — confirmar QoS 1 y "
@@ -334,14 +363,16 @@ for topic, payload in muestras[:3]:
             "5. **Confundir `value` con `value_str`** — InfluxDB rechaza tipos mixtos.",
         ),
         section(
-            16, "Ejercicios propuestos",
+            16,
+            "Ejercicios propuestos",
             "1. Añade `valve_state` al mapping y publícala.\n"
             "2. Implementa `publish_with_backpressure(client, msgs, target_rate)` que "
             "envía a `target_rate` msgs/s usando `time.sleep`.\n"
             "3. Simula una pérdida del 5% de mensajes y mide el impacto.",
         ),
         section(
-            17, "Cómo se reutiliza con datos reales",
+            17,
+            "Cómo se reutiliza con datos reales",
             "Para enviar telemetría real basta con cambiar `MQTT_HOST` en `.env` y "
             "leer del topic real. La función `iter_mqtt_messages` se reusa palabra por "
             "palabra; solo cambia el origen de los datos.",
@@ -366,49 +397,57 @@ def _nb_03_validacion(target: Path) -> Path:
     title = "Validación Telegraf → InfluxDB → Grafana"
     sections = [
         section(
-            1, "Objetivo",
+            1,
+            "Objetivo",
             "Verificar que los mensajes publicados en el notebook anterior han "
             "llegado a InfluxDB con `captia_point`, los 5 tags correctos y el field "
             "`value` numérico.",
         ),
         section(
-            2, "Qué se aprende",
+            2,
+            "Qué se aprende",
             "- Cómo escribir queries Flux en Python.\n"
             "- Cómo confirmar el schema canónico desde el cliente.\n"
             "- Cómo invalidar un dataset (revertir, no editar) si algo está mal.\n"
             "- Cómo verificar el funcionamiento de los rollups.",
         ),
         section(
-            3, "Contexto del caso de uso",
+            3,
+            "Contexto del caso de uso",
             "Una vez se publica, el equipo Caso A debe demostrar que los dashboards "
             "de Grafana y los downsamples a 1m / 15m / 1h funcionan correctamente. "
             "Esta validación se hace con queries Flux ejecutadas desde Python.",
         ),
         section(
-            4, "Relación con CENTINELA+",
+            4,
+            "Relación con CENTINELA+",
             "Las queries que escribimos aquí son las mismas que ejecutará el "
             "Dashboard Adapter en producción cuando un alumno consulte AULA01 desde "
             "el chatbot del Caso H.",
         ),
         section(
-            5, "Relación con Medallion",
+            5,
+            "Relación con Medallion",
             "Estamos en la **capa plata**. La transformación bronce → plata ya "
             "ocurrió; aquí auditamos su correcto funcionamiento.",
         ),
         section(
-            6, "Datos de entrada",
+            6,
+            "Datos de entrada",
             "InfluxDB con los datos publicados. Si trabajamos en modo offline, "
             "construimos el resultado esperado a mano para comparar.",
         ),
         section(
-            7, "Schema CAPTIA esperado",
+            7,
+            "Schema CAPTIA esperado",
             "El resultado de la query debe contener filas con `captia_env=dev`, "
             "`domain_id=bms_classrooms`, `site_id=ies_simarro`, `asset_id=AULA01`, "
             "`variable=<algo>`, `_field=value`, `_value=<float>`.",
         ),
         setup_section(),
         section(
-            9, "Carga de datos o mock",
+            9,
+            "Carga de datos o mock",
             "Si el cliente está disponible, ejecutamos la query Flux contra el "
             "bucket `telemetry`. Si estamos offline, mostramos el resultado esperado.",
             """\
@@ -444,7 +483,8 @@ df_query.head()
 """,
         ),
         section(
-            10, "Exploración paso a paso",
+            10,
+            "Exploración paso a paso",
             "Comprobamos las columnas devueltas y la cardinalidad de tags.",
             """\
 import os
@@ -456,11 +496,13 @@ for tag in ["captia_env", "domain_id", "site_id", "asset_id", "variable"]:
 """,
         ),
         section(
-            11, "Transformación bronce → plata",
+            11,
+            "Transformación bronce → plata",
             "No aplica — auditamos la plata existente.",
         ),
         section(
-            12, "Construcción de capa oro",
+            12,
+            "Construcción de capa oro",
             "Como tarea didáctica, calculamos un agregador horario que sería "
             "idéntico al downsample de Influx. Esto sirve para entender qué hace "
             "el bucket `telemetry_1m`.",
@@ -473,7 +515,8 @@ else:
 """,
         ),
         section(
-            13, "Visualizaciones explicativas",
+            13,
+            "Visualizaciones explicativas",
             "Plot de la serie agregada (si hay datos).",
             """\
 if not df_query.empty:
@@ -482,7 +525,8 @@ if not df_query.empty:
 """,
         ),
         section(
-            14, "Validaciones",
+            14,
+            "Validaciones",
             "Las dos validaciones canónicas: 5 tags presentes y field único.",
             """\
 required = set(CANONICAL_TAGS)
@@ -497,7 +541,8 @@ print("Validaciones OK")
 """,
         ),
         section(
-            15, "Errores comunes",
+            15,
+            "Errores comunes",
             "1. **`influx_query` devuelve vacío**: confirmar `range(start)` y "
             "`asset_id`.\n"
             "2. **Field múltiple**: si aparece más de un `_field`, hay datos legacy.\n"
@@ -506,14 +551,16 @@ print("Validaciones OK")
             "internos son siempre UTC.",
         ),
         section(
-            16, "Ejercicios propuestos",
+            16,
+            "Ejercicios propuestos",
             "1. Escribe una query Flux que cuente puntos por aula en la última "
             "hora.\n"
             "2. Modifica la query para devolver solo `state_events`.\n"
             "3. Construye un dashboard Grafana con CO₂ y `ac_state` superpuestos.",
         ),
         section(
-            17, "Cómo se reutiliza con datos reales",
+            17,
+            "Cómo se reutiliza con datos reales",
             "El mismo notebook funciona sobre `simarro-prod`: cambiar `INFLUXDB_URL` "
             "y `INFLUXDB_TOKEN` en `.env`, y la query devuelve datos reales.",
         ),

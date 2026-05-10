@@ -35,9 +35,16 @@ def test_legacy_signature_preserved() -> None:
     index, outdoor, occ, setp, enable = _make_inputs()
     rng = np.random.default_rng(42)
     out = simulate_indoor_temperature(
-        index, outdoor, occ, setp, enable,
-        cfg_indoor={"tau_minutes": 90, "initial_temp": 28.0,
-                    "occupancy_heat_gain_c_per_person": 0.02},
+        index,
+        outdoor,
+        occ,
+        setp,
+        enable,
+        cfg_indoor={
+            "tau_minutes": 90,
+            "initial_temp": 28.0,
+            "occupancy_heat_gain_c_per_person": 0.02,
+        },
         rng=rng,
     )
     assert isinstance(out, pd.Series)
@@ -57,11 +64,24 @@ def test_tau_cool_equal_tau_is_escape_hatch() -> None:
     }
     rng_a = np.random.default_rng(42)
     out_with_mode = simulate_indoor_temperature(
-        index, outdoor, occ, setp, enable, cfg, rng_a, hvac_mode=mode,
+        index,
+        outdoor,
+        occ,
+        setp,
+        enable,
+        cfg,
+        rng_a,
+        hvac_mode=mode,
     )
     rng_b = np.random.default_rng(42)
     out_legacy = simulate_indoor_temperature(
-        index, outdoor, occ, setp, enable, cfg, rng_b,
+        index,
+        outdoor,
+        occ,
+        setp,
+        enable,
+        cfg,
+        rng_b,
     )
     np.testing.assert_array_almost_equal(out_with_mode.values, out_legacy.values)
 
@@ -80,11 +100,25 @@ def test_cool_reaches_setpoint_faster_than_heat() -> None:
     }
     rng_cool = np.random.default_rng(42)
     out_cool = simulate_indoor_temperature(
-        index, outdoor, occ, setp, enable, cfg, rng_cool, hvac_mode=mode_cool,
+        index,
+        outdoor,
+        occ,
+        setp,
+        enable,
+        cfg,
+        rng_cool,
+        hvac_mode=mode_cool,
     )
     rng_heat = np.random.default_rng(42)
     out_heat = simulate_indoor_temperature(
-        index, outdoor, occ, setp, enable, cfg, rng_heat, hvac_mode=mode_heat,
+        index,
+        outdoor,
+        occ,
+        setp,
+        enable,
+        cfg,
+        rng_heat,
+        hvac_mode=mode_heat,
     )
     # Tras 30 min (360 samples), cool debería estar más cerca del setpoint que heat.
     idx_30min = 360
@@ -114,13 +148,29 @@ def test_heat_mode_uses_tau_heat() -> None:
     }
     rng_a = np.random.default_rng(42)
     out_with_short_cool = simulate_indoor_temperature(
-        index, outdoor, occ, setp, enable, cfg_with_cool_short, rng_a, hvac_mode=mode_heat,
+        index,
+        outdoor,
+        occ,
+        setp,
+        enable,
+        cfg_with_cool_short,
+        rng_a,
+        hvac_mode=mode_heat,
     )
     rng_b = np.random.default_rng(42)
     out_legacy = simulate_indoor_temperature(
-        index, outdoor, occ, setp, enable, cfg_no_cool, rng_b, hvac_mode=mode_heat,
+        index,
+        outdoor,
+        occ,
+        setp,
+        enable,
+        cfg_no_cool,
+        rng_b,
+        hvac_mode=mode_heat,
     )
     # En modo heat, ambos deberían dar lo mismo (tau_cool_minutes ignorado).
     np.testing.assert_array_almost_equal(
-        out_with_short_cool.values, out_legacy.values, decimal=4,
+        out_with_short_cool.values,
+        out_legacy.values,
+        decimal=4,
     )

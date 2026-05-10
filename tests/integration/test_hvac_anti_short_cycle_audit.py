@@ -32,7 +32,8 @@ def _make_oscillating_inputs(n_samples: int = 240, freq_seconds: int = 5):
     setpoint = pd.Series([21.0] * n_samples, index=index, name="setpoint")
     indoor = pd.Series(
         21.0 + rng.normal(0, 0.5, n_samples),
-        index=index, name="indoor",
+        index=index,
+        name="indoor",
     )
     occ = pd.Series([10] * n_samples, index=index, name="occupancy")
     scene = pd.Series(["class"] * n_samples, index=index, name="scene_mode")
@@ -54,7 +55,10 @@ def test_min_dwell_zero_is_escape_hatch() -> None:
     _, indoor, setp, occ, scene = _make_oscillating_inputs()
     enable_legacy = hvac_enable(indoor, setp, occ, scene)
     enable_zero = hvac_enable(
-        indoor, setp, occ, scene,
+        indoor,
+        setp,
+        occ,
+        scene,
         cfg_indoor={"hvac_min_on_minutes": 0.0, "hvac_min_off_minutes": 0.0},
     )
     assert (enable_legacy.values == enable_zero.values).all()
@@ -66,7 +70,10 @@ def test_anti_short_cycle_reduces_toggles() -> None:
     _, indoor, setp, occ, scene = _make_oscillating_inputs(n_samples=240)
     enable_legacy = hvac_enable(indoor, setp, occ, scene)
     enable_dwell = hvac_enable(
-        indoor, setp, occ, scene,
+        indoor,
+        setp,
+        occ,
+        scene,
         cfg_indoor={"hvac_min_on_minutes": 5.0, "hvac_min_off_minutes": 5.0},
     )
     n_legacy = _toggles(enable_legacy.values)
@@ -82,7 +89,10 @@ def test_min_dwell_run_length_p10_above_threshold() -> None:
     """p10(run_length) ≥ 5 min con dwell=5 (regla R-HVAC-EN-03)."""
     _, indoor, setp, occ, scene = _make_oscillating_inputs(n_samples=720)
     enable = hvac_enable(
-        indoor, setp, occ, scene,
+        indoor,
+        setp,
+        occ,
+        scene,
         cfg_indoor={"hvac_min_on_minutes": 5.0, "hvac_min_off_minutes": 5.0},
     )
     arr = enable.values

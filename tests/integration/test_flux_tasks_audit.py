@@ -56,17 +56,22 @@ def test_six_tier_tasks_exist() -> None:
 @pytest.mark.integration
 def test_tier1_tasks_query_captia_point_meta() -> None:
     """Las tier-1 tasks consultan captia_metadata bucket con measurement captia_point_meta."""
-    tier1 = ["downsample_analog_1m", "downsample_presence_1m",
-             "downsample_state_1m", "downsample_counter_1m"]
+    tier1 = [
+        "downsample_analog_1m",
+        "downsample_presence_1m",
+        "downsample_state_1m",
+        "downsample_counter_1m",
+    ]
     for name in tier1:
         flux = _read_task(name)
         assert flux, f"task file empty: {name}"
-        assert 'from(bucket: "captia_metadata")' in flux, \
+        assert 'from(bucket: "captia_metadata")' in flux, (
             f"{name} no consulta captia_metadata bucket"
-        assert 'r._measurement == "captia_point_meta"' in flux, \
+        )
+        assert 'r._measurement == "captia_point_meta"' in flux, (
             f"{name} no filtra _measurement == captia_point_meta"
-        assert 'r._field == "metric_kind"' in flux, \
-            f"{name} no filtra _field == metric_kind"
+        )
+        assert 'r._field == "metric_kind"' in flux, f"{name} no filtra _field == metric_kind"
 
 
 @pytest.mark.integration
@@ -111,18 +116,22 @@ def test_continuous_tasks_use_telemetry_bucket() -> None:
     for name in ["downsample_analog_1m", "downsample_presence_1m", "downsample_counter_1m"]:
         flux = _read_task(name)
         assert 'from(bucket: "telemetry")' in flux, f"{name} debería leer telemetry"
-        assert 'r._measurement == "captia_point"' in flux, \
+        assert 'r._measurement == "captia_point"' in flux, (
             f"{name} debería filtrar captia_point en telemetry"
+        )
 
 
 @pytest.mark.integration
 def test_all_tier1_tasks_write_to_telemetry_1m() -> None:
     """Las 4 tasks tier-1 escriben a telemetry_1m bucket."""
-    for name in ["downsample_analog_1m", "downsample_presence_1m",
-                 "downsample_state_1m", "downsample_counter_1m"]:
+    for name in [
+        "downsample_analog_1m",
+        "downsample_presence_1m",
+        "downsample_state_1m",
+        "downsample_counter_1m",
+    ]:
         flux = _read_task(name)
-        assert 'to(bucket: "telemetry_1m"' in flux, \
-            f"{name} debería escribir a telemetry_1m"
+        assert 'to(bucket: "telemetry_1m"' in flux, f"{name} debería escribir a telemetry_1m"
 
 
 @pytest.mark.integration
@@ -131,7 +140,7 @@ def test_cascade_tasks_preserve_stat_tag() -> None:
     for name in ["downsample_15m", "downsample_1h"]:
         flux = _read_task(name)
         # Cascade tasks use `r.stat == "mean"` etc. as filters per stat type.
-        has_stat_handling = "r.stat ==" in flux or "set(key: \"stat\"" in flux
+        has_stat_handling = "r.stat ==" in flux or 'set(key: "stat"' in flux
         assert has_stat_handling, f"{name} debería filtrar/setear el tag stat en cascada"
 
 

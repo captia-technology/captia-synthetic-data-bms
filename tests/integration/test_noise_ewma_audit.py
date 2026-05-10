@@ -37,9 +37,7 @@ def test_legacy_no_tau_keeps_step() -> None:
     # En la transición 0→20 hay un salto > 15 dB en 1 sample (sin EWMA).
     transition_idx = len(out) // 2
     delta = abs(float(out.iloc[transition_idx] - out.iloc[transition_idx - 1]))
-    assert delta > 15.0, (
-        f"Sin EWMA esperamos salto > 15 dB en transición, got {delta:.2f}"
-    )
+    assert delta > 15.0, f"Sin EWMA esperamos salto > 15 dB en transición, got {delta:.2f}"
 
 
 @pytest.mark.integration
@@ -72,9 +70,7 @@ def test_tau_3min_smooths_transition() -> None:
     # Con tau=3 min, alpha = 5/180 = 0.0278; salto inicial ~0.0278 * 22 = 0.6 dB.
     # Tolerancia ≤ 3 dB para cubrir margen.
     p99 = float(np.quantile(diffs.values, 0.99))
-    assert p99 <= 3.0, (
-        f"Con tau=3 min, p99 |Δn| consecutivo debería ser ≤ 3 dB, got {p99:.2f}"
-    )
+    assert p99 <= 3.0, f"Con tau=3 min, p99 |Δn| consecutivo debería ser ≤ 3 dB, got {p99:.2f}"
 
 
 @pytest.mark.integration
@@ -91,9 +87,7 @@ def test_ewma_converges_to_target() -> None:
     out = simulate_noise(index, occ, cfg, rng)
     # Target en occ=20: 55 + 0.35 * 20 = 62 dB.
     final = float(out.iloc[-1])
-    assert abs(final - 62.0) < 1.0, (
-        f"Sin convergencia: final {final:.2f} dB, esperado ~62 ± 1"
-    )
+    assert abs(final - 62.0) < 1.0, f"Sin convergencia: final {final:.2f} dB, esperado ~62 ± 1"
 
 
 @pytest.mark.integration

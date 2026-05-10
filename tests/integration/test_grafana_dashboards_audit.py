@@ -129,4 +129,6 @@ def test_dashboard_uses_canonical_measurement(dashboard: Path) -> None:
     # Si tiene queries con _measurement, debe usar captia_point (no captia_metric o legacy)
     if "_measurement" in text:
         # No debe haber referencias a measurements legacy
-        assert "captia_metric" not in text, f"{dashboard.name} referencia measurement legacy 'captia_metric'"
+        assert "captia_metric" not in text, (
+            f"{dashboard.name} referencia measurement legacy 'captia_metric'"
+        )

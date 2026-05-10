@@ -263,19 +263,24 @@ def test_alias_sink_metrics_aggregate_across_emit_and_batch() -> None:
     sink = FakeSink()
     adapter = AliasSinkAdapter(sink, {"power": "power_01", "humidity": "relative-humidity"})
 
-    adapter.emit(FakeDataPoint("AULA01", "power", 100.0))         # renamed
-    adapter.emit(FakeDataPoint("AULA01", "co2", 600.0))            # passthrough
-    adapter.emit_batch([
-        FakeDataPoint("AULA01", "humidity", 55.0),                 # renamed
-        FakeDataPoint("AULA01", "fault.valve_stuck", 1.0),         # passthrough
-        FakeDataPoint("AULA02", "power", 250.0),                   # renamed
-    ])
+    adapter.emit(FakeDataPoint("AULA01", "power", 100.0))  # renamed
+    adapter.emit(FakeDataPoint("AULA01", "co2", 600.0))  # passthrough
+    adapter.emit_batch(
+        [
+            FakeDataPoint("AULA01", "humidity", 55.0),  # renamed
+            FakeDataPoint("AULA01", "fault.valve_stuck", 1.0),  # passthrough
+            FakeDataPoint("AULA02", "power", 250.0),  # renamed
+        ]
+    )
 
     assert adapter.renamed_count == 3
     assert adapter.passthrough_count == 2
     assert len(sink.emitted) == 5
     assert {p.variable for p in sink.emitted} == {
-        "power_01", "co2", "relative-humidity", "fault.valve_stuck",
+        "power_01",
+        "co2",
+        "relative-humidity",
+        "fault.valve_stuck",
     }
 
 
