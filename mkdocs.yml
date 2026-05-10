@@ -154,7 +154,8 @@ nav:
     - Dependabot: operations/dependabot.md
   - CAPTIA Corporate:
     - Presentación: captia-corporate/index.md
-    - Business case: captia-corporate/business-case.md
+    - Resumen ejecutivo (1 pág): captia-corporate/executive-summary.md
+    - Business case (ROI detallado): captia-corporate/business-case.md
   - Decisiones:
     - Índice ADR: decisions/index.md
   - Archivo:

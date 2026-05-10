@@ -55,7 +55,16 @@ def run_notebook(nb: Path, timeout: int) -> dict:
             capture_output=True,
             text=True,
             timeout=timeout + 60,
-            env={**os.environ, "PYTHONIOENCODING": "utf-8", "MPLBACKEND": "Agg"},
+            env={
+                **os.environ,
+                "PYTHONIOENCODING": "utf-8",
+                "MPLBACKEND": "Agg",
+                # Force notebooks to use mock data instead of trying to reach
+                # http://influxdb:8086 (Docker DNS) from the host runner. The
+                # _common.connection helper returns None when this is set, and
+                # all notebooks have a `if client is None` fallback path.
+                "INFLUX_OFFLINE": "true",
+            },
         )
         elapsed = time.time() - started
         if result.returncode == 0:
