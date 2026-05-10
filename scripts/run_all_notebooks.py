@@ -30,8 +30,7 @@ REPORT_PATH = REPO_ROOT / "docs" / "audit" / "NOTEBOOK_EXECUTION_REPORT.md"
 
 def find_notebooks() -> list[Path]:
     return sorted(
-        nb for nb in NOTEBOOKS_DIR.rglob("*.ipynb")
-        if ".ipynb_checkpoints" not in nb.parts
+        nb for nb in NOTEBOOKS_DIR.rglob("*.ipynb") if ".ipynb_checkpoints" not in nb.parts
     )
 
 
@@ -39,8 +38,12 @@ def run_notebook(nb: Path, timeout: int) -> dict:
     rel = nb.relative_to(REPO_ROOT)
     started = time.time()
     cmd = [
-        sys.executable, "-m", "jupyter", "nbconvert",
-        "--to", "notebook",
+        sys.executable,
+        "-m",
+        "jupyter",
+        "nbconvert",
+        "--to",
+        "notebook",
         "--execute",
         "--inplace",
         f"--ExecutePreprocessor.timeout={timeout}",
@@ -74,7 +77,8 @@ def run_notebook(nb: Path, timeout: int) -> dict:
             error_lines = (result.stderr or result.stdout).strip().splitlines()
             # Buscar líneas de error útiles
             relevant = [
-                ln for ln in error_lines
+                ln
+                for ln in error_lines
                 if any(kw in ln for kw in ("Error", "Traceback", "FAILED", "raise", "raised"))
             ]
             error = "\n".join(relevant[-8:]) if relevant else "\n".join(error_lines[-5:])
@@ -104,7 +108,7 @@ def write_report(results: list[dict], started_at: datetime) -> None:
         f"> **Generado:** {started_at.isoformat()}",
         f"> **Total notebooks:** {total}",
         f"> **PASS:** {n_pass} · **FAIL:** {n_fail} · **TIMEOUT:** {n_timeout}",
-        f"> **Tiempo total:** {total_secs/60:.1f} min ({total_secs:.0f} s)",
+        f"> **Tiempo total:** {total_secs / 60:.1f} min ({total_secs:.0f} s)",
         "",
         "## Resumen por caso de uso",
         "",
@@ -119,8 +123,7 @@ def write_report(results: list[dict], started_at: datetime) -> None:
         d["elapsed"] += r["elapsed_s"]
     for case, d in sorted(by_case.items()):
         lines.append(
-            f"| `{case}` | {d['PASS']} | {d['FAIL']} | {d['TIMEOUT']} | "
-            f"{d['elapsed']:.0f} |"
+            f"| `{case}` | {d['PASS']} | {d['FAIL']} | {d['TIMEOUT']} | {d['elapsed']:.0f} |"
         )
 
     lines += [
@@ -131,7 +134,11 @@ def write_report(results: list[dict], started_at: datetime) -> None:
         "|---|---|---:|---|",
     ]
     for r in results:
-        err_short = (r["error"][:140].replace("\n", " ") + "…") if len(r["error"]) > 140 else r["error"].replace("\n", " ")
+        err_short = (
+            (r["error"][:140].replace("\n", " ") + "…")
+            if len(r["error"]) > 140
+            else r["error"].replace("\n", " ")
+        )
         emoji = {"PASS": "✅", "FAIL": "❌", "TIMEOUT": "⏱"}.get(r["status"], "⚠")
         lines.append(
             f"| `{r['notebook']}` | {emoji} {r['status']} | "

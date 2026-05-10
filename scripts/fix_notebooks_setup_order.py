@@ -36,9 +36,7 @@ def fix_notebook(path: Path) -> bool:
         return False
     # If setup is already at position 0 or 1, we still want it before any other
     # code cell. Find the first code cell index.
-    first_code_idx = next(
-        (i for i, c in enumerate(cells) if c.cell_type == "code"), None
-    )
+    first_code_idx = next((i for i, c in enumerate(cells) if c.cell_type == "code"), None)
     if first_code_idx is None or setup_idx == first_code_idx:
         return False
     # Move setup before first code cell.
@@ -51,8 +49,7 @@ def fix_notebook(path: Path) -> bool:
 
 def main() -> int:
     notebooks = sorted(
-        nb for nb in NOTEBOOKS_DIR.rglob("*.ipynb")
-        if ".ipynb_checkpoints" not in nb.parts
+        nb for nb in NOTEBOOKS_DIR.rglob("*.ipynb") if ".ipynb_checkpoints" not in nb.parts
     )
     fixed = 0
     skipped = 0
