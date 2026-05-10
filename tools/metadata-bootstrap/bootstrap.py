@@ -153,14 +153,20 @@ def build_variable_lines(
     domain_id: str,
     domain_cfg: dict[str, Any],
     variables_cfg: dict[str, Any],
+    derivations_cfg: dict[str, Any] | None,
     captia_env: str,
     n_aulas_override: int | None,
 ) -> list[str]:
     """Build line-protocol for captia_point_meta — one row per (asset, variable).
 
-    LOCAL ADDITION (vs captia-connect): if a variable has `production_name:`,
-    use it as the canonical `variable` tag (matches simarro-prod ground truth).
-    Vendor `name` is preserved as a `vendor_name` field for traceability.
+    Combines TWO sources:
+      1. variables.yaml `asset_types.<type>.variables` — vendor-emitted vars
+         (uses `production_name:` if present, else `name`).
+      2. derivations.yaml `asset_types.<type>.derivations` — derived vars
+         (12 extra vars produced by AliasSinkAdapter from vendor signals).
+
+    Both are written to the same captia_point_meta measurement so the
+    catalog reflects exactly what lands in InfluxDB.
     """
     lines: list[str] = []
     site_info = DOMAIN_SITE_MAP.get(domain_id, {})
@@ -169,64 +175,120 @@ def build_variable_lines(
     ts_ns = int(time.time() * 1_000_000_000)
 
     asset_types_cfg = variables_cfg.get("asset_types", {})
+    derivations_asset_types = (derivations_cfg or {}).get("asset_types", {}) or {}
     assets = get_assets_for_domain(domain_id, domain_cfg, n_aulas_override)
 
     for asset_id, asset_type_name in assets:
+        # ---- Vendor variables (from variables.yaml) ----
         at_data = asset_types_cfg.get(asset_type_name, {})
         variables = at_data.get("variables", []) or []
         for var in variables:
             vendor_name = var.get("name", "")
             if not vendor_name:
                 continue
-
-            # LOCAL: prefer production_name if defined.
             canonical_name = var.get("production_name") or vendor_name
-
-            tags = {
-                "domain_id": domain_id,
-                "site_id": site_id,
-                "asset_id": asset_id,
-                "variable": canonical_name,
-                "captia_env": captia_env,
-                "asset_type": asset_type_name,
-            }
-            tag_str = _build_tag_str(tags)
-
-            metric_kind = var.get("metric_kind", "analog_gauge")
-            storage_mode = var.get("storage_mode") or _METRIC_KIND_STORAGE_MAP.get(
-                metric_kind, "continuous"
+            line = _build_variable_line(
+                domain_id=domain_id,
+                site_id=site_id,
+                asset_id=asset_id,
+                asset_type=asset_type_name,
+                captia_env=captia_env,
+                canonical_name=canonical_name,
+                vendor_name=vendor_name,
+                var_cfg=var,
+                entity_id_tag=entity_id_tag,
+                ts_ns=ts_ns,
+                source="vendor",
             )
+            lines.append(line)
 
-            rng = var.get("range", [])
-            display_name = DISPLAY_NAMES_ES.get(
-                canonical_name,
-                DISPLAY_NAMES_ES.get(vendor_name, vendor_name.replace("_", " ").title()),
+        # ---- Derivation variables (from derivations.yaml) ----
+        deriv_data = derivations_asset_types.get(asset_type_name, {})
+        derivations = deriv_data.get("derivations", []) or []
+        for d in derivations:
+            d_name = d.get("name", "")
+            if not d_name:
+                continue
+            d_meta = d.get("metadata", {}) or {}
+            line = _build_variable_line(
+                domain_id=domain_id,
+                site_id=site_id,
+                asset_id=asset_id,
+                asset_type=asset_type_name,
+                captia_env=captia_env,
+                canonical_name=d_name,
+                vendor_name=d.get("source", ""),
+                var_cfg=d_meta,
+                entity_id_tag=entity_id_tag,
+                ts_ns=ts_ns,
+                source=f"derivation:{d.get('transform', 'passthrough')}",
             )
-
-            fields: dict[str, Any] = {
-                "vendor_name": vendor_name,
-                "data_type": var.get("data_type", "float"),
-                "unit": var.get("unit", ""),
-                "category": var.get("category", "OTHER"),
-                "point_type": var.get("point_type", "sensor"),
-                "metric_kind": metric_kind,
-                "storage_mode": storage_mode,
-                "is_actuator": var.get("point_type", "") in ("actuator", "setpoint"),
-                "is_optional": bool(var.get("optional", False)),
-                "display_name": display_name,
-                "description": var.get("description", ""),
-                "entity_id_tag": entity_id_tag,
-                "schema_version": "1.0",
-                "updated_by": "metadata-bootstrap",
-            }
-            if isinstance(rng, list) and len(rng) >= 1 and isinstance(rng[0], (int, float)):
-                fields["range_min"] = float(rng[0])
-            if isinstance(rng, list) and len(rng) >= 2 and isinstance(rng[1], (int, float)):
-                fields["range_max"] = float(rng[1])
-
-            lines.append(f"{VARIABLE_MEASUREMENT},{tag_str} {_build_field_str(fields)} {ts_ns}")
+            lines.append(line)
 
     return lines
+
+
+def _build_variable_line(
+    *,
+    domain_id: str,
+    site_id: str,
+    asset_id: str,
+    asset_type: str,
+    captia_env: str,
+    canonical_name: str,
+    vendor_name: str,
+    var_cfg: dict[str, Any],
+    entity_id_tag: str,
+    ts_ns: int,
+    source: str,
+) -> str:
+    """Build a single line-protocol record for captia_point_meta."""
+    tags = {
+        "domain_id": domain_id,
+        "site_id": site_id,
+        "asset_id": asset_id,
+        "variable": canonical_name,
+        "captia_env": captia_env,
+        "asset_type": asset_type,
+    }
+    tag_str = _build_tag_str(tags)
+
+    metric_kind = var_cfg.get("metric_kind", "analog_gauge")
+    storage_mode = var_cfg.get("storage_mode") or _METRIC_KIND_STORAGE_MAP.get(
+        metric_kind, "continuous"
+    )
+    rng = var_cfg.get("range", [])
+    display_name = var_cfg.get(
+        "display_name",
+        DISPLAY_NAMES_ES.get(
+            canonical_name,
+            DISPLAY_NAMES_ES.get(vendor_name, canonical_name.replace("_", " ").title()),
+        ),
+    )
+
+    fields: dict[str, Any] = {
+        "vendor_name": vendor_name,
+        "data_type": var_cfg.get("data_type", "float"),
+        "unit": var_cfg.get("unit", ""),
+        "category": var_cfg.get("category", "OTHER"),
+        "point_type": var_cfg.get("point_type", "sensor"),
+        "metric_kind": metric_kind,
+        "storage_mode": storage_mode,
+        "is_actuator": var_cfg.get("point_type", "") in ("actuator", "setpoint"),
+        "is_optional": bool(var_cfg.get("optional", False)),
+        "display_name": display_name,
+        "description": var_cfg.get("description", ""),
+        "entity_id_tag": entity_id_tag,
+        "schema_version": "1.0",
+        "updated_by": "metadata-bootstrap",
+        "source": source,
+    }
+    if isinstance(rng, list) and len(rng) >= 1 and isinstance(rng[0], (int, float)):
+        fields["range_min"] = float(rng[0])
+    if isinstance(rng, list) and len(rng) >= 2 and isinstance(rng[1], (int, float)):
+        fields["range_max"] = float(rng[1])
+
+    return f"{VARIABLE_MEASUREMENT},{tag_str} {_build_field_str(fields)} {ts_ns}"
 
 
 def build_domain_line(domain_id: str, domain_cfg: dict[str, Any], captia_env: str) -> str:
@@ -426,12 +488,38 @@ def main() -> int:
         logger.error("Invalid YAML: %s", e)
         return 1
 
+    # derivations.yaml is OPTIONAL — back-compat with deployments without it.
+    derivations_path = domain_dir / "derivations.yaml"
+    derivations_cfg: dict[str, Any] | None = None
+    if derivations_path.exists():
+        try:
+            derivations_cfg = load_yaml(derivations_path)
+        except yaml.YAMLError as e:
+            logger.warning("derivations.yaml invalid (skipping): %s", e)
+            derivations_cfg = None
+
     all_lines: list[str] = [build_domain_line(args.domain, domain_cfg, args.env)]
-    var_lines = build_variable_lines(args.domain, domain_cfg, variables_cfg, args.env, args.n_aulas)
+    var_lines = build_variable_lines(
+        args.domain, domain_cfg, variables_cfg, derivations_cfg, args.env, args.n_aulas
+    )
     all_lines.extend(var_lines)
+
+    n_vendor = sum(
+        len((variables_cfg.get("asset_types", {}).get(at, {}) or {}).get("variables", []) or [])
+        for at in (variables_cfg.get("asset_types") or {})
+    )
+    n_derived = (
+        sum(
+            len((derivations_cfg.get("asset_types", {}).get(at, {}) or {}).get("derivations", []) or [])
+            for at in (derivations_cfg.get("asset_types") or {})
+        )
+        if derivations_cfg
+        else 0
+    )
     logger.info(
-        "Built: 1 captia_domain_meta + %d captia_point_meta = %d lines",
-        len(var_lines), len(all_lines),
+        "Built: 1 captia_domain_meta + %d captia_point_meta = %d lines "
+        "(per asset: %d vendor + %d derived = %d vars × %d aulas)",
+        len(var_lines), len(all_lines), n_vendor, n_derived, n_vendor + n_derived, args.n_aulas,
     )
 
     if args.dry_run:

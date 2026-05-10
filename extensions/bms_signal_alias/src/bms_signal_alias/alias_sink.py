@@ -1,17 +1,20 @@
-"""AliasSinkAdapter — wrapper que renombra variables vendor → producción.
+"""AliasSinkAdapter — wrapper que renombra y DERIVA variables vendor → producción.
 
-Usa el campo opcional ``production_name`` por entry en
-``config/domains/<domain>/variables.yaml`` para construir el mapping
-``vendor_name → production_name``. Aplica el rename a cada DataPoint antes
-de delegar al sink real.
+Dos responsabilidades:
+1. **Rename**: usa ``production_name`` en ``variables.yaml`` para construir
+   el mapping ``vendor_name → production_name`` y renombrar cada DataPoint.
+2. **Derive**: usa ``derivations.yaml`` para generar 0+ DataPoints derivados
+   por cada DataPoint original (ej. ``temperature`` → ``temperature-indoor``
+   con jitter, ``co2`` → ``t-voc`` con transform lineal).
 
-Cierra L-PV-01 (parcialmente) — los DataPoints emitidos a MQTT/file/Influx
-llevan los nombres canónicos de simarro-prod, lo que hace al generador
-sintético drop-in replacement de telemetría real.
+Cierra L-PV-01 completamente — los DataPoints emitidos a MQTT/file/Influx
+llevan los nombres canónicos de simarro-prod (21 vars rename + 12 vars
+derived = 33 vars en total), drop-in replacement de telemetría real.
 
 Cross-ref:
     docs/specs/digital-twin-bms-physics-validation/11-production-signal-mapping.md
     docs/specs/digital-twin-bms-physics-validation/07-validator-design.md
+    config/domains/bms_classrooms/derivations.yaml
 """
 
 from __future__ import annotations
@@ -23,6 +26,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
+from .derivations import Derivation, derive_points, load_derivations_yaml
 
 LOG = logging.getLogger("bms_signal_alias")
 
@@ -80,22 +85,34 @@ class AliasSinkAdapter:
                  presentes en el dict pasan sin renombrar.
     """
 
-    def __init__(self, real_sink: Any, aliases: dict[str, str]):
+    def __init__(
+        self,
+        real_sink: Any,
+        aliases: dict[str, str],
+        derivations: dict[str, list[Derivation]] | None = None,
+    ):
         self.real_sink = real_sink
         self.aliases = dict(aliases)
+        self.derivations = dict(derivations or {})
         self._renamed_count = 0
         self._passthrough_count = 0
+        self._derived_count = 0
+        n_derivations = sum(len(v) for v in self.derivations.values())
         LOG.info(
-            "AliasSinkAdapter wrapping %s with %d alias entries",
+            "AliasSinkAdapter wrapping %s with %d alias entries + %d derivations",
             type(real_sink).__name__,
             len(self.aliases),
+            n_derivations,
         )
 
     @classmethod
-    def from_yaml(cls, real_sink: Any, yaml_path: Path) -> AliasSinkAdapter:
-        """Construye el adapter cargando el mapping desde un fichero YAML."""
+    def from_yaml(
+        cls, real_sink: Any, yaml_path: Path, derivations_yaml: Path | None = None
+    ) -> AliasSinkAdapter:
+        """Construye el adapter cargando alias map + derivations desde YAMLs."""
         aliases = build_alias_map_from_yaml(yaml_path)
-        return cls(real_sink, aliases)
+        derivations = load_derivations_yaml(derivations_yaml) if derivations_yaml else {}
+        return cls(real_sink, aliases, derivations)
 
     @property
     def renamed_count(self) -> int:
@@ -104,6 +121,10 @@ class AliasSinkAdapter:
     @property
     def passthrough_count(self) -> int:
         return self._passthrough_count
+
+    @property
+    def derived_count(self) -> int:
+        return self._derived_count
 
     def open(self) -> None:
         if hasattr(self.real_sink, "open"):
@@ -118,16 +139,39 @@ class AliasSinkAdapter:
             self.real_sink.flush()
 
     def emit(self, point: Any) -> Any:
-        # Forward return value (vendor sinks may return None or int depending on impl).
-        return self.real_sink.emit(self._rename(point))
+        """Emit ORIGINAL (renamed) + DERIVED points to the real sink.
+
+        Order: derivations are computed BEFORE rename so they match against
+        vendor names (e.g. derivation source="temperature" matches before
+        the point gets renamed to "temperature_01").
+        """
+        derived = derive_points(point, self.derivations)
+        result = self.real_sink.emit(self._rename(point))
+        for d in derived:
+            self.real_sink.emit(self._rename(d))
+            self._derived_count += 1
+        return result
 
     def emit_batch(self, points: Iterable[Any]) -> int:
-        # BUG FIX (audit E2E):
-        #   - vendor FileSinkAdapter.emit_batch llama len(points) → falla con generator.
-        #     Materializamos a list para preservar compatibilidad con Sequence-based sinks.
-        #   - vendor ScenarioRunner.run_backfill hace `result.points_emitted += sink.emit_batch(batch)`.
-        #     emit_batch DEBE retornar int (cuenta de puntos emitidos). Forward return.
-        renamed = [self._rename(p) for p in points]
+        """Emit batch with derivations interleaved.
+
+        BUG FIX (audit E2E):
+          - vendor FileSinkAdapter.emit_batch llama len(points) → falla con generator.
+            Materializamos a list para preservar compatibilidad con Sequence-based sinks.
+          - vendor ScenarioRunner.run_backfill hace `result.points_emitted += sink.emit_batch(batch)`.
+            emit_batch DEBE retornar int (cuenta de puntos emitidos). Forward return.
+
+        Derivations: por cada point original, expandimos a [point + derived...]
+        ANTES de renombrar (para que `source` matchee vendor names).
+        """
+        expanded: list[Any] = []
+        for p in points:
+            expanded.append(p)
+            extras = derive_points(p, self.derivations)
+            expanded.extend(extras)
+            self._derived_count += len(extras)
+
+        renamed = [self._rename(p) for p in expanded]
         if hasattr(self.real_sink, "emit_batch"):
             n = self.real_sink.emit_batch(renamed)
             return n if n is not None else len(renamed)

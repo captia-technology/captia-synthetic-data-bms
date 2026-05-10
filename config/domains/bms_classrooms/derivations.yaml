@@ -1,0 +1,198 @@
+# =============================================================================
+# BMS Classrooms — Derivations: 12 production variables generated FROM vendor
+# variables to align with simarro-prod gateway BMS catalog (PPTX slide 14).
+# =============================================================================
+# Each derivation declares:
+#   name:           canonical production name (used as `variable` tag in InfluxDB)
+#   source:         vendor name (matched against DataPoint.variable BEFORE alias rename)
+#   transform:      transform function: passthrough | jitter | linear |
+#                   bool_to_speed | bool_to_intensity | threshold_to_bool
+#   params:         transform-specific parameters
+#   metadata:       inline metadata for captia_point_meta (catalog)
+#
+# Applied by extensions/bms_signal_alias/derivations.py inside the
+# AliasSinkAdapter, AFTER physics generation, BEFORE rename to production
+# name. Each emit(point) on the original variable spawns 0+ extra emits with
+# the derivation's `name` as `variable` tag.
+#
+# Cross-ref:
+#   docs/specs/digital-twin-bms-physics-validation/11-production-signal-mapping.md
+#   docs/archive/presentaciones/influxdb-simarro-buckets.pptx slide 14
+# =============================================================================
+
+asset_types:
+  classroom:
+    derivations:
+
+      # ── Sensors derived (continuous) ─────────────────────────────────────
+      - name: temperature-indoor
+        source: temperature
+        transform: jitter
+        params: { stddev: 0.3 }
+        metadata:
+          data_type: float
+          unit: "°C"
+          point_type: sensor
+          metric_kind: analog_gauge
+          category: ENVIRONMENTAL
+          range: [10.0, 35.0]
+          display_name: "Temperatura Interior"
+          description: "Sensor termo ambiente (segundo canal, ligeramente desfasado del termo principal)"
+
+      - name: t-voc
+        source: co2
+        transform: linear
+        params: { a: 0.5, b: -200, noise_stddev: 10.0, clip_min: 0.0, clip_max: 1500.0 }
+        metadata:
+          data_type: float
+          unit: "ppb"
+          point_type: sensor
+          metric_kind: analog_gauge
+          category: ENVIRONMENTAL
+          range: [0.0, 1500.0]
+          display_name: "TVOC"
+          description: "Compuestos orgánicos volátiles totales (correlados con CO₂)"
+
+      - name: max-sound-level
+        source: noise
+        transform: linear
+        params: { a: 1.15, b: 0, noise_stddev: 5.0, clip_min: 0.0, clip_max: 110.0 }
+        metadata:
+          data_type: float
+          unit: "dB(A)"
+          point_type: sensor
+          metric_kind: analog_gauge
+          category: ENVIRONMENTAL
+          range: [0.0, 110.0]
+          display_name: "Nivel Sonoro (pico)"
+          description: "Pico instantáneo del nivel sonoro (típicamente 1.1-1.2× la media)"
+
+      # ── Aire (sensor + relé del HVAC secundario) ─────────────────────────
+      - name: aire
+        source: presence_pir
+        transform: passthrough
+        params: {}
+        metadata:
+          data_type: float
+          unit: ""
+          point_type: sensor
+          metric_kind: bool_presence
+          category: HVAC
+          range: [0.0, 1.0]
+          display_name: "Sensor Aire"
+          description: "Sensor presencia/calidad aire ambiente (bool)"
+
+      - name: aire_state
+        source: hvac_enable
+        transform: passthrough
+        params: {}
+        metadata:
+          data_type: float
+          unit: ""
+          point_type: actuator
+          metric_kind: bool_state
+          category: HVAC
+          range: [0.0, 1.0]
+          display_name: "Estado Relé Aire"
+          description: "Estado on/off del relé del sistema de aire"
+
+      # ── Fan speeds (3 ventiladores con velocidades numéricas) ────────────
+      - name: fan_speed_01
+        source: relay_3
+        transform: bool_to_speed
+        params: { speed_on: 60.0, speed_off: 0.0, jitter_stddev: 5.0 }
+        metadata:
+          data_type: float
+          unit: "%"
+          point_type: actuator
+          metric_kind: analog_gauge
+          category: HVAC
+          range: [0.0, 100.0]
+          display_name: "Velocidad Ventilador 1"
+          description: "Velocidad del ventilador 1 cuando está activo (0-100%)"
+
+      - name: fan_speed_02
+        source: relay_4
+        transform: bool_to_speed
+        params: { speed_on: 80.0, speed_off: 0.0, jitter_stddev: 5.0 }
+        metadata:
+          data_type: float
+          unit: "%"
+          point_type: actuator
+          metric_kind: analog_gauge
+          category: HVAC
+          range: [0.0, 100.0]
+          display_name: "Velocidad Ventilador 2"
+          description: "Velocidad del ventilador 2 cuando está activo (0-100%)"
+
+      - name: fan_speed_03
+        source: hvac_enable
+        transform: bool_to_speed
+        params: { speed_on: 100.0, speed_off: 0.0, jitter_stddev: 5.0 }
+        metadata:
+          data_type: float
+          unit: "%"
+          point_type: actuator
+          metric_kind: analog_gauge
+          category: HVAC
+          range: [0.0, 100.0]
+          display_name: "Velocidad Ventilador 3"
+          description: "Velocidad del ventilador 3 (atado al estado HVAC principal)"
+
+      - name: fan_speed_03_state
+        source: hvac_enable
+        transform: passthrough
+        params: {}
+        metadata:
+          data_type: float
+          unit: ""
+          point_type: actuator
+          metric_kind: bool_state
+          category: HVAC
+          range: [0.0, 1.0]
+          display_name: "Estado Ventilador 3"
+          description: "Estado on/off del ventilador 3"
+
+      # ── Lights con intensidad numérica (además del relay state) ──────────
+      - name: light_01
+        source: relay_1
+        transform: bool_to_intensity
+        params: { intensity_on: 85.0, intensity_off: 0.0, jitter_stddev: 10.0, clip_max: 100.0 }
+        metadata:
+          data_type: float
+          unit: "%"
+          point_type: actuator
+          metric_kind: analog_gauge
+          category: CONTROL
+          range: [0.0, 100.0]
+          display_name: "Intensidad Luz 1"
+          description: "Intensidad luminosa del grupo de luces 1 cuando está encendido (0-100%)"
+
+      - name: light_02
+        source: relay_2
+        transform: bool_to_intensity
+        params: { intensity_on: 85.0, intensity_off: 0.0, jitter_stddev: 10.0, clip_max: 100.0 }
+        metadata:
+          data_type: float
+          unit: "%"
+          point_type: actuator
+          metric_kind: analog_gauge
+          category: CONTROL
+          range: [0.0, 100.0]
+          display_name: "Intensidad Luz 2"
+          description: "Intensidad luminosa del grupo de luces 2 cuando está encendido (0-100%)"
+
+      # ── Valve feedback (bool derivado de la posición continua) ───────────
+      - name: valve_state
+        source: heating_valve_pos
+        transform: threshold_to_bool
+        params: { threshold: 5.0 }
+        metadata:
+          data_type: float
+          unit: ""
+          point_type: actuator
+          metric_kind: bool_state
+          category: HVAC
+          range: [0.0, 1.0]
+          display_name: "Estado Válvula"
+          description: "Feedback bool de la posición de la válvula (>5% = abierta)"

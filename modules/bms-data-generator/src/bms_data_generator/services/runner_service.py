@@ -371,24 +371,35 @@ def _maybe_wrap_with_alias(sinks: list, config_path: Path, domain_id: str) -> li
     if not settings.production_alias_enabled:
         return sinks
 
-    from bms_signal_alias import AliasSinkAdapter, build_alias_map_from_yaml
+    from bms_signal_alias import (
+        AliasSinkAdapter,
+        build_alias_map_from_yaml,
+        load_derivations_yaml,
+    )
 
     variables_yaml = _resolve_domain_config_path(config_path, domain_id, "variables.yaml")
     aliases = build_alias_map_from_yaml(variables_yaml)
-    if not aliases:
+
+    # Load derivations.yaml (12 production vars derived from vendor signals).
+    # Backwards compatible: if file doesn't exist, derivations dict is empty.
+    derivations_yaml = _resolve_domain_config_path(config_path, domain_id, "derivations.yaml")
+    derivations = load_derivations_yaml(derivations_yaml) if derivations_yaml.exists() else {}
+    n_derivations = sum(len(v) for v in derivations.values())
+
+    if not aliases and not derivations:
         LOG.info(
-            "production_alias enabled but no aliases found at %s — skipping wrap",
-            variables_yaml,
+            "production_alias enabled but no aliases or derivations found "
+            "(variables.yaml=%s, derivations.yaml=%s) — skipping wrap",
+            variables_yaml, derivations_yaml,
         )
         return sinks
 
     LOG.info(
-        "wrapping %d sink(s) with AliasSinkAdapter (%d aliases) using %s",
-        len(sinks),
-        len(aliases),
-        variables_yaml,
+        "wrapping %d sink(s) with AliasSinkAdapter "
+        "(%d aliases from %s, %d derivations from %s)",
+        len(sinks), len(aliases), variables_yaml, n_derivations, derivations_yaml,
     )
-    return [AliasSinkAdapter(s, aliases) for s in sinks]
+    return [AliasSinkAdapter(s, aliases, derivations) for s in sinks]
 
 
 def _build_fault_emitter_hook(
