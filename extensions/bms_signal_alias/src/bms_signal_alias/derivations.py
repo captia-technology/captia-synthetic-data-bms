@@ -248,5 +248,4 @@ def derive_iterable(
     """Yield each input point followed by its derived points (flat stream)."""
     for p in points:
         yield p
-        for d in derive_points(p, derivations_by_source):
-            yield d
+        yield from derive_points(p, derivations_by_source)
