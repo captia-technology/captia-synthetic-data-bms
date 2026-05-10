@@ -37,6 +37,11 @@ class _Job:
     finished_at: datetime | None = None
     points_emitted: int = 0
     error: str | None = None
+    # FIX (2026-05-10): referencia al ScenarioRunner del vendor para que
+    # RunnerService.stop() pueda parar el publisher loop (vendor.runner._running).
+    # Sin esto, el thread del job seguía publicando MQTT tras stop(),
+    # produciendo zombi clients con mismo client_id que saturaban el broker.
+    runner: Any = None
 
 
 @contextmanager
@@ -113,7 +118,16 @@ def _build_runner(config_path: Path) -> tuple[Any, Any]:
     sinks: list = []
     for sink_cfg in config.sinks:
         if sink_cfg.type == SinkType.MQTT:
-            sinks.append(MQTTSinkAdapter(MQTTSinkConfig(**sink_cfg.config)))
+            mqtt_kwargs = dict(sink_cfg.config)
+            # FIX (2026-05-10): el broker MQTT desconecta cualquier cliente
+            # anterior con el mismo client_id (MQTT spec). Si dos instancias
+            # del generator (host + container, o jobs simultáneos) usan el
+            # mismo client_id "captia-bms-generator-demo", entran en un loop
+            # de reconexiones que satura el broker y descarta mensajes hacia
+            # Telegraf. Sufijo único garantiza separación.
+            base_id = mqtt_kwargs.get("client_id") or "captia-bms-gen"
+            mqtt_kwargs["client_id"] = f"{base_id}-{uuid.uuid4().hex[:8]}"
+            sinks.append(MQTTSinkAdapter(MQTTSinkConfig(**mqtt_kwargs)))
         elif sink_cfg.type == SinkType.FILE:
             sinks.append(FileSinkAdapter(FileSinkConfig(**sink_cfg.config)))
         elif sink_cfg.type == SinkType.STDOUT:
@@ -127,6 +141,12 @@ def _build_runner(config_path: Path) -> tuple[Any, Any]:
     sinks = _maybe_wrap_with_alias(sinks, config_path, config.domain.id)
 
     sink = sinks[0] if len(sinks) == 1 else CompositeSink(sinks)
+
+    # FIX (2026-05-10): wrap final sink con métricas Prometheus para que
+    # captia_bms_messages_published_total y captia_bms_connected reflejen
+    # el estado real del MQTT publisher. El vendor sink no instrumenta
+    # nada de prometheus_client por sí mismo.
+    sink = _MetricsCountingSink(sink)
 
     # T-PV-08 + T-PV-30: si faults activos, envuelve sink con _LateCloseSink
     # para que sobreviva al close() interno del runner y permita al fault_hook
@@ -143,6 +163,93 @@ def _build_runner(config_path: Path) -> tuple[Any, Any]:
     if fault_hook is not None:
         return runner, sink, fault_hook
     return runner, sink
+
+
+class _MetricsCountingSink:
+    """Sink wrapper que actualiza counters Prometheus en cada emit/open/close.
+
+    Conforma con ``SinkAdapterPort``: open/close/emit/emit_batch/flush.
+    Engancha:
+      - ``captia_bms_messages_published_total{topic}`` por cada DataPoint emit.
+      - ``captia_bms_connected`` (Gauge 0/1) en open/close.
+      - ``captia_bms_publish_errors_total{topic, reason}`` en excepciones.
+
+    Sin esto, las métricas del API quedan en 0 aunque el sink real publique
+    correctamente (el vendor sink no instrumenta prometheus_client).
+    """
+
+    def __init__(self, real_sink: Any):
+        self.real_sink = real_sink
+
+    @property
+    def name(self) -> str:
+        return getattr(self.real_sink, "name", "metrics_counting")
+
+    def open(self) -> None:
+        if hasattr(self.real_sink, "open"):
+            self.real_sink.open()
+        try:
+            from .. import metrics
+
+            metrics.CONNECTED.set(1)
+        except Exception:  # noqa: BLE001
+            pass
+
+    def close(self) -> None:
+        try:
+            from .. import metrics
+
+            metrics.CONNECTED.set(0)
+        except Exception:  # noqa: BLE001
+            pass
+        if hasattr(self.real_sink, "close"):
+            self.real_sink.close()
+
+    def flush(self) -> None:
+        if hasattr(self.real_sink, "flush"):
+            self.real_sink.flush()
+
+    def emit(self, point: Any) -> Any:
+        result = self.real_sink.emit(point)
+        self._record_one(point)
+        return result
+
+    def emit_batch(self, points: Any) -> int:
+        # Materializa para poder contar y delegar.
+        materialized = list(points) if not isinstance(points, list) else points
+        n = self.real_sink.emit_batch(materialized) if hasattr(self.real_sink, "emit_batch") else None
+        if n is None:
+            for p in materialized:
+                self.real_sink.emit(p)
+            n = len(materialized)
+        for p in materialized:
+            self._record_one(p)
+        return n
+
+    def _record_one(self, point: Any) -> None:
+        try:
+            from .. import metrics
+
+            variable = getattr(point, "variable", "unknown")
+            metrics.record_publish(topic=str(variable), count=1)
+            asset = getattr(point, "asset_id", "unknown")
+            domain = getattr(point, "domain_id", "bms_classrooms") or "bms_classrooms"
+            metrics.record_points(domain=domain, asset=asset, count=1)
+        except Exception:  # noqa: BLE001 — métrica opcional, no romper publish
+            pass
+
+    # Forward AliasSink-specific properties (mantiene introspección de tests).
+    @property
+    def renamed_count(self) -> int:
+        return getattr(self.real_sink, "renamed_count", 0)
+
+    @property
+    def passthrough_count(self) -> int:
+        return getattr(self.real_sink, "passthrough_count", 0)
+
+    @property
+    def aliases(self) -> dict:
+        return getattr(self.real_sink, "aliases", {})
 
 
 class _LateCloseSink:
@@ -437,6 +544,12 @@ class RunnerService:
     def _run_job(self, job_id: str, config_path: Path) -> None:
         with self._lock:
             self._jobs[job_id].phase = "running"
+            try:
+                from .. import metrics
+
+                metrics.ACTIVE_JOBS.inc()
+            except Exception:  # noqa: BLE001 — metrics opcional
+                pass
         try:
             if not config_path.is_file():
                 raise FileNotFoundError(f"config not found: {config_path}")
@@ -447,6 +560,11 @@ class RunnerService:
             else:
                 runner, _sink = factory_result
                 fault_hook = None
+            # FIX: registra runner para que stop() pueda señalizar al loop
+            # interno del vendor (`runner._running = False`) y permitir
+            # graceful shutdown sin dejar threads zombi publicando MQTT.
+            with self._lock:
+                self._jobs[job_id].runner = runner
             results = runner.run()
             points = sum(getattr(r, "points_emitted", 0) for r in results)
             # T-PV-30: post-run hook emits FaultEvents to the sink (Caso C real).
@@ -471,6 +589,15 @@ class RunnerService:
             with self._lock:
                 if self._active_job_id == job_id:
                     self._active_job_id = None
+                # Limpia referencia al runner — el thread terminó y el sink
+                # ya cerró su conexión MQTT (o lo hará en run()'s finally).
+                self._jobs[job_id].runner = None
+                try:
+                    from .. import metrics
+
+                    metrics.ACTIVE_JOBS.dec()
+                except Exception:  # noqa: BLE001
+                    pass
 
     def _fail(self, job_id: str, reason: str) -> None:
         with self._lock:
@@ -488,6 +615,12 @@ class RunnerService:
             self._jobs[job_id].finished_at = datetime.now(tz=UTC)
             if job_id in self._stop_flags:
                 self._stop_flags[job_id].set()
+            # FIX (2026-05-10): señaliza al runner del vendor para que su
+            # publisher loop salga (sin esto, el thread seguía publicando
+            # MQTT con el mismo client_id, colisionando con futuros jobs).
+            runner = self._jobs[job_id].runner
+            if runner is not None and hasattr(runner, "_running"):
+                runner._running = False
             if self._active_job_id == job_id:
                 self._active_job_id = None
 
