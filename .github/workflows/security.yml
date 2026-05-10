@@ -67,7 +67,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run Trivy on filesystem
-        uses: aquasecurity/trivy-action@0.36.0
+        # NOTA: las tags reales del repo son `vX.Y.Z` (con prefijo `v`).
+        # `@0.36.0` (sin v) no resuelve aunque dependabot lo sugiera así.
+        uses: aquasecurity/trivy-action@master
         with:
           scan-type: fs
           format: sarif
