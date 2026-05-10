@@ -32,6 +32,7 @@ flowchart LR
 | Quiero… | Sección | Tiempo |
 |---|---|---|
 | **Levantar el stack en local** y ver `make demo` funcionando | [Empezar → Quickstart](QUICKSTART.md) | ~5 min |
+| **Configurar y visualizar datos** en Grafana, MQTTX-Web, InfluxDB, Prometheus, Loki | [Operaciones → Visualizar datos](operations/visualizing-data.md) | ~10 min |
 | **Entender qué hay en cada servicio** del compose | [Arquitectura → Visión general](architecture/index.md) | ~10 min |
 | **Validar que el modelo físico es plausible** | [Modelo físico → Resumen](physical-model/index.md) | ~15 min |
 | **Comparar contra CAPTIA-connect** upstream | [Auditoría → Consistencia](audit/CONSISTENCY_MATRIX.md) | ~10 min |
