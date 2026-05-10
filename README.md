@@ -2,11 +2,11 @@
 
 # CAPTIA-SYNTHETIC-DATA-BMS
 
-**Generador de datos sintéticos BMS (Building Management System) para CAPTIA**
+**Get Started — levanta el stack BMS en 5 pasos y visualiza datos en menos de 10 minutos**
 
-Microservicio listo para producir 6–12 meses de telemetría sintética conforme al schema canónico CAPTIA, publicarla por MQTT a Telegraf → InfluxDB y visualizarla en Grafana — todo en un único `task quickstart`.
-
+[![Documentation Site](https://img.shields.io/badge/docs-captia--technology.github.io-2451FF.svg?logo=materialformkdocs&logoColor=white)](https://captia-technology.github.io/captia-synthetic-data-bms/)
 [![CI](https://github.com/captia-technology/captia-synthetic-data-bms/actions/workflows/ci.yml/badge.svg)](https://github.com/captia-technology/captia-synthetic-data-bms/actions/workflows/ci.yml)
+[![Deploy Docs](https://github.com/captia-technology/captia-synthetic-data-bms/actions/workflows/deploy-docs.yml/badge.svg)](https://github.com/captia-technology/captia-synthetic-data-bms/actions/workflows/deploy-docs.yml)
 [![Security](https://github.com/captia-technology/captia-synthetic-data-bms/actions/workflows/security.yml/badge.svg)](https://github.com/captia-technology/captia-synthetic-data-bms/actions/workflows/security.yml)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-3776ab.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
@@ -14,246 +14,287 @@ Microservicio listo para producir 6–12 meses de telemetría sintética conform
 [![InfluxDB 2.7](https://img.shields.io/badge/InfluxDB-2.7-22ADF6.svg?logo=influxdb&logoColor=white)](https://www.influxdata.com/)
 [![Grafana 11.4](https://img.shields.io/badge/Grafana-11.4-F46800.svg?logo=grafana&logoColor=white)](https://grafana.com/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
 [![Spec-Driven](https://img.shields.io/badge/spec--driven-yes-2ea44f)](docs/specs/synthetic-bms/)
-[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](.pre-commit-config.yaml)
+
+📖 **Documentación completa**: <https://captia-technology.github.io/captia-synthetic-data-bms/>
 
 </div>
 
-> **¿Qué es esto?** Una pieza autocontenida que genera telemetría realista de aulas educativas
-> (CO₂, temperatura, humedad, ruido, ocupación, climatización, consumo) y la entrega exactamente
-> con los topics MQTT, measurement y tags que usa CAPTIA-CONNECT en producción. Sirve para entrenar
-> modelos de predicción de consumo, detección de anomalías HVAC, calidad de aire y como banco de
-> pruebas del pipeline IoT entero.
+> **¿Qué es esto?** Un microservicio que genera telemetría sintética realista de aulas
+> educativas (CO₂, temperatura, humedad, ocupación, climatización, consumo eléctrico),
+> la publica con los topics MQTT y schema exactos de CAPTIA-CONNECT en producción y la
+> visualiza end-to-end (MQTT → Telegraf → InfluxDB → Grafana). Sirve para entrenar
+> modelos de ML, probar el pipeline IoT entero o como banco de pruebas docente.
 
 ---
 
-## Índice
+## Lo que vas a tener funcionando en 10 minutos
 
-1. [TL;DR — diez segundos](#tldr--diez-segundos)
-2. [Arquitectura](#arquitectura)
-3. [Quickstart](#quickstart)
-4. [Casos de uso](#casos-de-uso)
-5. [Notebooks didácticos](#notebooks-didácticos)
-6. [API HTTP](#api-http)
-7. [Schema canónico CAPTIA](#schema-canónico-captia)
-8. [Stack y versiones](#stack-y-versiones)
-9. [Configuración](#configuración)
-10. [Comandos `task` / `make`](#comandos-task--make)
-11. [Tests y calidad](#tests-y-calidad)
-12. [Documentación y specs](#documentación-y-specs)
-13. [FAQ](#faq)
-14. [Contribuir](#contribuir)
-15. [Licencia y soporte](#licencia-y-soporte)
+```text
+                  ┌────────────────────────────────────────────┐
+                  │  Tu navegador (localhost)                  │
+                  │  ─────────────────────────────────         │
+                  │   :3001  Grafana       (4 dashboards)      │
+                  │   :8083  MQTTX-Web     (cliente MQTT)      │
+                  │   :8087  InfluxDB UI   (Flux queries)      │
+                  │   :9090  Prometheus    (métricas)          │
+                  │   :8121  /docs         (OpenAPI generator) │
+                  └─────────────────┬──────────────────────────┘
+                                    │
+        ┌───────────────────────────┴───────────────────────────┐
+        │  Stack Docker Compose (red `captia-bms-network`)      │
+        │                                                       │
+        │   bms-data-generator ──► Mosquitto ──► Telegraf       │
+        │                            │                          │
+        │                            ▼                          │
+        │   InfluxDB (7 buckets) ◄── ┘                          │
+        │       │                                               │
+        │       └──► Grafana ◄── Prometheus ◄── (scrape)        │
+        │                                                       │
+        │                  Loki ◄── Promtail (logs)             │
+        └───────────────────────────────────────────────────────┘
+```
+
+10 contenedores: `bms-data-generator`, `mosquitto`, `telegraf`, `influxdb`,
+`grafana`, `prometheus`, `loki`, `promtail`, `redis`, `mqttx-web`. Todos
+con healthchecks; todos con tag fijo (no `latest`).
 
 ---
 
-## TL;DR — diez segundos
+## Antes de empezar: requisitos
+
+| Herramienta | Versión mínima | Para qué |
+|-------------|----------------|----------|
+| **Docker Desktop** | 24+ con Compose v2 | Ejecuta los 10 contenedores |
+| **Git** | 2.0+ | Clonar el repo |
+| **Make** | GNU Make 3.81+ | Atajos `make demo`, `make smoke`, etc. |
+| **Bash** | 4.0+ (incluido en Git for Windows) | Los scripts `.sh` lo necesitan |
+
+> **Windows**: Git for Windows ya trae `bash` (Git Bash). Para `make`:
+> `winget install GnuWin32.Make` o `scoop install make`. **macOS**: `brew install make`.
+> **Linux**: ya viene.
+
+Verifica que tienes todo:
+
+```bash
+docker --version           # >= 24
+docker compose version     # v2
+git --version              # >= 2
+make --version             # >= 3.81
+bash --version             # >= 4
+```
+
+---
+
+## Get Started en 5 pasos
+
+### Paso 1 · Clonar el repo (30 s)
 
 ```bash
 git clone https://github.com/captia-technology/captia-synthetic-data-bms.git
 cd captia-synthetic-data-bms
-task quickstart        # ó: make quickstart
 ```
 
-Eso genera tu `.env` con secretos aleatorios, levanta los nueve contenedores, espera healthchecks,
-ejecuta la suite smoke y te imprime las URL locales. Grafana queda en
-http://localhost:3001 con `admin / admin`.
-
----
-
-## Arquitectura
-
-```mermaid
-flowchart LR
-    USER[Usuario / curl / dashboard]
-    subgraph net["captia-network (Docker Compose)"]
-        subgraph svc["bms-data-generator (FastAPI :8120)"]
-            API["/v1/control · /v1/datasets<br/>/healthz · /readyz · /metrics"]
-            RUN[RunnerService]
-            DUMP[DumpService]
-        end
-        EXT["extensions/<br/>bms_calibration"]
-        VEND["vendor/<br/>synthetic-generator (BMS-only)"]
-        MOS[(Mosquitto<br/>2.0.18)]
-        TEL[Telegraf 1.32]
-        INF[(InfluxDB 2.7<br/>6 buckets + 5 Flux tasks)]
-        REDIS[(Redis 7)]
-        GRAF[Grafana 11.4<br/>4 dashboards]
-        PROM[Prometheus]
-        LOKI[(Loki)]
-        PT[Promtail]
-    end
-
-    USER -- HTTP --> API
-    API --> RUN
-    API --> DUMP
-    RUN --> VEND
-    DUMP --> VEND
-    EXT --> VEND
-    VEND -- paho-mqtt --> MOS
-    DUMP -. line-protocol file .-> USER
-    MOS --> TEL --> INF
-    GRAF --> INF
-    GRAF --> PROM
-    GRAF --> LOKI
-    GRAF --> REDIS
-    PROM -- scrape --> svc
-    PT -- docker socket --> LOKI
-```
-
-- **`vendor/synthetic-generator/`** — copia controlada del motor hexagonal interno de CAPTIA, recortada al dominio `bms_classrooms` (parche `001-bms-only.patch`).
-- **`extensions/bms_calibration/`** — calendario lectivo de Valencia 2025-2026, inyector de cuatro tipos de fallos HVAC y hooks de calibración real.
-- **`modules/bms-data-generator/`** — control plane FastAPI con jobs en threads daemon, métricas Prometheus y logs JSON.
-- **`compose/` + `infra/`** — el stack docker reproducible.
-
-Detalle completo en [`docs/specs/synthetic-bms/03-architecture-spec.md`](docs/specs/synthetic-bms/03-architecture-spec.md).
-
----
-
-## Quickstart
-
-### Requisitos
-
-- Docker 24+ y Docker Compose v2
-- [`uv`](https://github.com/astral-sh/uv) ≥ 0.5
-- Python 3.12+ (lo instala `uv` si falta)
-- [`task`](https://taskfile.dev) (Taskfile runner) o GNU Make
-
-### Instalación reproducible
+### Paso 2 · Generar el archivo `.env` con secretos (5 s)
 
 ```bash
-git clone https://github.com/captia-technology/captia-synthetic-data-bms.git
-cd captia-synthetic-data-bms
-
-task quickstart     # one-shot
-# - genera .env con secretos aleatorios
-# - uv sync
-# - preflight (Docker, puertos, .env)
-# - docker compose up -d
-# - espera healthchecks (≤ 120 s)
-# - smoke checks
-# - imprime URLs útiles
+make init-env
 ```
 
-### Acceso tras `quickstart`
+Esto crea `.env` a partir de `.env.example` rellenando los `CHANGE_ME` con
+tokens aleatorios (`INFLUXDB_TOKEN`, `BMS_API_TOKEN`, `INFLUXDB_ADMIN_PASSWORD`).
+Es **idempotente**: si ya existe `.env`, no toca nada. Para regenerarlo:
+`make init-env-force`.
 
-| Servicio | URL local | Credenciales |
-|----------|-----------|--------------|
-| Generator API | http://localhost:8120 | Bearer `BMS_API_TOKEN` (en `.env`) |
-| OpenAPI docs | http://localhost:8120/docs | — |
-| Grafana | http://localhost:3001 | `admin` / `admin` |
-| InfluxDB UI | http://localhost:8087 | `admin` / `INFLUXDB_ADMIN_PASSWORD` |
-| Prometheus | http://localhost:9090 | — |
-| Loki | http://localhost:3100/ready | — |
-| MQTT (TCP) | `localhost:1884` | anonymous (dev) |
-| MQTT (WebSocket) | `ws://localhost:9002` | anonymous (dev) |
+### Paso 3 · Levantar el stack (3–6 min la primera vez)
 
-> **Aviso seguridad** — todas las credenciales por defecto y `allow_anonymous true` de Mosquitto son **solo para desarrollo**. Antes de exponer el stack ver [`SECURITY.md`](SECURITY.md).
+Tienes **tres modos** según tu objetivo:
 
----
-
-## Casos de uso
-
-| Caso | Para qué | Comando | Salida |
-|------|----------|---------|--------|
-| **A — Pipeline IoT en vivo** | Ver el flujo MQTT → Telegraf → InfluxDB → Grafana en tiempo real | `curl -X POST http://localhost:8120/v1/control/start -H "Authorization: Bearer $BMS_API_TOKEN" -H 'content-type: application/json' -d '{"config_path":"/app/config/projects/bms_v1_demo.yaml","mode":"live","aulas":10,"faults":[]}'` | Datos en bucket `telemetry`, dashboards `bms_overview` y `bms_iaq_caseD` |
-| **B — Predicción consumo 12 m** | 12 meses de `power_01`, `temperature_outdoor`, `solar_irradiance`, ocupación | `task dump:caseB` | `output/ies_simarro_12m_<job>.lp` (line-protocol importable con `influx write`) |
-| **C — Anomalías HVAC** | 6 meses con etiquetas de fallo en bucket `state_events` | `task dump:caseC` | Dump con eventos `variable=fault.<tipo>` |
-| **D — Calidad aire / ocupación** | 1 min de resolución para CO₂ → ocupación | `task dump:caseD` | `output/ies_simarro_3m_<job>.csv` |
-
-Cada caso tiene su YAML en [`config/projects/`](config/projects/) y su dashboard en
-[`infra/grafana/dashboards/`](infra/grafana/dashboards/).
-
-> **Material docente extendido:** los 11 casos del Curso de Especialización
-> IES Simarro (A–J + extra) tienen una página por caso en
-> [`docs/use-cases/`](docs/use-cases/) con datos esperados, capas Medallion,
-> notebooks asociados y errores comunes.
-
----
-
-## Notebooks didácticos
-
-45 notebooks ejecutables en [`notebooks/`](notebooks/) con la estructura
-Medallion (bronce → plata → oro) y los 11 casos de uso del curso.
-
-| Carpeta | Notebooks | Tema |
-|---------|-----------|------|
-| [`00_project_overview/`](notebooks/00_project_overview/) | 3 | Medallion, schema CAPTIA, conexión `.env` |
-| [`01_case_A_pipeline_iot/`](notebooks/01_case_A_pipeline_iot/) | 3 | Pipeline MQTT → Telegraf → InfluxDB |
-| [`02_case_B_energy_forecasting/`](notebooks/02_case_B_energy_forecasting/) | 5 | Forecast consumo 24 h |
-| [`03_case_C_hvac_anomaly_detection/`](notebooks/03_case_C_hvac_anomaly_detection/) | 5 | Anomalías HVAC IF + AE |
-| [`04_case_D_iaq_occupancy/`](notebooks/04_case_D_iaq_occupancy/) | 5 | IAQ + ocupación desde ambiente |
-| [`05_case_E_weather_solar/`](notebooks/05_case_E_weather_solar/) | 4 | ERA5 → predicción solar |
-| [`06_case_F_mlops/`](notebooks/06_case_F_mlops/) | 3 | MLflow + lakeFS, reproducibilidad |
-| [`07_case_G_data_quality_agents/`](notebooks/07_case_G_data_quality_agents/) | 4 | Reglas calidad + agentes |
-| [`08_case_H_rag_chatbot/`](notebooks/08_case_H_rag_chatbot/) | 5 | Tools + RAG + golden set |
-| [`09_case_I_spark_vs_pandas/`](notebooks/09_case_I_spark_vs_pandas/) | 4 | Benchmark big data |
-| [`10_case_J_traffic_yolo/`](notebooks/10_case_J_traffic_yolo/) | 4 | Captura DGT + YOLO + meteo |
-
-Helpers reutilizables en [`notebooks/_common/`](notebooks/_common/) (schema,
-conexión, mocks, plotting, plantilla 18 secciones). Mocks deterministas en
-[`notebooks/_data/`](notebooks/_data/) (`seed=42`).
+| Comando | Qué hace | Cuándo usarlo |
+|---------|----------|---------------|
+| **`make demo`** ⭐ | Levanta toda la infra (sin build local). Verifica healthchecks + smoke. | **Recomendado para empezar** — más rápido, no necesita Python local |
+| `make quickstart` | Igual que `demo` + build del generator FastAPI desde código fuente | Si vas a tocar el código del generator |
+| `make up` | Solo `docker compose up -d`. No espera healthchecks. | Avanzado / scripts |
 
 ```bash
-uv run python scripts/build_notebook_data.py        # genera mocks
-uv run python -m scripts.build_notebooks            # regenera 45 .ipynb
-uv run --with jupyterlab jupyter lab notebooks/     # abre Jupyter Lab
+make demo
 ```
 
-Ver [`docs/notebooks/how-to-run.md`](docs/notebooks/how-to-run.md) para
-instrucciones detalladas y el [`docs/audit/NOTEBOOK_PLAN.md`](docs/audit/NOTEBOOK_PLAN.md)
-para el plan completo (propósito, audiencia, nivel, validaciones por notebook).
+La primera vez tarda **3–6 min** (descarga de imágenes Docker). Las siguientes,
+**< 60 s**. Verás algo como:
+
+```
+==> Preflight CAPTIA-SYNTHETIC-DATA-BMS
+  OK docker 25.0.3 corriendo
+  OK docker compose v2.24.5 disponible
+  OK .env presente
+==> docker compose up -d
+[+] Running 11/11 ...
+==> Esperando healthchecks (max 120 s)
+  OK 10 services healthy
+==> Smoke MQTT OK
+==> Smoke InfluxDB OK
+==> Smoke Grafana OK
+==> Stack BMS listo.
+```
+
+> Si algo falla aquí, salta directo a [Troubleshooting](#troubleshooting-express).
+
+### Paso 4 · Verificar que todo está sano (10 s)
+
+```bash
+make ps        # listar 10 contenedores Up (healthy)
+make smoke     # MQTT publish + Influx buckets + Grafana datasources + schema
+```
+
+Salida esperada de `make smoke`:
+
+```
+==> Smoke MQTT (puerto 1884)         - publish OK
+==> Smoke InfluxDB (http://localhost:8087)  - 7 buckets canónicos presentes
+==> Smoke Grafana (http://localhost:3001)   - datasources provisionados (4)
+==> Schema canónico CAPTIA verificado
+```
+
+Si algún check falla, mira `make logs SERVICE=<nombre>` y consulta
+[`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md).
+
+### Paso 5 · Abrir las UIs (30 s)
+
+```bash
+make urls    # imprime los URLs útiles
+```
+
+Abre en tu navegador (orden recomendado para una primera vez):
+
+1. **Grafana** → <http://localhost:3001> (`admin` / `admin`)
+   - Dashboard recomendado: **System Health Cockpit** (UID `bms-overview`)
+2. **MQTTX-Web** → <http://localhost:8083>
+   - Importa la config preconfigurada: `infra/mqttx/captia-bms-mqttx-config.json`
+   - 7 suscripciones listas + 2 scripts de decode (ver [`infra/mqttx/README.md`](infra/mqttx/README.md))
+3. **InfluxDB UI** → <http://localhost:8087> (`admin` / valor de `INFLUXDB_ADMIN_PASSWORD` en `.env`)
+4. **OpenAPI del generator** → <http://localhost:8121/docs>
+
+> **Guía completa con queries listas para pegar**: [`docs/operations/visualizing-data.md`](docs/operations/visualizing-data.md)
 
 ---
 
-## API HTTP
+## Acceso a las UIs (mapa maestro)
 
-### Públicos
+| Servicio | URL local | Credenciales | Para qué |
+|----------|-----------|--------------|----------|
+| **Grafana** | <http://localhost:3001> | `admin` / `admin` | 4 dashboards: overview, energy, faults, IAQ |
+| **MQTTX-Web** | <http://localhost:8083> | — (importar JSON) | Ver tráfico MQTT en vivo |
+| **InfluxDB UI** | <http://localhost:8087> | `admin` / `INFLUXDB_ADMIN_PASSWORD` | Queries Flux, gestión buckets |
+| **Generator API** | <http://localhost:8121> | `Bearer BMS_API_TOKEN` | Control plane (`/v1/control`, `/v1/datasets`) |
+| **Generator OpenAPI** | <http://localhost:8121/docs> | — | Swagger UI |
+| **Generator metrics** | <http://localhost:8121/metrics> | — | Métricas Prometheus raw |
+| **Prometheus** | <http://localhost:9090> | — | Tiempo-series del propio stack |
+| **Loki API** | <http://localhost:3100/ready> | — | Logs centralizados (consulta vía Grafana → Explore) |
+| **Mosquitto MQTT (TCP)** | `tcp://localhost:1884` | anonymous (dev) | Para `mosquitto_pub` / `mosquitto_sub` |
+| **Mosquitto MQTT (WebSocket)** | `ws://localhost:9102/mqtt` | anonymous (dev) | Para clientes browser |
 
-```http
-GET /healthz   200  { "status": "ok", "version": "0.1.0", "uptime": 12.3 }
-GET /readyz    200  cuando MQTT conectado y config cargada; 503 sino
-GET /metrics   200  text/plain Prometheus
-GET /docs      Swagger UI (deshabilitar si ENVIRONMENT=production)
-```
-
-### Control plane (`/v1/control`, Bearer)
-
-```http
-POST /v1/control/start   { config_path, mode: "live"|"backfill", aulas: 1..70, faults: [...] }
-POST /v1/control/stop?job_id=...
-GET  /v1/control/status?job_id=...
-```
-
-### Datasets (`/v1/datasets`, Bearer)
-
-```http
-POST /v1/datasets/export { months: 1..24, format: "line_protocol"|"csv_long", include_faults }
-GET  /v1/datasets/jobs/{id}
-```
-
-Estados del job:
-
-```mermaid
-stateDiagram-v2
-    [*] --> pending: start() / export()
-    pending --> running: daemon thread acquires
-    running --> completed: ScenarioRunner.run() returns
-    running --> error: exception (config, sink, runner)
-    running --> stopped: POST /stop
-    completed --> [*]
-    error --> [*]
-    stopped --> [*]
-```
-
-Ver [`docs/specs/synthetic-bms/06-api-and-ui-spec.md`](docs/specs/synthetic-bms/06-api-and-ui-spec.md).
+> **Aviso seguridad** — `admin/admin` y `allow_anonymous true` son **solo para desarrollo**.
+> Antes de exponer el stack en cualquier red, lee [`SECURITY.md`](SECURITY.md).
 
 ---
 
-## Schema canónico CAPTIA
+## Comandos del día a día
 
-Inmutable: las dashboards y queries de cualquier consumidor CAPTIA dependen de él.
+```bash
+# Estado
+make ps                    # ver contenedores
+make logs                  # tail de todos
+make logs SERVICE=grafana  # tail de uno solo
+make urls                  # imprimir URLs
+
+# Verificación
+make smoke                 # 4 smoke checks (MQTT + Influx + Grafana + schema)
+
+# Apagar / limpiar
+make down                  # detener (PRESERVA datos)
+make clean                 # detener + BORRAR volúmenes (datos perdidos)
+
+# Generar dumps offline (sin necesidad de Grafana)
+make dump-caseB            # 12 meses consumo eléctrico (line-protocol)
+make dump-caseC            # 6 meses con averías HVAC
+make dump-caseD            # 3 meses calidad aire @ 1 min
+
+# Tests
+make test                  # unit (rápido, < 1 s)
+make test-integration      # integration
+make test-snapshot         # determinismo seed=42
+make test-all              # todo el árbol
+
+# Re-arrancar tras cambio de código del generator
+make quickstart            # rebuilda + sube
+```
+
+Lista completa con `make help`.
+
+---
+
+## Troubleshooting express
+
+| Síntoma | Causa más probable | Fix |
+|---------|--------------------|-----|
+| `docker: command not found` | Docker no instalado / no en PATH | Instalar Docker Desktop y reiniciar terminal |
+| `make: command not found` (Windows) | `make` no está en PATH | `winget install GnuWin32.Make` y abrir nueva terminal |
+| `bash: command not found` (Windows) | No tienes Git for Windows o no está en PATH | Instalar [Git for Windows](https://git-scm.com/download/win) |
+| `make demo` cuelga en "Esperando healthchecks" | Imágenes aún descargándose la 1ª vez | Esperar hasta 6 min; si pasa de 10 min, `make logs` para diagnosticar |
+| Puerto 3001/8087/etc. ya en uso | Otro stack tuyo está ocupándolo | Edita `.env` y cambia `*_PORT_HOST`, luego `make down && make demo` |
+| Grafana sin datos | El generator no publica | `make logs SERVICE=bms-data-generator` y verifica que diga "publishing to MQTT" |
+| `Connection refused` al broker MQTT | Puerto host no mapeado | `make ps` y comprueba que mosquitto muestra `1884->1883` |
+| MQTTX-Web no conecta vía WS | Puerto WS distinto al esperado | Comprobar que `MQTT_WS_PORT_HOST=9102` en `.env`, conectar a `ws://localhost:9102/mqtt` |
+| `init-env` dice "ya existe" pero falta variable | `.env` antiguo sin la variable nueva | `make init-env-force` (regenera) o editar `.env` manualmente |
+| Tests Python no corren | Falta `uv` | `pip install uv && make install` |
+
+Más detalle en [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md).
+
+---
+
+## ¿Y ahora qué?
+
+Cuando ya tengas el stack funcionando, las siguientes paradas:
+
+| Quiero… | Lee |
+|---------|-----|
+| **Visualizar datos** con queries listas | [`docs/operations/visualizing-data.md`](docs/operations/visualizing-data.md) |
+| **Entender la arquitectura** completa | [`docs/architecture/index.md`](docs/architecture/index.md) |
+| **Lanzar un caso de uso concreto** (consumo, averías, IAQ) | [`docs/use-cases/`](docs/use-cases/) |
+| **Trabajar con notebooks** didácticos (45 .ipynb) | [`docs/notebooks/how-to-run.md`](docs/notebooks/how-to-run.md) |
+| **Llamar al API del generator** (control plane) | [`docs/specs/synthetic-bms/06-api-and-ui-spec.md`](docs/specs/synthetic-bms/06-api-and-ui-spec.md) |
+| **Ver el schema canónico** (measurement, tags, topics) | [`docs/specs/synthetic-bms/02-domain-spec.md`](docs/specs/synthetic-bms/02-domain-spec.md) |
+| **Validar la fidelidad física** del generador | [`docs/physical-model/index.md`](docs/physical-model/index.md) |
+| **Auditoría completa** vs CAPTIA-connect upstream | [`docs/audit/CONSISTENCY_MATRIX.md`](docs/audit/CONSISTENCY_MATRIX.md) |
+| **Decisiones técnicas** (ADRs) | [`docs/decisions/index.md`](docs/decisions/index.md) |
+| **Contribuir** (workflow + convenciones) | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
+
+---
+
+## Stack y versiones (resumen)
+
+| Servicio | Imagen | Puerto host (default `.env`) |
+|----------|--------|------------------------------|
+| Mosquitto | `eclipse-mosquitto:2.0.18` | `1884` (MQTT), `9102` (WS) |
+| Telegraf | `telegraf:1.32` | (interno `:9273`) |
+| InfluxDB | `influxdb:2.7` | `8087` |
+| Redis | `redis:7-alpine` | (interno) |
+| Grafana | `grafana/grafana:11.4.0` (build local) | `3001` |
+| Prometheus | `prom/prometheus:v2.49.1` | `9090` |
+| Loki | `grafana/loki:2.9.4` | `3100` |
+| Promtail | `grafana/promtail:2.9.4` | — |
+| MQTTX-Web | `emqx/mqttx-web:v1.13.0` | `8083` |
+| BMS Generator | Python 3.12 / FastAPI | `8121` |
+
+Todas las imágenes **pinned**, healthchecks en todos los servicios persistentes,
+límites `mem_limit`/`cpus` documentados. Detalle: `compose/`.
+
+---
+
+## Schema canónico CAPTIA (resumen)
+
+Lo más importante que necesitas saber para entender los datos:
 
 ```text
 measurement : captia_point
@@ -264,227 +305,15 @@ topic MQTT  : captia/{env}/{tenant}/{site}/{device}/telemetry/{name}
 payload     : {"value": <float>, "ts_ns": <epoch_ns>}
 ```
 
-| Bucket InfluxDB | Retención | Origen |
-|-----------------|-----------|--------|
-| `telemetry` | 14 d | live raw |
-| `telemetry_1m` | 30 d | tarea Flux |
-| `telemetry_15m` | 90 d | tarea Flux |
-| `telemetry_1h` | 365 d | tarea Flux |
-| `state_events` | 90 d | on-change dedup vía Telegraf statefile |
-| `captia_metadata` | ∞ | catálogo de variables |
-
-Verificación: `task smoke:schema` ejecuta queries Flux que confirman el contrato.
-
----
-
-## Stack y versiones
-
-| Servicio | Imagen | Puerto host |
-|----------|--------|-------------|
-| Mosquitto | `eclipse-mosquitto:2.0.18` | 1884 (MQTT), 9002 (WS) |
-| Telegraf | `telegraf:1.32` | (interno :9273 metrics) |
-| InfluxDB | `influxdb:2.7` | 8087 |
-| Redis | `redis:7-alpine` | (interno) |
-| Grafana | `grafana/grafana:11.4.0` (build local) | 3001 |
-| Prometheus | `prom/prometheus:v2.49.1` | 9090 |
-| Loki | `grafana/loki:2.9.4` | 3100 |
-| Promtail | `grafana/promtail:2.9.4` | — |
-| BMS Generator | Python 3.12 / FastAPI | 8120 |
-
-Todas las imágenes están **pinned** a una versión exacta (no `latest`). Ver `compose/`.
-
----
-
-## Configuración
-
-Variables agrupadas por servicio en [`.env.example`](.env.example). Las críticas:
-
-| Variable | Default | Para qué |
-|----------|---------|----------|
-| `BMS_API_TOKEN` | (generado por `task init:env`) | Bearer auth para `/v1/*` |
-| `BMS_N_AULAS` | `10` | Número de aulas (`AULA01..AULA70`) |
-| `BMS_SEED` | `42` | RNG determinista |
-| `BMS_FAULTS_ENABLED` | `false` | Activa la inyección de fallos HVAC |
-| `INFLUXDB_TOKEN` | (generado) | Token admin InfluxDB |
-| `GRAFANA_ADMIN_PASSWORD` | `admin` | **Cambiar antes de exponer** |
-| `MQTT_PORT_HOST` | `1884` | Puerto host del broker MQTT |
-| `BMS_GENERATOR_PORT_HOST` | `8120` | Puerto host del API |
-
-`task init:env` genera secretos aleatorios y crea `.env`. `task init:env:force` lo regenera.
-
----
-
-## Comandos `task` / `make`
-
-```text
-task quickstart          # one-shot bootstrap completo
-task urls                # imprime URLs locales
-task install             # uv sync workspace
-task lint                # ruff check + format check
-task format              # ruff format
-task test                # pytest -m unit
-task test:integration    # pytest -m integration
-task test:snapshot       # pytest -m snapshot (determinismo seed=42)
-task up / down / clean   # docker compose up -d / down / down -v
-task wait:healthy        # bloquea hasta healthy o 120 s timeout
-task ps / logs           # estado / tail logs (SERVICE=<name> opcional)
-task smoke               # mqtt + influx + grafana + schema canónico
-task dump:caseB|C|D      # exports de los 3 casos backfill
-task vendor:update       # re-vendor synthetic-generator (maintainers)
-task config:render       # docker compose config (rendered)
-```
-
-Para usuarios sin `task`: el `Makefile` envuelve los targets más comunes (`make quickstart`, `make test`, `make up`, …).
-
----
-
-## Tests y calidad
-
-- **Unit + integration in-process**: `task test` y `task test:integration`. 46 tests pasan en < 1 s gracias a un *fake runner* inyectable (sin tocar el motor pesado).
-- **Snapshot determinismo**: `task test:snapshot`. Hash sha256 fijo del `FaultInjector` con `seed=42` (`extensions/bms_calibration/tests/test_determinism.py`).
-- **Vendor unit tests**: `uv run pytest vendor/synthetic-generator/tests/unit -q --override-ini="markers="`. 129 tests heredados.
-- **Smoke E2E** (post `task up`): `task test:smoke` valida `/healthz`, MQTT publish, query Influx, Grafana.
-
-CI ejecuta lint, los cuatro niveles de test, build Docker, validación compose y un escaneo `gitleaks` + `pip-audit` + `Trivy fs` (`.github/workflows/`). `pre-commit` con ruff, gitleaks y markdownlint en local.
-
-```mermaid
-flowchart LR
-    PR[Pull Request] --> ci[CI workflow]
-    ci --> lint[ruff check + format]
-    ci --> tests[unit / integration / snapshot / vendor unit]
-    ci --> build[Docker build no-push]
-    ci --> compose[docker compose config]
-    sec[Security workflow] --> gitleaks
-    sec --> pip-audit
-    sec --> trivy[Trivy fs SARIF]
-    rel[Tag v*.*.*] --> release[ghcr.io image + GitHub release]
-```
-
----
-
-## Documentación y specs
-
-### Sitio web (MkDocs Material)
-
-```bash
-uv run --with mkdocs-material mkdocs serve --dev-addr 0.0.0.0:8000
-```
-
-| Sección | Contenido |
-|---------|-----------|
-| [Empezar](docs/getting-started/) | Quickstart, setup local, notebooks |
-| [Arquitectura](docs/architecture/) | Medallion, CENTINELA+, schema CAPTIA, flujo de datos |
-| [Casos de uso](docs/use-cases/) | 10 casos A–J + extra, una página por caso |
-| [Notebooks](docs/notebooks/) | 45 notebooks didácticos: índice, cómo ejecutar, mapa |
-| [Contratos](docs/contracts/) | Schema InfluxDB, MQTT topics, catálogo variables, capas Medallion |
-| [Validación](docs/validation/) | E2E, calidad de datos, realismo físico, validación ML |
-| [Operación](docs/operations/) | Troubleshooting, environment, Docker |
-| [Auditoría](docs/audit/) | 11 fases cerradas, USE_CASE_MATRIX, NOTEBOOK_PLAN, DOCS_REPORT |
-| [Especificaciones](docs/specs/) | SDD synthetic-bms (00–10) y physics validation |
-| [Decisiones](docs/decisions/) | ADRs |
-| [Archivo](docs/archive/) | Documentación histórica del dominio |
-
-### Notebooks didácticos
-
-45 notebooks ejecutables en `notebooks/`. Cubren los 11 casos de uso del Curso de
-Especialización IA & Big Data del IES Simarro con la estructura Medallion bronce
-→ plata → oro:
-
-```bash
-uv run python scripts/build_notebook_data.py    # mocks deterministas
-uv run --with jupyterlab jupyter lab notebooks/  # abrir Jupyter Lab
-```
-
-Cada notebook sigue las [18 secciones obligatorias](notebooks/_common/template_outline.md)
-y el schema canónico CAPTIA. Helpers reutilizables en `notebooks/_common/`.
-
-### Spec-driven development
-
-Las specs viven en [`docs/specs/synthetic-bms/`](docs/specs/synthetic-bms/) y
-[`docs/specs/digital-twin-bms-physics-validation/`](docs/specs/digital-twin-bms-physics-validation/).
-
-| Spec | Contenido |
-|------|-----------|
-| `00-research-report.md` | Mapa de fuentes y patrones detectados |
-| `00-open-questions.md` | Lagunas detectadas y su estado |
-| `00-repo-map.md` | Árbol target y de referencia |
-| `01-product-spec.md` | Goal, casos de uso, criterios de aceptación |
-| `02-domain-spec.md` | Entidades, variables, calendario, modelo de fallos |
-| `03-architecture-spec.md` | Diagramas, reglas de import, flujos |
-| `04-infra-spec.md` | Compose, healthchecks, volúmenes, redes |
-| `05-observability-spec.md` | Métricas, logs, dashboards, alertas |
-| `06-api-and-ui-spec.md` | Endpoints, auth, errores, OpenAPI |
-| `07-testing-spec.md` | Pirámide, fixtures, validaciones |
-| `08-task-plan.md` | Trazabilidad spec → tarea → test |
-| `09-decision-log.md` | ADRs |
-| `10-validation-checklist.md` | Checklist final por categoría |
-| `STATUS.md` | Estado actual del proyecto |
-
-Documentos fuente del dominio (archivados):
-[`CAPTIA_Informe_CasosDeUso_DatosSinteticos.md`](docs/archive/CAPTIA_Informe_CasosDeUso_DatosSinteticos.md),
-[`CENTINELA_Guia_Alumnos_v4.md`](docs/archive/CENTINELA_Guia_Alumnos_v4.md) y
-[`MEDALLION_Arquitectura_Guia_Referencia.md`](docs/archive/MEDALLION_Arquitectura_Guia_Referencia.md).
-
----
-
-## FAQ
-
-<details>
-<summary><b>¿Es BMS = Battery Management System?</b></summary>
-
-No. Aquí BMS = **Building Management System** (gateway de aula educativa). El dominio es `bms_classrooms` y los assets son `AULA01..AULA70` del IES Simarro.
-</details>
-
-<details>
-<summary><b>¿Por qué hay un directorio <code>vendor/</code> en lugar de un git submodule?</b></summary>
-
-Porque la decisión técnica registrada (ADR-001) prioriza control sobre el upstream y la posibilidad de aplicar parches reproducibles vía `vendor/synthetic-generator/PATCHES/`. El upstream `synthetic-generator` es interno y se re-vendora con `task vendor:update` (requiere `CAPTIA_CONNECT_PATH`).
-</details>
-
-<details>
-<summary><b>¿Por qué Mosquitto admite conexiones anónimas?</b></summary>
-
-Solo en desarrollo. `infra/mosquitto/mosquitto.conf` lo marca explícitamente como dev-only. Antes de cualquier despliegue ver el hardening checklist en [`SECURITY.md`](SECURITY.md).
-</details>
-
-<details>
-<summary><b>¿Puedo añadir un nuevo dominio (ej. <code>bms_offices</code>)?</b></summary>
-
-Sí, sin tocar `vendor/`. Crea un nuevo paquete bajo `extensions/` con un plugin que implemente `synthetic_generator.ports.domain.DomainAdapterPort` y registra el dominio con `@register_domain`. Añade un YAML de scenario en `config/projects/`. Spec relevante: `02-domain-spec.md`.
-</details>
-
-<details>
-<summary><b>¿Tests usan el runner real?</b></summary>
-
-Las suites unit/integration usan un `_FakeRunner` inyectado vía `runner_factory` para mantenerlas instantáneas. Los tests E2E bajo `tests/e2e/` se ejecutan contra el stack levantado y por defecto sólo en local (marker `slow`).
-</details>
-
-<details>
-<summary><b>¿Cómo escalo más allá de 10 aulas?</b></summary>
-
-`BMS_N_AULAS` admite hasta 70. Para volúmenes mayores ajusta también `mem_limit` / `cpus` del contenedor en `compose/generator.yaml` y baja `freq` del scenario YAML según el tipo de carga (5 s vs 1 min vs 5 min).
-</details>
-
----
-
-## Contribuir
-
-PRs y issues son bienvenidos. Antes de empezar lee:
-
-- [`CONTRIBUTING.md`](CONTRIBUTING.md) — workflow spec-driven, layout, convenciones.
-- [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) — Contributor Covenant 2.1.
-- [`SECURITY.md`](SECURITY.md) — política de divulgación de vulnerabilidades.
-
-Stack local listo en una línea: `task quickstart`. Para añadir hooks pre-commit:
-`pip install pre-commit && pre-commit install`.
+Detalle completo en [`docs/specs/synthetic-bms/02-domain-spec.md`](docs/specs/synthetic-bms/02-domain-spec.md).
 
 ---
 
 ## Licencia y soporte
 
-- Licencia: [Apache License 2.0](LICENSE) — © 2026 CAPTIA Technology. Atribución en [`NOTICE`](NOTICE).
-- Issues: <https://github.com/captia-technology/captia-synthetic-data-bms/issues>
-- Contacto / divulgación responsable: **jaime.sendra@captiatechnology.com**
-- Más información: <https://captiatechnology.com>
+- **Licencia**: [Apache License 2.0](LICENSE) — © 2026 CAPTIA Technology · Atribución en [`NOTICE`](NOTICE)
+- **Issues**: <https://github.com/captia-technology/captia-synthetic-data-bms/issues>
+- **Contacto**: jaime.sendra@captiatechnology.com
+- **Más info**: <https://captiatechnology.com>
 
 > *Hecho con `uv`, FastAPI, NumPy, Pandas, paho-mqtt y mucho café del IES Simarro.*
