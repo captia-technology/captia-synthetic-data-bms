@@ -7,7 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added — 2026-05-10 (Fase 12 — Pipeline E2E + signal mapping completo)
+_Sin cambios todavía. Próximos cambios listados aquí antes del siguiente release._
+
+## [0.2.1] - 2026-05-10
+
+Patch release con fixes de pipeline CI/CD aplicados tras v0.2.0. **Cero
+cambios funcionales del código del generator** — la imagen Docker `0.2.1`
+es funcionalmente idéntica a `0.2.0` (solo `ruff format` + sin cambios
+en runtime).
+
+### Fixed
+
+- **Lint (`ruff check`)** — `UP028: Replace 'yield' over 'for' loop with 'yield from'`
+  en `extensions/bms_signal_alias/src/bms_signal_alias/derivations.py:251`.
+- **Security workflow — gitleaks** — `gitleaks-action@v2` requiere licencia
+  comercial para repos pertenecientes a organizaciones (ver
+  https://gitleaks.io/products.html). Sustituido por descarga del binario
+  OSS `gitleaks v8.21.2` ejecutado directamente. Mismo motor, mismas
+  reglas, sin licencia.
+- **Security workflow — trivy** — `aquasecurity/trivy-action@<version>`
+  no resuelve porque las tags reales del repo upstream son `vX.Y.Z` (con
+  prefijo `v`) y la sintaxis `@X.Y.Z` falla. Cambiado a `@master`
+  (recomendado por aquasecurity en su README).
+
+### Style
+
+- **`ruff format`** aplicado a 3 archivos: `derivations.py`,
+  `runner_service.py`, `bootstrap.py`. Solo line breaks y alineación de
+  paréntesis; cero cambios funcionales.
+
+### Workflows GREEN tras esta release
+
+```
+CI (5 jobs)         ✓ Validate compose  ✓ Lint  ✓ Tests (Python 3.12)
+                    ✓ E2E smoke         ✓ Build Docker image
+Security (3 jobs)   ✓ gitleaks OSS  ✓ pip-audit  ✓ trivy (master)
+Deploy Docs         ✓ MkDocs → GitHub Pages
+Release v0.2.1      ✓ GHCR image + GitHub release
+```
+
+### Image
+
+```
+ghcr.io/captia-technology/captia-synthetic-data-bms/bms-data-generator:0.2.1
+ghcr.io/captia-technology/captia-synthetic-data-bms/bms-data-generator:latest
+                                                    sha256:b7a6da8b... (377 MB)
+```
+
+## [0.2.0] - 2026-05-10
+
+**Fase 12 — Pipeline E2E + signal mapping completo.**
+
+Primera release que cierra el gap "drop-in replacement de simarro-prod":
+las **30 variables canónicas** del PPTX simarro-prod slide 14 están
+todas generadas por el stack standalone, con catálogo metadata poblado
+**automáticamente desde el primer deploy**. El pipeline MQTT → Telegraf
+→ InfluxDB → Grafana queda sólido tras debug E2E exhaustivo (corregida
+la causa raíz del silent data drop).
+
+### Added
 
 - **`tools/metadata-bootstrap/`** — nuevo servicio Python (500 LOC,
   adaptado de `captia-connect/tools/metadata-bootstrap`). Pobla
@@ -36,25 +94,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reporta Wrote pero datos no aparecen" y "Múltiples instancias compartiendo
   client_id".
 
-### Fixed — 2026-05-10
+### Fixed
 
-- **Pipeline E2E silent data drop** (`9eba9c8`, ADR-022): Telegraf
+- **Pipeline E2E silent data drop** (ADR-022): Telegraf
   `persistent_session = true` causaba que tras restart entregase el queue
   persistente del broker con timestamps históricos corruptos, que InfluxDB
   rechazaba silenciosamente por retention policy. Cambiado a `false`.
   `agent.statefile` eliminado (estaba ligado al persistent session).
-- **MQTT client_id collisions** (`9669e94`): el config YAML del scenario
-  tenía `client_id: "captia-bms-generator-demo"` fijo. Si dos procesos
+- **MQTT client_id collisions**: el config YAML del scenario tenía
+  `client_id: "captia-bms-generator-demo"` fijo. Si dos procesos
   publicaban con el mismo ID (ej. host zombi + container), MQTT spec
   fuerza al broker a desconectar el anterior y entran en loop infinito.
   `runner_service.py::_build_runner` ahora appende UUID hex(8) al
   client_id configurado.
-- **`RunnerService.stop()` no paraba el runner del vendor** (`9669e94`):
-  el `stop()` previo solo marcaba el job como "stopped" pero
+- **`RunnerService.stop()` no paraba el runner del vendor**: el `stop()`
+  previo solo marcaba el job como "stopped" pero
   `ScenarioRunner.run_live()` (vendor) seguía publicando indefinidamente.
   Ahora `_Job.runner` mantiene referencia al runner y `stop()` setea
   `runner._running = False`.
-- **Métricas Prometheus no se actualizaban** (`9669e94`): nuevo
+- **Métricas Prometheus no se actualizaban**: nuevo
   `_MetricsCountingSink` wrapper que instrumenta
   `captia_bms_messages_published_total{topic}`, `captia_bms_connected`,
   `captia_bms_active_jobs` sin tocar vendor.
@@ -64,7 +122,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `processors.clone.tagpass` de Telegraf (no matcheaba ningún glob).
 - **Variables `*_audit` residuales borradas** del bucket `telemetry`.
 
-### Documentation — 2026-05-10
+### Documentation
 
 - **Drift audit profundo**: corregidos los 4 grupos de drifts identificados:
   - "6 buckets" → "7 buckets" (`telemetry_events` añadido) en 6 archivos.
@@ -77,6 +135,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`docs/operations/visualizing-data.md`** actualizado con `make verify-metadata`.
 - **3 nuevos ADRs**: 020 (metadata-bootstrap), 021 (derivations), 022
   (persistent_session=false).
+
+### Security
+
+- **Sanitización pre-público**: eliminadas referencias a tenant interno
+  (`influx.simarro-prod.captiatechnology.com`), rutas absolutas Windows
+  (`C:\CAPTIA\...`) en docs y scripts. Aviso de revisión añadido para
+  PPTX internos en `docs/archive/presentaciones/README.md`.
+- **README "Quiénes somos"** reescrito con copy literal de captia.ai
+  (claim, 5 productos, sectores objetivo).
+
+### Verification
+
+- 331 puntos escritos a `captia_metadata` (1 + 330 = 33 vars × 10 aulas).
+- Job live con 5 aulas → 12/12 derivations llegan al bucket telemetry.
+- 30/30 vars del PPTX simarro-prod slide 14 cubiertas.
+- `make verify-metadata` OK; `make smoke` OK.
+
+### Image
+
+```
+ghcr.io/captia-technology/captia-synthetic-data-bms/bms-data-generator:0.2.0
+                                                    sha256:4a29eee3... (377 MB)
+```
 
 ## [Pre-2026-05-10]
 
@@ -156,5 +237,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - API token (`BMS_API_TOKEN`) optional locally, mandatory in compose
   through `${BMS_API_TOKEN:?required}`.
 
-[Unreleased]: https://github.com/jaimesendra/captia-synthetic-data-bms/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/jaimesendra/captia-synthetic-data-bms/releases/tag/v0.1.0
+[Unreleased]: https://github.com/captia-technology/captia-synthetic-data-bms/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/captia-technology/captia-synthetic-data-bms/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/captia-technology/captia-synthetic-data-bms/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/captia-technology/captia-synthetic-data-bms/releases/tag/v0.1.0
