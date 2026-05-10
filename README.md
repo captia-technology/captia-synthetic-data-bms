@@ -30,34 +30,76 @@
 
 ## Lo que vas a tener funcionando en 10 minutos
 
-```text
-                  ┌────────────────────────────────────────────┐
-                  │  Tu navegador (localhost)                  │
-                  │  ─────────────────────────────────         │
-                  │   :3001  Grafana       (4 dashboards)      │
-                  │   :8083  MQTTX-Web     (cliente MQTT)      │
-                  │   :8087  InfluxDB UI   (Flux queries)      │
-                  │   :9090  Prometheus    (métricas)          │
-                  │   :8121  /docs         (OpenAPI generator) │
-                  └─────────────────┬──────────────────────────┘
-                                    │
-        ┌───────────────────────────┴───────────────────────────┐
-        │  Stack Docker Compose (red `captia-bms-network`)      │
-        │                                                       │
-        │   bms-data-generator ──► Mosquitto ──► Telegraf       │
-        │                            │                          │
-        │                            ▼                          │
-        │   InfluxDB (7 buckets) ◄── ┘                          │
-        │       │                                               │
-        │       └──► Grafana ◄── Prometheus ◄── (scrape)        │
-        │                                                       │
-        │                  Loki ◄── Promtail (logs)             │
-        └───────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph BROWSER["🖥️&nbsp;Tu navegador · localhost"]
+        direction LR
+        UI_GR["Grafana<br/>:3001"]
+        UI_MX["MQTTX-Web<br/>:8083"]
+        UI_IF["InfluxDB UI<br/>:8087"]
+        UI_PR["Prometheus<br/>:9090"]
+        UI_DC["Generator /docs<br/>:8121"]
+    end
+
+    subgraph STACK["🐳&nbsp;Stack Docker Compose · red captia-bms-network"]
+        direction TB
+
+        subgraph PIPE["Pipeline de telemetría"]
+            direction LR
+            GEN["bms-data-generator<br/>FastAPI :8120"]
+            MOS[("Mosquitto 2.0.18<br/>MQTT :1883 · WS :9001")]
+            TEL["Telegraf 1.32<br/>MQTT consumer + dedup"]
+            INF[("InfluxDB 2.7<br/>7 buckets")]
+            GEN -- "publish&nbsp;MQTT" --> MOS
+            MOS -- "consume&nbsp;MQTT" --> TEL
+            TEL -- "write&nbsp;line-protocol" --> INF
+        end
+
+        subgraph OBS["Observabilidad"]
+            direction LR
+            PRO["Prometheus v2.49"]
+            LOK[("Loki 2.9")]
+            PRT["Promtail 2.9"]
+            GRA["Grafana 11.4<br/>4 dashboards"]
+            PRT -- "push&nbsp;logs" --> LOK
+        end
+
+        RED[("Redis 7<br/>Live cache")]
+        MXW["MQTTX-Web v1.13<br/>SPA estática"]
+
+        PRO -. "scrape&nbsp;/metrics" .-> GEN
+        GRA -- "Flux" --> INF
+        GRA -- "PromQL" --> PRO
+        GRA -- "LogQL" --> LOK
+        GRA -. "Live cache" .-> RED
+    end
+
+    UI_GR -->|HTTP| GRA
+    UI_MX -->|HTTP&nbsp;assets| MXW
+    UI_MX -. "ws://:9102/mqtt" .-> MOS
+    UI_IF -->|HTTP| INF
+    UI_PR -->|HTTP| PRO
+    UI_DC -->|HTTP| GEN
+
+    classDef ui fill:#2451FF,stroke:#1a3acc,color:#fff,stroke-width:1px
+    classDef store fill:#22ADF6,stroke:#1a85be,color:#fff,stroke-width:1px
+    classDef proc fill:#FB8C00,stroke:#c46900,color:#fff,stroke-width:1px
+    classDef logs fill:#43A047,stroke:#2d6f31,color:#fff,stroke-width:1px
+
+    class UI_GR,UI_MX,UI_IF,UI_PR,UI_DC ui
+    class MOS,INF,LOK,RED store
+    class GEN,TEL,PRO,GRA,MXW proc
+    class PRT logs
 ```
 
-10 contenedores: `bms-data-generator`, `mosquitto`, `telegraf`, `influxdb`,
-`grafana`, `prometheus`, `loki`, `promtail`, `redis`, `mqttx-web`. Todos
-con healthchecks; todos con tag fijo (no `latest`).
+> **Lectura del flujo**: el generator **publica** vía MQTT al broker Mosquitto.
+> Telegraf **consume** del broker y **escribe** a InfluxDB (no hay flecha directa
+> Mosquitto → InfluxDB). Prometheus hace **scrape** del `/metrics` del generator.
+> Grafana lee de InfluxDB (Flux), Prometheus (PromQL) y Loki (LogQL) según el panel.
+
+**10 contenedores en total**: `bms-data-generator`, `mosquitto`, `telegraf`,
+`influxdb`, `grafana`, `prometheus`, `loki`, `promtail`, `redis`, `mqttx-web`.
+Todos con healthchecks, todos con tag de imagen fijo (no `latest`).
 
 ---
 
