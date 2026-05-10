@@ -45,10 +45,10 @@
 ## ADR-006 — Buckets InfluxDB replicados
 
 - **Contexto**: replicar `modules/data-plane/scripts/init_influx_buckets_tasks.sh`.
-- **Decisión**: 6 buckets: `telemetry` (14d), `telemetry_1m` (30d), `telemetry_15m` (90d), `telemetry_1h` (365d), `state_events` (90d), `captia_metadata` (∞).
+- **Decisión**: 7 buckets: `telemetry` (14d), `telemetry_1m` (30d), `telemetry_15m` (90d), `telemetry_1h` (365d), `state_events` (90d), `telemetry_events` (90d), `captia_metadata` (∞).
 - **Alternativas**: buckets custom (rompe queries pre-existentes).
 - **Consecuencias**: 5 tareas Flux activas para downsampling.
-- **Estado**: Aceptada.
+- **Estado**: Aceptada (ampliada 2026-05-10 con `telemetry_events` para eventos cmd/ack — vacío en standalone, poblado por controllers en producción).
 
 ## ADR-007 — Frecuencia 5 s telemetry, backfill default 30 días
 
@@ -239,6 +239,90 @@
     `/metrics` (cobertura local), no si el Controller central lo ve.
 - **Estado**: Aceptada (decisión consciente para demo standalone).
 - **Cierra**: H-13 (`docs/audit/AUDIT_REPORT.md`).
+
+## ADR-020 — Metadata bootstrap automático en cada deploy (replicado de captia-connect)
+
+- **Contexto** (2026-05-10): el bucket `captia_metadata` ya se poblaba via
+  `infra/influxdb/init/init_buckets_tasks.sh::populate_metadata` (awk). Pero
+  ese parser awk era frágil (no manejaba `derivations.yaml`, no usaba
+  `display_name` ES, escribía menos campos que captia-connect). Necesitamos
+  que el catálogo se rellene automáticamente desde el primer deploy con
+  schema completo y compatible con el patrón captia-connect.
+- **Decisión**: nuevo servicio Docker `metadata-bootstrap` (Python) en
+  `tools/metadata-bootstrap/`, adaptado de
+  `captia-connect/tools/metadata-bootstrap/`. Encadenado tras
+  `influx-init` con `condition: service_completed_successfully`.
+  `BOOTSTRAP_MODE=force` purga + reescribe en cada deploy. Soporta
+  `production_name` (override local) y `derivations.yaml` (12 vars
+  adicionales).
+- **Alternativas**: (a) mantener parser awk — descartada por fragilidad y
+  divergencia con captia-connect; (b) ejecutar bootstrap manualmente
+  bajo profile — descartada porque rompe el principio "primer deploy
+  completo sin pasos manuales".
+- **Consecuencias**: el awk legacy queda como fallback (deprecated). El
+  servicio Python tiene precedencia. `make verify-metadata` valida ≥
+  N_aulas × 33 entries. El generator y los dashboards downstream pueden
+  asumir catálogo poblado.
+- **Estado**: Aceptada.
+
+## ADR-021 — Derivations declarativas vendor → production (cierra L-PV-01)
+
+- **Contexto** (2026-05-10): el vendor `synthetic-generator` emite 21
+  variables por aula. La spec PPTX `simarro-prod` slide 14 lista 30
+  variables canónicas (12 vars adicionales: `temperature-indoor`, `t-voc`,
+  `max-sound-level`, `aire`, `aire_state`, `fan_speed_01..03`,
+  `fan_speed_03_state`, `light_01..02`, `valve_state`). La regla 003
+  prohíbe modificar el vendor. Necesitamos cerrar L-PV-01 sin tocar
+  `vendor/synthetic-generator/`.
+- **Decisión**: nuevo `config/domains/<dom>/derivations.yaml` con
+  declaraciones `name + source + transform + params + metadata`. Nuevo
+  módulo `extensions/bms_signal_alias/derivations.py` con 6 transforms
+  (`passthrough`, `jitter`, `linear`, `bool_to_speed`,
+  `bool_to_intensity`, `threshold_to_bool`). El `AliasSinkAdapter`
+  intercepta cada `emit(point)`, computa derived points sobre el name
+  vendor, y emite original + derivados al sink real (después del
+  rename). Determinismo preservado: RNG seeded por hash de
+  `(name, asset, ts_5s_bucket)`.
+- **Alternativas**: (a) parchear vendor con nuevos physics — descartada
+  por regla 003; (b) sink wrapper externo (no en alias adapter) —
+  descartada porque duplica responsabilidades; (c) generar las 12 vars
+  desde el host con un script post-MQTT — descartada por latencia y
+  duplicación de pipeline.
+- **Consecuencias**: emisión por aula pasa de 21 → 33 vars. Telegraf
+  consumer y processors absorben sin cambios (mismo measurement
+  `captia_point`). `metadata-bootstrap` también lee `derivations.yaml`
+  y escribe sus entries a `captia_point_meta` con field
+  `source=derivation:<transform>` para distinguir origen. Cierra
+  L-PV-01 (BLOCKER) — el generador es ahora drop-in replacement de
+  `simarro-prod` con 30/30 vars cubiertas.
+- **Estado**: Aceptada.
+
+## ADR-022 — `persistent_session = false` en Telegraf MQTT consumer
+
+- **Contexto** (2026-05-10): debug end-to-end del incidente "Telegraf
+  reporta `Wrote batch of N metrics` pero datos no aparecen en bucket".
+  Diagnóstico: el queue persistente del broker acumulaba mensajes con
+  timestamps corruptos (residuo histórico del bug `date +%s%N` en Alpine
+  publisher demo, que enviaba `ts_ns` como 10 dígitos en vez de 19,
+  interpretado como año 1970 por Telegraf). Cada restart de Telegraf
+  drenaba ese backlog; los puntos quedaban "outside retention policy" y
+  se descartaban silenciosamente con HTTP 204 sin error visible.
+- **Decisión**: `persistent_session = false` en ambos `mqtt_consumer`
+  (telemetry + events). Sin esto, el cliente recibe queue antiguo del
+  broker en cada reconnect. También eliminado `agent.statefile` (estaba
+  ligado al persistent_session). Subido `max_inflight_messages 200 →
+  1000` en Mosquitto como red de seguridad ante futuros bursts.
+- **Alternativas**: (a) mantener persistent_session=true y rotar
+  `client_id` por restart — funcionaría pero pierde mensajes al rotar
+  (cambia QoS1 contract); (b) limpiar manualmente el queue del broker
+  tras incidentes — descartada por imposibilidad de detectar el problema
+  (silent drops).
+- **Consecuencias**: pérdida del comportamiento "QoS1 from-the-last-ack"
+  tras restart de Telegraf — aceptable porque el generator vive en el
+  mismo stack y los datos perdidos son segundos de retransmisión, no
+  horas. Ganancia: 0 silent drops, troubleshooting trivial vía métricas
+  Telegraf, recovery time-to-data tras restart < 30s.
+- **Estado**: Aceptada.
 
 ## ADR-017 — `telemetry_events` bucket mantenido pese a deprecated upstream
 

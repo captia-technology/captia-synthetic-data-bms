@@ -403,11 +403,17 @@ topics: captia/+/+/+/+/event/+, captia/sniper/event
 consumer: Events Engine, dashboards de auditoría
 ```
 
-**Estado actual del repo**: NO existe.
-- `infra/influxdb/init/init_buckets_tasks.sh:62-67` solo crea 6 buckets.
-- `infra/telegraf/telegraf.conf:35-50` solo tiene 1 `mqtt_consumer` (telemetry).
-
-**Acción** (T-PV-NEW): añadir bucket + segundo `mqtt_consumer` en Telegraf con `topics = ["captia/+/+/+/+/event/+"]`. Ver `10-implementation-readiness.md`.
+**Estado actual del repo** (actualizado 2026-05-10): ✅ **implementado**.
+- `infra/influxdb/init/init_buckets_tasks.sh` crea los **7 buckets**
+  canónicos incluido `telemetry_events` (90d).
+- `infra/telegraf/telegraf.conf` define **2 `mqtt_consumer`**: uno para
+  `captia/+/+/+/+/telemetry/+` (`captia_point`) y otro para
+  `captia/+/+/+/+/event/+` + `captia/sniper/event` (`captia_cmd_event`,
+  ruteado al bucket `telemetry_events`).
+- El bucket queda **vacío en standalone** porque ningún publisher emite
+  a `event/*`; poblado en producción real por controllers tipo
+  CAPTIA-CONNECT. Documentado en
+  `docs/specs/synthetic-bms/05-observability-spec.md`.
 
 ## Measurement de `state_events` divergente
 

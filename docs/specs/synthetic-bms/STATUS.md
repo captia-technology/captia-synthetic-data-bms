@@ -1,12 +1,37 @@
 # STATUS — synthetic-bms
 
-**Última actualización**: 2026-05-09
-**Fase actual**: 11 (Polish para GitHub público) — COMPLETADA
+**Última actualización**: 2026-05-10
+**Fase actual**: 12 (Pipeline E2E + metadata-bootstrap + signal mapping completo) — COMPLETADA
 **Tarea en curso**: ninguna
-**Última tarea completada**: T-061 (README profesional)
+**Última tarea completada**: ACCIÓN 1 — 12 derivations production_name (cierra L-PV-01)
 **Tests verdes**: 46 PASS (workspace) + 129 PASS (vendor unit), 0 failed
 **Bloqueos**: ninguno
-**Próxima tarea**: tag `v0.1.0` y push a GitHub público
+**Próxima tarea**: tag `v0.2.0` con changelog completo Fase 12
+
+## Cambios en Fase 12 (2026-05-10)
+
+- **Pipeline E2E debug + fix definitivo** (commit `9eba9c8`): Telegraf
+  `persistent_session = true` causaba silent data drop tras backlog
+  acumulado en queue del broker → `false` por default ahora.
+- **Cliente MQTT único por instancia** (`9669e94`): UUID hex(8) appended
+  al `client_id` configurado para evitar colisiones MQTT spec.
+- **`RunnerService.stop()` señaliza vendor runner**: setea
+  `runner._running = False` para graceful shutdown sin threads zombi.
+- **`_MetricsCountingSink` wrapper**: instrumenta Prometheus counters
+  (`captia_bms_messages_published_total`, `connected`, `active_jobs`)
+  sin tocar vendor.
+- **`max_inflight_messages 200 → 1000`** en Mosquitto.
+- **MQTTX-Web service** (`compose/observability.yaml`): UI MQTT preconfigurada
+  con import JSON listo (`infra/mqttx/captia-bms-mqttx-config.json`).
+- **`tools/metadata-bootstrap/`** (`c87ca6f`): nuevo servicio Python (500 LOC,
+  adaptado de captia-connect) que pobla `captia_metadata` AUTOMÁTICAMENTE
+  en cada deploy. 21 vendor + 12 derived = 33 vars × N aulas.
+- **12 derivations vendor → production** (`88ff7d7`): cierra L-PV-01
+  completo. Nuevo `derivations.yaml` + `derivations.py` con 6 transforms.
+  Cubre las 30 vars del PPTX simarro-prod slide 14.
+- **Auditoría docs cross-repo**: drifts corregidos (6→7 buckets, 21→33
+  vars, persistent_session documented, metadata-bootstrap doc, derivations
+  doc).
 
 ## Histórico
 

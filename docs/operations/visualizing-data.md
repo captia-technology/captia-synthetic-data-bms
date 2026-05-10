@@ -227,7 +227,7 @@ Sin abrir UI:
 
 ```powershell
 make smoke              # healthchecks + verify-canonical-schema
-make verify:influx      # 6 buckets esperados + tags presentes
+make verify-metadata    # 33 vars × N aulas en captia_metadata + 1 captia_domain_meta
 make verify:mqtt        # publish + subscribe round-trip
 ```
 

@@ -5,18 +5,41 @@
 Recorrido de un único punto de telemetría desde el sensor BMS de AULA01
 hasta su visualización en Grafana.
 
+## Pre-requisito — bootstrap del catálogo
+
+Antes de cualquier flujo de telemetría, en el primer arranque (y en cada
+deploy) el servicio one-shot `metadata-bootstrap`
+(`tools/metadata-bootstrap/bootstrap.py`, encadenado tras `influx-init`
+en `compose/data-plane-init.yaml`) puebla el bucket `captia_metadata`
+con `N_aulas × 33 vars` entries (21 vendor + 12 derivadas) más 1
+`captia_domain_meta`. Esto permite a dashboards y queries Flux
+correlacionar telemetría con `display_name`, `unit`, `range_min/max`,
+`category`, `metric_kind` y `storage_mode` mediante JOIN por los tags
+compartidos `domain_id, site_id, variable, captia_env`.
+
 ## Escenario
 
 El sensor de CO₂ de AULA01 mide 712 ppm a las 08:05:45 UTC del 2026-05-10.
 
-## Paso 1 — el sensor publica
+## Paso 1 — el generator publica
+
+El `bms-data-generator` ejecuta su loop interno (vendor `ScenarioRunner`),
+genera DataPoints físicos y los pasa al `AliasSinkAdapter`. Antes de
+publicar al broker, el adapter:
+
+1. **Deriva** 0+ DataPoints adicionales según `derivations.yaml` (ej.
+   `co2 → t-voc`, `temperature → temperature-indoor`).
+2. **Renombra** vendor → production_name según `variables.yaml` (ej.
+   `humidity → relative-humidity`).
+
+Cada DataPoint se publica vía paho-mqtt al broker con QoS 1:
 
 ```
 Topic:   captia/dev/default/ies_simarro/AULA01/telemetry/co2
 Payload: {"value": 712, "ts_ns": 1714572345000000000}
 ```
 
-QoS 1. El sensor no espera más allá del ACK del broker.
+El sensor real (en producción) sigue el mismo formato (drop-in replacement).
 
 ## Paso 2 — Mosquitto enruta
 
@@ -79,12 +102,26 @@ Grafana muestra la curva CO₂ AULA01 en tiempo real.
 
 ## Variantes
 
-- **`ac_state` (on-change)**: salta paso 5 (no rollup); va directamente a
-  `state_events` con dedup.
-- **Eventos del sistema**: topic `event/{name}` → bucket
-  `telemetry_events`.
-- **Etiquetas de fallo Caso C**: measurement separado `captia_fault_labels`
-  en `state_events`.
+- **`ac_state` (on-change)**: salta paso 5 (no rollup); el processor
+  `processors.clone` de Telegraf duplica el point a measurement
+  `captia_point_state` con `stat=last` y va al bucket `state_events`
+  vía dedup. Variables on-change incluidas: sufijos `*_state`, `*_sp`,
+  `*_setpoint`, `*_cmd`, `*_mode`, `relay_*`, `fault.*`, más explícitas
+  `ac_control`, `aire_state`, `valve_control`, `valve_state`,
+  `fan_speed_03_state`.
+- **Eventos cmd/ack**: topic `event/{name}` → measurement
+  `captia_cmd_event` → bucket `telemetry_events`. **Vacío en standalone**
+  (sólo poblado por controllers reales tipo `captia-connect` con SCADA).
+- **Etiquetas de fallo Caso C**: variables `fault.<tipo>` (4 tipos:
+  `sensor_drift`, `valve_stuck`, `fan_failure`, `refrigerant_low`)
+  emitidas por `extensions/bms_calibration/FaultEventEmitter` → measurement
+  `captia_point` (no separado) → clonadas a `state_events`.
+- **Variables derivadas** (12 vars del PPTX simarro-prod): el
+  `AliasSinkAdapter` aplica un transform declarativo
+  (`passthrough`, `jitter`, `linear`, `bool_to_speed`,
+  `bool_to_intensity`, `threshold_to_bool`) sobre el DataPoint vendor y
+  emite un point adicional con `variable=<production_name>`. Mismas rutas
+  downstream que el original.
 
 ## Latencia
 
@@ -97,7 +134,7 @@ Total mediana: **~65 ms**. Ver `docs/audit/E2E_VALIDATION_REPORT.md`.
 
 ## Ejecutar este flujo
 
-- [Quickstart](../QUICKSTART.md) levanta los 8 servicios.
+- [Quickstart](../QUICKSTART.md) levanta los 10 servicios + 2 one-shots.
 - [`notebooks/01_case_A_pipeline_iot/02_publicacion_mqtt_a_influxdb.ipynb`](https://github.com/captia-technology/CAPTIA-SYNTHETIC-DATA-BMS/blob/main/notebooks/01_case_A_pipeline_iot/02_publicacion_mqtt_a_influxdb.ipynb)
   reproduce paso 1 en clase.
 - [`notebooks/01_case_A_pipeline_iot/03_validacion_telegraf_influx_grafana.ipynb`](https://github.com/captia-technology/CAPTIA-SYNTHETIC-DATA-BMS/blob/main/notebooks/01_case_A_pipeline_iot/03_validacion_telegraf_influx_grafana.ipynb)

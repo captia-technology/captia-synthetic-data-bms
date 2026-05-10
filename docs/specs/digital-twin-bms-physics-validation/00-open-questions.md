@@ -8,20 +8,35 @@ Inventario de ambigüedades, divergencias y deudas técnicas detectadas durante 
 
 ## Lagunas críticas (bloquean validación robusta)
 
-### L-PV-01 — Catálogo de variables vendor ↔ producción divergente [BLOCKER]
+### L-PV-01 — Catálogo de variables vendor ↔ producción divergente [CERRADO 2026-05-10]
 
-- **Hallazgo (actualizado tras revisar PPTX)**: `vendor/synthetic-generator/config/domains/bms_classrooms/variables.yaml:24-202` define 21 variables con nombres `temperature`, `humidity`, `co2`, `power`, `energy`, `presence_pir`, `outdoor_temp`, `daylight_lux`, `thermostat_setpoint`, `hvac_mode`, `hvac_enable`, `heating_valve_pos`, `scene_mode`, `relay_1..relay_4`, `iaq_index`, `noise`, `illuminance`, `occupancy`.
-  
-  La **producción real en `simarro-prod`** (ground truth `docs/influxdb-simarro-buckets.pptx` slide 14, snapshot 2026-03-28) usa nombres **completamente distintos**: `temperature_01`, `temperature_01_sp`, `temperature-indoor`, `relative-humidity`, `t-voc`, `iaq-index`, `avg-sound-level`, `max-sound-level`, `luminosity`, `occupancy` (bool), `people-count`, `power_01`, `ac_state`, `ac_control`, `aire`, `aire_state`, `fan_speed_01..03` + `_state`, `light_01..02` + `_state`, `valve_control`, `valve_state`.
-
-  La spec `docs/specs/synthetic-bms/02-domain-spec.md:60-85` parcialmente alinea con producción (usa `temperature_01`, `power_01`, etc.) pero también lista variables que **no existen ni en vendor ni en producción** (`temperature_supply`, `temperature_return`, `solar_irradiance`).
-- **Impacto severo**: el generador sintético **NO es drop-in replacement** de telemetría real. Cualquier dashboard, alerta, query Flux, modelo ML entrenado contra producción **no funciona** contra datos sintéticos.
-- **Propuesta**:
-  - Crear nueva spec `11-production-signal-mapping.md` con tabla canónica vendor → producción (entregada).
-  - Implementar override de `config/domains/bms_classrooms/variables.yaml` con nombres alineados a producción + AliasSink wrapper (T-PV-21..23 en `10-*`).
-  - Rectificar `synthetic-bms/02-domain-spec.md` eliminando `temperature_supply`, `temperature_return`, `solar_irradiance`, `t_voc` (con underscore — el real es `t-voc`).
+- **Estado**: ✅ **CERRADO** en commit `88ff7d7` (2026-05-10). Las 30 vars
+  del PPTX simarro-prod slide 14 están todas cubiertas:
+  - **21 vars** del vendor `synthetic-generator` renombradas via
+    `production_name:` en `config/domains/bms_classrooms/variables.yaml`
+    (cierra T-PV-21..23) — implementación pre-existente en
+    `extensions/bms_signal_alias/AliasSinkAdapter` (commit pre-2026-05-10).
+  - **12 vars adicionales** generadas declarativamente en
+    `config/domains/bms_classrooms/derivations.yaml` con 6 transforms
+    (`passthrough`, `jitter`, `linear`, `bool_to_speed`,
+    `bool_to_intensity`, `threshold_to_bool`) aplicados en
+    `extensions/bms_signal_alias/derivations.py` y enganchados al mismo
+    `AliasSinkAdapter`. Cierra L-PV-01 completamente. Ver ADR-021.
+- **Verificación**: job live con N aulas → `make verify-metadata` retorna
+  ≥ N×33 entries en `captia_point_meta` y las 12 vars derivadas
+  aparecen en bucket `telemetry` con tags canónicos. Se cubren las 30
+  variables exactas del slide 14.
+- **Hallazgo histórico (preservado para trazabilidad)**:
+  `vendor/synthetic-generator/config/domains/bms_classrooms/variables.yaml:24-202`
+  definía 21 variables con nombres vendor (`temperature`, `humidity`,
+  `co2`, etc.). La spec `docs/specs/synthetic-bms/02-domain-spec.md:60-85`
+  parcialmente alineaba con producción pero listaba variables que no
+  existen ni en vendor ni en producción (`temperature_supply`,
+  `temperature_return`, `solar_irradiance`). El gap se elevó a BLOCKER
+  estructural y se resolvió mediante alias + derivations sin tocar el
+  vendor (regla 003 preservada).
 - **Confidence**: alto.
-- **Severity**: **BLOCKER** (elevado de "blocker para reglas" a "blocker estructural para todo el caso de uso").
+- **Severity**: ~~BLOCKER~~ — **resuelto**.
 
 ### L-PV-02 — Avería física no se materializa en `state_events`
 
@@ -186,9 +201,17 @@ Inventario de ambigüedades, divergencias y deudas técnicas detectadas durante 
   - tags: 5 canónicos + `event_type ∈ {cmd_authorized, cmd_rejected, sniper_error}`
   - 7 fields string: `cmd_id, metric, target, reason, error, source, detail`
   - producer: Telegraf output #3 + 2º mqtt_consumer con topics `captia/+/+/+/+/event/+`, `captia/sniper/event`
-- **Estado actual local**:
-  - `infra/influxdb/init/init_buckets_tasks.sh:62-67` solo crea 6 buckets (falta `telemetry_events`).
-  - `infra/telegraf/telegraf.conf:35-50` solo tiene 1 `mqtt_consumer` (telemetry).
+- **Estado actual local** (actualizado 2026-05-10): ✅ **resuelto**.
+  - `infra/influxdb/init/init_buckets_tasks.sh` crea **7 buckets** incluido
+    `telemetry_events` (90d).
+  - `infra/telegraf/telegraf.conf` tiene **2 `mqtt_consumer`**: uno para
+    `captia/+/+/+/+/telemetry/+` (measurement `captia_point`) y otro para
+    `captia/+/+/+/+/event/+` + `captia/sniper/event` (measurement
+    `captia_cmd_event`) ruteado al bucket `telemetry_events`.
+  - El bucket queda **vacío en standalone** (sin captia-connect controller
+    publishing a `event/*`); poblado en producción real. Ver
+    `docs/specs/synthetic-bms/05-observability-spec.md` sección "Buckets
+    InfluxDB — comportamiento esperado".
 - **Impacto**: el generador sintético no puede emitir auditoría de comandos ni eventos de plataforma. Caso C (faults) no puede usar este canal canónico — actualmente el spec set propone marcar faults en `state_events` con `variable=fault.<tipo>`, lo cual es válido pero distinto del patrón producción.
 - **Propuesta**:
   - Añadir línea en `init_buckets_tasks.sh:67` → `create_bucket_if_missing "telemetry_events" "90d"`.

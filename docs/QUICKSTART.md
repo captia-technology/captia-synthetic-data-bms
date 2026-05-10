@@ -48,8 +48,8 @@ Esto hace:
 1. Genera `.env` con contraseñas aleatorias (la primera vez).
 2. Verifica que Docker está corriendo y los puertos están libres.
 3. Descarga las imágenes que falten (sólo la primera vez, ~1 GB).
-4. Arranca **8 contenedores**: Mosquitto, InfluxDB, Redis, Telegraf, Grafana, Prometheus, Loki, Promtail.
-5. Inicializa InfluxDB con 6 buckets y 5 tareas Flux.
+4. Arranca **10 contenedores**: Mosquitto, InfluxDB, Redis, Telegraf, Grafana, Prometheus, Loki, Promtail, MQTTX-Web, bms-data-generator. Más 2 one-shots: `influx-init` (buckets+tasks) y `metadata-bootstrap` (catálogo).
+5. Inicializa InfluxDB con 7 buckets, 5 tareas Flux y `metadata-bootstrap` (catálogo de 33 vars × N aulas: 21 vendor + 12 derivadas).
 6. Comprueba que MQTT, InfluxDB y Grafana responden.
 7. Imprime las URL para abrir en el navegador.
 

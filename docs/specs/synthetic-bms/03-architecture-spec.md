@@ -224,7 +224,7 @@ sequenceDiagram
 | FastAPI control plane | Estándar del repo padre | ADR-003 |
 | Schema canónico CAPTIA | Compatibilidad con Telegraf existente | ADR-004 |
 | Topics MQTT exactos | Replicar Telegraf consumer | ADR-005 |
-| 6 buckets InfluxDB con retenciones | Replicar data-plane existente | ADR-006 |
+| 7 buckets InfluxDB con retenciones (incluye `telemetry_events` operativo) | Replicar data-plane existente + soporte cmd/ack | ADR-006 |
 | Frecuencia 5 s telemetry | Cubre Casos A y B | ADR-007 |
 | `seed=42` default | Determinismo reproducible | ADR-008 |
 | 10 aulas default | Volumen demo manejable | ADR-009 |

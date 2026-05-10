@@ -156,13 +156,13 @@ internos). Cada uno tiene una población esperada según el modo de ejecución:
 
 | Bucket | Measurement | Origen | Standalone (este repo) | Producción (con captia-connect) |
 |--------|-------------|--------|------------------------|--------------------------------|
-| `telemetry` | `captia_point` | Telegraf consumer de `captia/+/+/+/+/telemetry/+` | **Poblado en vivo** (~12K puntos/5min con 10 aulas × 21 vars × 5s) | Igual + tráfico real de gateways/sensores |
+| `telemetry` | `captia_point` | Telegraf consumer de `captia/+/+/+/+/telemetry/+` | **Poblado en vivo** (~12K puntos/5min con 10 aulas × 33 vars × 5s; 21 vendor + 12 derived) | Igual + tráfico real de gateways/sensores |
 | `telemetry_1m` | `captia_point` (downsample) | Flux task `downsample_*_1m` | Poblado a partir del primer minuto | Igual |
 | `telemetry_15m` | `captia_point` (downsample) | Flux task `downsample_15m` (cascada desde 1m) | Poblado a los 15 min | Igual |
 | `telemetry_1h` | `captia_point` (downsample) | Flux task `downsample_1h` (cascada desde 15m) | Poblado a la hora | Igual |
 | `state_events` | `captia_point_state` | Telegraf clone+dedup (vars `*_state`, `*_sp`, `fault.*`, `ac_control`, `aire_state`, `valve_control`) | **Poblado en vivo** (~600 puntos/5min, 12 vars on-change) | Igual |
 | `telemetry_events` | `captia_cmd_event` | Telegraf consumer de `captia/+/+/+/+/event/+` | **VACÍO esperado** | Poblado por controllers (cmd/ack) |
-| `captia_metadata` | `captia_point_meta` | `infra/influxdb/init/init_buckets_tasks.sh` (one-shot al setup) | **21 entries** (catálogo de variables canónicas con `category`, `metric_kind`, `unit`) | Igual + entries adicionales para cada partner integrado |
+| `captia_metadata` | `captia_point_meta` | `tools/metadata-bootstrap/bootstrap.py` (one-shot, AUTOMÁTICO en cada deploy via `compose/data-plane-init.yaml`, `BOOTSTRAP_MODE=force`) | **33 vars × N aulas** entries (`category`, `metric_kind`, `unit`, `range_min/max`, `display_name`, `source=vendor\|derivation:<transform>`) | Igual + entries adicionales para cada partner integrado |
 
 > **`telemetry_events` vacío en standalone es comportamiento DOCUMENTADO**.
 > Este bucket recibe únicamente eventos de control bidireccional (`cmd_id`,

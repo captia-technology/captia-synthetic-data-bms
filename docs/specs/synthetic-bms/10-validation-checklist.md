@@ -41,8 +41,9 @@
 - [ ] Variables `${VAR:-default}` en compose (excepto `:?required`).
 - [ ] `depends_on: condition: service_healthy` en consumidores.
 - [ ] Red `captia-network` declarada y compartida.
-- [ ] 6 buckets InfluxDB creados: `influx bucket list`.
+- [ ] 7 buckets InfluxDB creados: `telemetry`, `telemetry_1m`, `telemetry_15m`, `telemetry_1h`, `state_events`, `telemetry_events`, `captia_metadata` (verificar con `influx bucket list`).
 - [ ] 5 tareas Flux activas: `influx task list`.
+- [ ] `captia_metadata` poblado: `make verify-metadata` retorna OK con ≥ N×33 `captia_point_meta` + 1 `captia_domain_meta`.
 
 ## Observabilidad
 

@@ -51,8 +51,8 @@ captia/{captia_env}/{captia_tenant}/{site_id}/{asset_id}/event/{variable}
 ### Asset (aula)
 
 - `asset_id` ∈ `{AULA01..AULA10}` por defecto (configurable hasta `AULA70` vía `BMS_N_AULAS`).
-- 16-21 variables por aula.
-- Independencia: cada aula tiene `np.random.default_rng(seed + asset_idx)` para sub-RNG independiente y reproducible.
+- **33 variables emitidas por aula**: 21 generadas por el vendor `synthetic-generator` (renombradas vendor → `production_name` en `variables.yaml`) + **12 derivadas** declarativamente en `config/domains/bms_classrooms/derivations.yaml` (transforms: `passthrough`, `jitter`, `linear`, `bool_to_speed`, `bool_to_intensity`, `threshold_to_bool`). Cubren las 30 variables canónicas del PPTX `simarro-prod` slide 14.
+- Independencia: cada aula tiene `np.random.default_rng(seed + asset_idx)` para sub-RNG independiente y reproducible. Las derivations añaden RNG sub-deterministic por `(name, asset, ts_5s_bucket)` para jitter reproducible dentro de la misma ventana.
 
 ### Variable (`metric_kind`)
 

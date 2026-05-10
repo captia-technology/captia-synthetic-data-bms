@@ -7,6 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — 2026-05-10 (Fase 12 — Pipeline E2E + signal mapping completo)
+
+- **`tools/metadata-bootstrap/`** — nuevo servicio Python (500 LOC,
+  adaptado de `captia-connect/tools/metadata-bootstrap`). Pobla
+  `captia_metadata` AUTOMÁTICAMENTE en cada deploy (encadenado tras
+  `influx-init`). Escribe `N_aulas × 33` rows a `captia_point_meta` +
+  1 a `captia_domain_meta`. Soporta `production_name` override y lee
+  también `derivations.yaml`. ADR-020.
+- **`config/domains/bms_classrooms/derivations.yaml`** — 12 vars derivadas
+  vendor → producción (cierra L-PV-01). Cubre las 30 vars del PPTX
+  simarro-prod slide 14: `temperature-indoor`, `t-voc`, `max-sound-level`,
+  `aire`, `aire_state`, `fan_speed_01..03`, `fan_speed_03_state`,
+  `light_01..02`, `valve_state`. ADR-021.
+- **`extensions/bms_signal_alias/derivations.py`** — engine declarativo
+  con 6 transforms (`passthrough`, `jitter`, `linear`, `bool_to_speed`,
+  `bool_to_intensity`, `threshold_to_bool`). Determinismo bit-a-bit via
+  `np.random.default_rng(seed=hash(name|asset|ts_5s_bucket))`.
+- **`AliasSinkAdapter` extendido** para emitir originales + derivados.
+  Counter `derived_count` expuesto.
+- **MQTTX-Web service** en `compose/observability.yaml` — UI MQTT con
+  config preconfigurada en `infra/mqttx/captia-bms-mqttx-config.json`
+  (auto-import de connection + 7 subscriptions + 2 scripts decode).
+- **`make verify-metadata`** — valida ≥ N×33 entries en
+  `captia_point_meta` + 1 en `captia_domain_meta`.
+- **`make metadata-bootstrap`** — re-ejecuta el bootstrap manualmente.
+- **`docs/operations/troubleshooting.md`** — entradas nuevas para "Telegraf
+  reporta Wrote pero datos no aparecen" y "Múltiples instancias compartiendo
+  client_id".
+
+### Fixed — 2026-05-10
+
+- **Pipeline E2E silent data drop** (`9eba9c8`, ADR-022): Telegraf
+  `persistent_session = true` causaba que tras restart entregase el queue
+  persistente del broker con timestamps históricos corruptos, que InfluxDB
+  rechazaba silenciosamente por retention policy. Cambiado a `false`.
+  `agent.statefile` eliminado (estaba ligado al persistent session).
+- **MQTT client_id collisions** (`9669e94`): el config YAML del scenario
+  tenía `client_id: "captia-bms-generator-demo"` fijo. Si dos procesos
+  publicaban con el mismo ID (ej. host zombi + container), MQTT spec
+  fuerza al broker a desconectar el anterior y entran en loop infinito.
+  `runner_service.py::_build_runner` ahora appende UUID hex(8) al
+  client_id configurado.
+- **`RunnerService.stop()` no paraba el runner del vendor** (`9669e94`):
+  el `stop()` previo solo marcaba el job como "stopped" pero
+  `ScenarioRunner.run_live()` (vendor) seguía publicando indefinidamente.
+  Ahora `_Job.runner` mantiene referencia al runner y `stop()` setea
+  `runner._running = False`.
+- **Métricas Prometheus no se actualizaban** (`9669e94`): nuevo
+  `_MetricsCountingSink` wrapper que instrumenta
+  `captia_bms_messages_published_total{topic}`, `captia_bms_connected`,
+  `captia_bms_active_jobs` sin tocar vendor.
+- **Mosquitto `max_inflight_messages 200 → 1000`** — red de seguridad
+  ante bursts de reconexiones.
+- **`valve_control` ahora va a `state_events`** — añadido al
+  `processors.clone.tagpass` de Telegraf (no matcheaba ningún glob).
+- **Variables `*_audit` residuales borradas** del bucket `telemetry`.
+
+### Documentation — 2026-05-10
+
+- **Drift audit profundo**: corregidos los 4 grupos de drifts identificados:
+  - "6 buckets" → "7 buckets" (`telemetry_events` añadido) en 6 archivos.
+  - "21 vars" → "33 vars (21 vendor + 12 derived)" en 5+ archivos.
+  - `persistent_session = false` documentado en troubleshooting + ADR-022.
+  - `metadata-bootstrap` documentado en specs (04, 05, 09, STATUS) +
+    `data-flow.md` con paso "Pre-requisito — bootstrap del catálogo".
+  - Derivations documentadas en `02-domain-spec.md` y `data-flow.md`.
+- **L-PV-01 cerrado** en `docs/specs/digital-twin-bms-physics-validation/00-open-questions.md`.
+- **`docs/operations/visualizing-data.md`** actualizado con `make verify-metadata`.
+- **3 nuevos ADRs**: 020 (metadata-bootstrap), 021 (derivations), 022
+  (persistent_session=false).
+
+## [Pre-2026-05-10]
+
 ### Added
 - **45 didactic notebooks** under `notebooks/` covering the 11 use cases
   (A-J + extra) of the IES Simarro AI & Big Data course. Each notebook

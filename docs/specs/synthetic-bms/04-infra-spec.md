@@ -128,7 +128,20 @@ flowchart TB
 - **Imagen**: `influxdb:2.7` (CLI).
 - **Restart**: `"no"`.
 - **Entrypoint**: `/scripts/init_buckets_tasks.sh`.
-- **Crea**: 6 buckets + 5 tareas Flux.
+- **Crea**: 7 buckets + 5 tareas Flux.
+
+### metadata-bootstrap (one-shot, AUTOMÁTICO desde 2026-05-10)
+
+- **Imagen**: build local `tools/metadata-bootstrap/Dockerfile` (python:3.12-slim).
+- **Restart**: `"no"`.
+- **Entrypoint**: `tools/metadata-bootstrap/entrypoint.sh` → `bootstrap.py`.
+- **Depends on**: `influx-init: condition: service_completed_successfully`.
+- **Modo default**: `BOOTSTRAP_MODE=force` (purga y reescribe en cada deploy).
+- **Escribe**: catálogo completo a `captia_metadata` bucket:
+  - `captia_point_meta`: `N_aulas × 33 vars` rows (21 vendor + 12 derivations).
+  - `captia_domain_meta`: 1 row con templates y namespace.
+- **Inspirado en**: `captia-connect/tools/metadata-bootstrap` (mismo patrón con
+  adición local de `production_name` y `derivations.yaml`).
 
 ## Buckets InfluxDB
 
@@ -138,8 +151,9 @@ flowchart TB
 | `telemetry_1m` | 30 días | Tarea Flux `downsample_analog_1m.flux` + `downsample_state_1m.flux` + `downsample_presence_1m.flux` + `downsample_counter_1m.flux` |
 | `telemetry_15m` | 90 días | Tarea Flux `downsample_15m.flux` |
 | `telemetry_1h` | 365 días | Tarea Flux `downsample_1h.flux` |
-| `state_events` | 90 días | Telegraf con statefile dedup on-change |
-| `captia_metadata` | infinito | Catálogo de variables (poblado al arranque) |
+| `state_events` | 90 días | Telegraf processors.clone+dedup on-change |
+| `telemetry_events` | 90 días | Telegraf consumer de `event/*` topics (vacío en standalone) |
+| `captia_metadata` | infinito | Catálogo de variables (poblado por `metadata-bootstrap` en cada deploy) |
 
 ## Volúmenes nombrados
 
@@ -187,7 +201,8 @@ Variables con default sensato vía `${VAR:-default}`:
 | IN-03 | `${VAR:-default}` usado en variables expuestas | grep en compose archivos |
 | IN-04 | `depends_on: condition: service_healthy` en consumidores | grep en compose archivos |
 | IN-05 | Sin secretos hardcodeados | `git grep -nE "password=\\|token=" compose/` solo muestra placeholders `${VAR:?required}` |
-| IN-06 | 6 buckets creados tras `influx-init` | Query `influx bucket list` |
+| IN-06 | 7 buckets creados tras `influx-init` (`telemetry`, `telemetry_1m`, `_15m`, `_1h`, `state_events`, `telemetry_events`, `captia_metadata`) | Query `influx bucket list` |
+| IN-07 | `captia_metadata` poblado por `metadata-bootstrap` con N×33 entries | `make verify-metadata` exit 0 |
 | IN-07 | 5 tareas Flux creadas | `influx task list` |
 | IN-08 | Telegraf consume topics MQTT y escribe `captia_point` en `telemetry` | `scripts/verify_canonical_schema.sh` |
 
