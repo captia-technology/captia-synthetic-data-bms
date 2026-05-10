@@ -17,7 +17,15 @@ gzip para tamaño manejable en repo.
 | `ingauge_aula01_3y.csv.gz` | 2024-09-09 → 2027-09-08 | 5 min | 315 360 | 5.1 MB | A (pipeline), D (IAQ) |
 | `lbnl_fdd_rtu_3y.csv.gz` | 2024-06-01 → 2027-05-31 | 5 min | 315 360 | 2.3 MB | C (anomalías HVAC) |
 | `traffic_camera_3y.csv.gz` | 2024-09-01 → 2027-08-31 | 15 min | 210 240 | 1.3 MB | J (tráfico DGT) |
-| **Total** | | | **1.02 M filas** | **~11 MB** | |
+| **`bms_simarro_canonical_12m.csv.gz`** ⭐ | 2025-09-01 → 2026-03-22 | 5 min, 10 aulas | **2 997 955** | **15 MB** | **TODOS los casos — schema canónico CAPTIA** |
+| **Total** | | | **~4 M filas** | **~26 MB** | |
+
+> ⭐ **`bms_simarro_canonical_12m.csv.gz`** es la salida real del **generador
+> hexagonal vendoreado del repo** ejecutado contra `bms_v1_caseB_consumption.yaml`.
+> Schema canónico CAPTIA estricto: 12 columnas (`timestamp, domain_id, site_id,
+> asset_id, variable, value, unit, data_type, point_type, quality, origin, pvn`),
+> 22 variables × 10 aulas × 5 min granularity = 3 M puntos. Idéntico bit-a-bit
+> al que produce el stack en producción (mismo seed=42, mismas físicas).
 
 ## Por qué 3 años
 
@@ -59,6 +67,46 @@ Mismas columnas que original más `fault_label` y `fault_severity` siempre prese
 Originales: `timestamp, camera_id, vehicles, weather_flag`.
 **Añadidas**: `cars, trucks, motorbikes, bicycles` (decomposición tipo
 COCO weights), `congestion_level` (`fluid` / `slow` / `dense` / `congested`).
+
+### `bms_simarro_canonical_12m.csv.gz` ⭐ (12 columnas, schema canónico CAPTIA)
+
+Producido directamente por el generador hexagonal `vendor/synthetic-generator/`
+(no por los mocks de `notebooks/_common/synthetic_mocks.py`). Schema:
+
+| Columna | Tipo | Significado |
+|---|---|---|
+| `timestamp` | ISO 8601 con TZ | Hora del muestreo (Europe/Madrid) |
+| `domain_id` | string | `bms_classrooms` (canónico CAPTIA) |
+| `site_id` | string | `ies_simarro` (canónico CAPTIA) |
+| `asset_id` | string | `AULA01..AULA10` |
+| `variable` | string | `temperature_01`, `co2`, `relative-humidity`, ... 22 variables |
+| `value` | float | Valor del field canónico |
+| `unit` | string | `°C`, `ppm`, `%`, `W`, etc. |
+| `data_type` | string | `float`, `boolean`, `int` |
+| `point_type` | string | `sensor`, `actuator`, `derived` |
+| `quality` | string | `OK`, `BAD`, `STALE` |
+| `origin` | string | `synthetic` (este repo) o `simarro-prod` (real) |
+| `pvn` | string | Process Variable Name = `${asset_id}__${variable}` |
+
+Equivalente directo al schema InfluxDB `captia_point` (los 5 tags
+[`captia_env`, `domain_id`, `site_id`, `asset_id`, `variable`] + field
+`value`). El `captia_env` se aplica en sink (default `dev`).
+
+Cómo se generó:
+
+```bash
+make demo                                                                    # arrancar infra
+curl -X POST http://localhost:8121/v1/datasets/export                        \
+     -H "Authorization: Bearer $BMS_API_TOKEN"                               \
+     -H "Content-Type: application/json"                                     \
+     -d '{"config_path":"/app/config/projects/bms_v1_caseB_consumption.yaml",\
+          "format":"csv_long","months":12,"include_faults":false}'
+# → /app/output/ies_simarro_12m_*.csv (380 MB sin comprimir)
+docker cp captia-bms-generator:/app/output/ies_simarro_12m_*.csv ./output/
+gzip -9 output/ies_simarro_12m_*.csv
+```
+
+Compresión: 380 MB → 15 MB (ratio 25×, típico CSV con tags repetitivos).
 
 ## Cómo se generan
 
