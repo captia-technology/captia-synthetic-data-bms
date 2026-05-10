@@ -25,20 +25,31 @@
 
 ## Quiénes somos
 
-**CAPTIA Technology** es una empresa española especializada en plataformas
-**AI-first** de análisis de datos industriales y energéticos en tiempo real.
-Operamos desde la Comunidad Valenciana con foco en:
+> **"Operacionalizamos inteligencia en entornos reales."**
+> — claim corporativo de CAPTIA Technology
 
-- **Edificación inteligente** (BMS — Building Management Systems).
-- **Energía** (predicción consumo, detección anomalías HVAC, optimización).
-- **Industria 4.0** (SCADA, MES, alarmas ISA-18.2, mantenimiento predictivo).
-- **Educación técnica** (FP, universidades, banco de pruebas docente).
+**CAPTIA Technology** es una *empresa-sistema* industrial: conecta sistemas,
+energía, datos y negocio para transformar operaciones fragmentadas en
+sistemas inteligentes y accionables. La propuesta gira en torno a una
+arquitectura integrada que conecta **lo existente** (PLC, sensores, ERP) con
+**lo nuevo** (visibilidad operativa en tiempo real e IA aplicada) sin
+*rip-and-replace*.
 
-Nuestra plataforma comercial **[Captia.ai](https://captiatechnology.com)**
-permite visualizar datos en tiempo real, consultar con IA contextual,
-generar informes automáticos en PDF, automatizar alertas/acciones, y
-gestionar alarmas industriales con ciclo ISA-18.2 completo — todo
-multi-tenant.
+La suite Captia se compone de cinco productos articulados como una cadena de valor:
+
+| Producto | Rol en la cadena | Qué hace (descripción literal) |
+|----------|------------------|-------------------------------|
+| **Captia Consulting** | Define y diseña | Assessment operacional |
+| **Captia Connect** | Conecta e integra | Sistemas conectados (PLC, sensores, ERP) |
+| **Captia AI** | Interpreta y automatiza | Dashboards operacionales |
+| **Captia Energy** | Integra la capa energética | Capa energética conectada y monitorizada |
+| **Captia Service** | Ejecuta en la capa de negocio | Implantaciones Odoo |
+
+**Sectores objetivo** declarados en captiatechnology.com: *plantas industriales,
+instalaciones energéticas y operaciones de producción*. Stack tecnológico de
+referencia: Odoo, PLC, sensores, ERP.
+
+> Más información: <https://captiatechnology.com>.
 
 ---
 
