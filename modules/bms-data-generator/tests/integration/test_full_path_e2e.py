@@ -95,6 +95,7 @@ def _run_scenario(scenario_path: Path, alias_enabled: bool = True) -> int:
     os.environ["BMS_PRODUCTION_ALIAS_ENABLED"] = "true" if alias_enabled else "false"
     # Force re-read of cached settings.
     from bms_data_generator.config import reset_settings_cache
+
     reset_settings_cache()
 
     from bms_data_generator.services.runner_service import _build_runner
@@ -108,6 +109,7 @@ def _run_scenario(scenario_path: Path, alias_enabled: bool = True) -> int:
 def _read_csv_rows(csv_path: Path) -> list[dict]:
     """Read csv_long output as list of dicts."""
     import csv
+
     with csv_path.open(encoding="utf-8") as f:
         reader = csv.DictReader(f)
         return list(reader)
@@ -136,11 +138,24 @@ def test_e2e_alias_sink_emits_production_names(tmp_path: Path) -> None:
 
     # No debe haber variables vendor crudas (que tienen production_name override).
     vendor_only_names = {
-        "temperature", "humidity", "noise", "illuminance", "iaq_index",
-        "outdoor_temp", "daylight_lux", "thermostat_setpoint",
-        "hvac_mode", "hvac_enable", "heating_valve_pos",
-        "relay_1", "relay_2", "relay_3", "relay_4",
-        "power", "energy", "presence_pir",
+        "temperature",
+        "humidity",
+        "noise",
+        "illuminance",
+        "iaq_index",
+        "outdoor_temp",
+        "daylight_lux",
+        "thermostat_setpoint",
+        "hvac_mode",
+        "hvac_enable",
+        "heating_valve_pos",
+        "relay_1",
+        "relay_2",
+        "relay_3",
+        "relay_4",
+        "power",
+        "energy",
+        "presence_pir",
     }
     leaked_vendor = emitted_vars & vendor_only_names
     assert not leaked_vendor, f"nombres vendor leak en output: {leaked_vendor}"
@@ -164,10 +179,12 @@ def test_e2e_schema_canonical_compliance(tmp_path: Path) -> None:
         assert row["asset_id"], "asset_id empty"
         assert row["variable"], "variable empty"
         # casing
-        assert row["asset_id"] == row["asset_id"].upper(), \
+        assert row["asset_id"] == row["asset_id"].upper(), (
             f"asset_id not uppercase: {row['asset_id']}"
-        assert row["variable"] == row["variable"].lower(), \
+        )
+        assert row["variable"] == row["variable"].lower(), (
             f"variable not lowercase: {row['variable']}"
+        )
         # value field
         assert row["value"], f"value empty for {row['asset_id']}.{row['variable']}"
         # parseable as float
@@ -229,6 +246,7 @@ def test_e2e_alias_count_consistency(tmp_path: Path) -> None:
 
     os.environ["BMS_PRODUCTION_ALIAS_ENABLED"] = "true"
     from bms_data_generator.config import reset_settings_cache
+
     reset_settings_cache()
     from bms_data_generator.services.runner_service import _build_runner
 

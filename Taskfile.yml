@@ -172,3 +172,34 @@ tasks:
     desc: "Render the merged compose config"
     cmds:
       - "{{.COMPOSE}} config"
+
+  notebooks:data:
+    desc: "Regenerate deterministic mock CSVs for the didactic notebooks"
+    cmds:
+      - uv run python scripts/build_notebook_data.py
+
+  notebooks:build:
+    desc: "Regenerate the 45 didactic notebooks (idempotent)"
+    deps: [notebooks:data]
+    cmds:
+      - uv run python -m scripts.build_notebooks
+
+  notebooks:test:
+    desc: "Run notebook integrity audit (JSON, schema citation, no secrets)"
+    cmds:
+      - uv run pytest tests/integration/test_notebooks_integrity.py -v
+
+  notebooks:lab:
+    desc: "Open Jupyter Lab pointing at notebooks/ (auto-installs jupyterlab)"
+    cmds:
+      - uv run --with jupyterlab --with ipykernel jupyter lab notebooks/
+
+  docs:build:
+    desc: "Build the MkDocs Material site"
+    cmds:
+      - uv run --with mkdocs-material mkdocs build
+
+  docs:serve:
+    desc: "Serve the MkDocs Material site locally on :8000"
+    cmds:
+      - uv run --with mkdocs-material mkdocs serve --dev-addr 0.0.0.0:8000

@@ -1,12 +1,17 @@
 # syntax=docker/dockerfile:1.6
 FROM python:3.12-slim AS builder
-WORKDIR /build
+# CRÍTICO: WORKDIR debe coincidir entre builder y runtime para que los
+# `_editable_impl_*.pth` (creados por `uv pip install -e`) apunten a paths
+# que existen en runtime. Si difieren (/build vs /app), import falla con
+# `No module named bms_data_generator`.
+WORKDIR /app
 RUN pip install --no-cache-dir uv==0.5.18
 
 # Copia el workspace completo para resolución de dependencias entre miembros.
 COPY pyproject.toml uv.lock ./
 COPY vendor/synthetic-generator/ ./vendor/synthetic-generator/
 COPY extensions/bms_calibration/ ./extensions/bms_calibration/
+COPY extensions/bms_signal_alias/ ./extensions/bms_signal_alias/
 COPY modules/bms-data-generator/ ./modules/bms-data-generator/
 
 RUN uv venv /opt/venv && \
@@ -14,6 +19,7 @@ RUN uv venv /opt/venv && \
     uv pip install \
         -e vendor/synthetic-generator \
         -e extensions/bms_calibration \
+        -e extensions/bms_signal_alias \
         -e modules/bms-data-generator
 
 FROM python:3.12-slim AS runtime
@@ -26,6 +32,7 @@ RUN useradd --create-home --shell /bin/bash --uid 10001 bmsapp
 COPY --from=builder /opt/venv /opt/venv
 COPY vendor/synthetic-generator/ ./vendor/synthetic-generator/
 COPY extensions/bms_calibration/ ./extensions/bms_calibration/
+COPY extensions/bms_signal_alias/ ./extensions/bms_signal_alias/
 COPY modules/bms-data-generator/src/ ./modules/bms-data-generator/src/
 COPY config/ ./config/
 

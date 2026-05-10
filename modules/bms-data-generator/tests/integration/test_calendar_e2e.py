@@ -21,8 +21,9 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 DOMAIN_YAML_LOCAL = REPO_ROOT / "config" / "domains" / "bms_classrooms" / "domain.yaml"
 
 
-def _write_scenario(tmp_path: Path, output_csv: Path, start: str, end: str,
-                    n_aulas: int = 2) -> Path:
+def _write_scenario(
+    tmp_path: Path, output_csv: Path, start: str, end: str, n_aulas: int = 2
+) -> Path:
     """Write scenario YAML with explicit domain.config_path → local override.
 
     Sin config_path explícito, el vendor carga su propio domain.yaml (que NO
@@ -30,10 +31,20 @@ def _write_scenario(tmp_path: Path, output_csv: Path, start: str, end: str,
     que el calendario Valencia 2025-26 oficial entre en vigor.
     """
     scenario = {
-        "project": {"namespace": "captia", "site_id": "ies_simarro",
-                    "modo": "synthetic", "schema_version": "v0.1"},
-        "simulation": {"timezone": "Europe/Madrid", "seed": 42,
-                       "start": start, "end": end, "freq": "5min", "n_aulas": n_aulas},
+        "project": {
+            "namespace": "captia",
+            "site_id": "ies_simarro",
+            "modo": "synthetic",
+            "schema_version": "v0.1",
+        },
+        "simulation": {
+            "timezone": "Europe/Madrid",
+            "seed": 42,
+            "start": start,
+            "end": end,
+            "freq": "5min",
+            "n_aulas": n_aulas,
+        },
         "domain": {"id": "bms_classrooms", "config_path": str(DOMAIN_YAML_LOCAL)},
         "phases": {"backfill": {"enabled": True}, "live": {"enabled": False}},
         "anomalies": {"p_missing": 0.0, "p_outlier": 0.0},
@@ -48,6 +59,7 @@ def _write_scenario(tmp_path: Path, output_csv: Path, start: str, end: str,
 def _run_and_get_rows(scenario_path: Path) -> list[dict]:
     os.environ["BMS_PRODUCTION_ALIAS_ENABLED"] = "true"
     from bms_data_generator.config import reset_settings_cache
+
     reset_settings_cache()
     from bms_data_generator.services.runner_service import _build_runner
 
@@ -79,8 +91,9 @@ def _hvac_enable_duty(rows: list[dict], variable: str = "ac_state") -> float:
 def test_lectivo_day_has_occupancy(tmp_path: Path) -> None:
     """Lunes 2026-01-12 (lectivo, fuera de vacaciones) debe tener occupancy > 0."""
     csv_path = tmp_path / "lectivo.csv"
-    scen = _write_scenario(tmp_path, csv_path,
-                           start="2026-01-12T08:00:00", end="2026-01-12T15:00:00", n_aulas=2)
+    scen = _write_scenario(
+        tmp_path, csv_path, start="2026-01-12T08:00:00", end="2026-01-12T15:00:00", n_aulas=2
+    )
     rows = _run_and_get_rows(scen)
     occ_mean = _occupancy_mean(rows, "people-count")
     assert occ_mean > 5.0, f"lectivo expected occupancy > 5, got {occ_mean:.2f}"
@@ -91,8 +104,9 @@ def test_lectivo_day_has_occupancy(tmp_path: Path) -> None:
 def test_navidad_day_has_zero_occupancy(tmp_path: Path) -> None:
     """2025-12-26 (Navidad, expandido en T-PV-09) debe tener occupancy ≈ 0."""
     csv_path = tmp_path / "navidad.csv"
-    scen = _write_scenario(tmp_path, csv_path,
-                           start="2025-12-26T08:00:00", end="2025-12-26T15:00:00", n_aulas=2)
+    scen = _write_scenario(
+        tmp_path, csv_path, start="2025-12-26T08:00:00", end="2025-12-26T15:00:00", n_aulas=2
+    )
     rows = _run_and_get_rows(scen)
     occ_mean = _occupancy_mean(rows, "people-count")
     assert occ_mean < 1.0, f"Navidad expected occupancy < 1, got {occ_mean:.2f}"
@@ -103,8 +117,9 @@ def test_navidad_day_has_zero_occupancy(tmp_path: Path) -> None:
 def test_fallas_day_has_zero_occupancy(tmp_path: Path) -> None:
     """2026-03-17 (Fallas, expandido en T-PV-09) debe tener occupancy ≈ 0."""
     csv_path = tmp_path / "fallas.csv"
-    scen = _write_scenario(tmp_path, csv_path,
-                           start="2026-03-17T08:00:00", end="2026-03-17T15:00:00", n_aulas=2)
+    scen = _write_scenario(
+        tmp_path, csv_path, start="2026-03-17T08:00:00", end="2026-03-17T15:00:00", n_aulas=2
+    )
     rows = _run_and_get_rows(scen)
     occ_mean = _occupancy_mean(rows, "people-count")
     assert occ_mean < 1.0, f"Fallas expected occupancy < 1, got {occ_mean:.2f}"
@@ -115,8 +130,9 @@ def test_fallas_day_has_zero_occupancy(tmp_path: Path) -> None:
 def test_pascua_day_has_zero_occupancy(tmp_path: Path) -> None:
     """2026-04-08 (Pascua, expandido en T-PV-09) debe tener occupancy ≈ 0."""
     csv_path = tmp_path / "pascua.csv"
-    scen = _write_scenario(tmp_path, csv_path,
-                           start="2026-04-08T08:00:00", end="2026-04-08T15:00:00", n_aulas=2)
+    scen = _write_scenario(
+        tmp_path, csv_path, start="2026-04-08T08:00:00", end="2026-04-08T15:00:00", n_aulas=2
+    )
     rows = _run_and_get_rows(scen)
     occ_mean = _occupancy_mean(rows, "people-count")
     assert occ_mean < 1.0, f"Pascua expected occupancy < 1, got {occ_mean:.2f}"
@@ -127,8 +143,9 @@ def test_pascua_day_has_zero_occupancy(tmp_path: Path) -> None:
 def test_weekend_has_zero_occupancy(tmp_path: Path) -> None:
     """Sábado 2026-01-17 (fin de semana) debe tener occupancy ≈ 0."""
     csv_path = tmp_path / "weekend.csv"
-    scen = _write_scenario(tmp_path, csv_path,
-                           start="2026-01-17T08:00:00", end="2026-01-17T15:00:00", n_aulas=2)
+    scen = _write_scenario(
+        tmp_path, csv_path, start="2026-01-17T08:00:00", end="2026-01-17T15:00:00", n_aulas=2
+    )
     rows = _run_and_get_rows(scen)
     occ_mean = _occupancy_mean(rows, "people-count")
     assert occ_mean < 1.0, f"Weekend expected occupancy < 1, got {occ_mean:.2f}"

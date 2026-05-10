@@ -34,16 +34,17 @@ Microservicio listo para producir 6–12 meses de telemetría sintética conform
 2. [Arquitectura](#arquitectura)
 3. [Quickstart](#quickstart)
 4. [Casos de uso](#casos-de-uso)
-5. [API HTTP](#api-http)
-6. [Schema canónico CAPTIA](#schema-canónico-captia)
-7. [Stack y versiones](#stack-y-versiones)
-8. [Configuración](#configuración)
-9. [Comandos `task` / `make`](#comandos-task--make)
-10. [Tests y calidad](#tests-y-calidad)
-11. [Documentación y specs](#documentación-y-specs)
-12. [FAQ](#faq)
-13. [Contribuir](#contribuir)
-14. [Licencia y soporte](#licencia-y-soporte)
+5. [Notebooks didácticos](#notebooks-didácticos)
+6. [API HTTP](#api-http)
+7. [Schema canónico CAPTIA](#schema-canónico-captia)
+8. [Stack y versiones](#stack-y-versiones)
+9. [Configuración](#configuración)
+10. [Comandos `task` / `make`](#comandos-task--make)
+11. [Tests y calidad](#tests-y-calidad)
+12. [Documentación y specs](#documentación-y-specs)
+13. [FAQ](#faq)
+14. [Contribuir](#contribuir)
+15. [Licencia y soporte](#licencia-y-soporte)
 
 ---
 
@@ -163,6 +164,46 @@ task quickstart     # one-shot
 
 Cada caso tiene su YAML en [`config/projects/`](config/projects/) y su dashboard en
 [`infra/grafana/dashboards/`](infra/grafana/dashboards/).
+
+> **Material docente extendido:** los 11 casos del Curso de Especialización
+> IES Simarro (A–J + extra) tienen una página por caso en
+> [`docs/use-cases/`](docs/use-cases/) con datos esperados, capas Medallion,
+> notebooks asociados y errores comunes.
+
+---
+
+## Notebooks didácticos
+
+45 notebooks ejecutables en [`notebooks/`](notebooks/) con la estructura
+Medallion (bronce → plata → oro) y los 11 casos de uso del curso.
+
+| Carpeta | Notebooks | Tema |
+|---------|-----------|------|
+| [`00_project_overview/`](notebooks/00_project_overview/) | 3 | Medallion, schema CAPTIA, conexión `.env` |
+| [`01_case_A_pipeline_iot/`](notebooks/01_case_A_pipeline_iot/) | 3 | Pipeline MQTT → Telegraf → InfluxDB |
+| [`02_case_B_energy_forecasting/`](notebooks/02_case_B_energy_forecasting/) | 5 | Forecast consumo 24 h |
+| [`03_case_C_hvac_anomaly_detection/`](notebooks/03_case_C_hvac_anomaly_detection/) | 5 | Anomalías HVAC IF + AE |
+| [`04_case_D_iaq_occupancy/`](notebooks/04_case_D_iaq_occupancy/) | 5 | IAQ + ocupación desde ambiente |
+| [`05_case_E_weather_solar/`](notebooks/05_case_E_weather_solar/) | 4 | ERA5 → predicción solar |
+| [`06_case_F_mlops/`](notebooks/06_case_F_mlops/) | 3 | MLflow + lakeFS, reproducibilidad |
+| [`07_case_G_data_quality_agents/`](notebooks/07_case_G_data_quality_agents/) | 4 | Reglas calidad + agentes |
+| [`08_case_H_rag_chatbot/`](notebooks/08_case_H_rag_chatbot/) | 5 | Tools + RAG + golden set |
+| [`09_case_I_spark_vs_pandas/`](notebooks/09_case_I_spark_vs_pandas/) | 4 | Benchmark big data |
+| [`10_case_J_traffic_yolo/`](notebooks/10_case_J_traffic_yolo/) | 4 | Captura DGT + YOLO + meteo |
+
+Helpers reutilizables en [`notebooks/_common/`](notebooks/_common/) (schema,
+conexión, mocks, plotting, plantilla 18 secciones). Mocks deterministas en
+[`notebooks/_data/`](notebooks/_data/) (`seed=42`).
+
+```bash
+uv run python scripts/build_notebook_data.py        # genera mocks
+uv run python -m scripts.build_notebooks            # regenera 45 .ipynb
+uv run --with jupyterlab jupyter lab notebooks/     # abre Jupyter Lab
+```
+
+Ver [`docs/notebooks/how-to-run.md`](docs/notebooks/how-to-run.md) para
+instrucciones detalladas y el [`docs/audit/NOTEBOOK_PLAN.md`](docs/audit/NOTEBOOK_PLAN.md)
+para el plan completo (propósito, audiencia, nivel, validaciones por notebook).
 
 ---
 
@@ -323,7 +364,44 @@ flowchart LR
 
 ## Documentación y specs
 
-Spec-driven development en [`docs/specs/synthetic-bms/`](docs/specs/synthetic-bms/):
+### Sitio web (MkDocs Material)
+
+```bash
+uv run --with mkdocs-material mkdocs serve --dev-addr 0.0.0.0:8000
+```
+
+| Sección | Contenido |
+|---------|-----------|
+| [Empezar](docs/getting-started/) | Quickstart, setup local, notebooks |
+| [Arquitectura](docs/architecture/) | Medallion, CENTINELA+, schema CAPTIA, flujo de datos |
+| [Casos de uso](docs/use-cases/) | 10 casos A–J + extra, una página por caso |
+| [Notebooks](docs/notebooks/) | 45 notebooks didácticos: índice, cómo ejecutar, mapa |
+| [Contratos](docs/contracts/) | Schema InfluxDB, MQTT topics, catálogo variables, capas Medallion |
+| [Validación](docs/validation/) | E2E, calidad de datos, realismo físico, validación ML |
+| [Operación](docs/operations/) | Troubleshooting, environment, Docker |
+| [Auditoría](docs/audit/) | 11 fases cerradas, USE_CASE_MATRIX, NOTEBOOK_PLAN, DOCS_REPORT |
+| [Especificaciones](docs/specs/) | SDD synthetic-bms (00–10) y physics validation |
+| [Decisiones](docs/decisions/) | ADRs |
+| [Archivo](docs/archive/) | Documentación histórica del dominio |
+
+### Notebooks didácticos
+
+45 notebooks ejecutables en `notebooks/`. Cubren los 11 casos de uso del Curso de
+Especialización IA & Big Data del IES Simarro con la estructura Medallion bronce
+→ plata → oro:
+
+```bash
+uv run python scripts/build_notebook_data.py    # mocks deterministas
+uv run --with jupyterlab jupyter lab notebooks/  # abrir Jupyter Lab
+```
+
+Cada notebook sigue las [18 secciones obligatorias](notebooks/_common/template_outline.md)
+y el schema canónico CAPTIA. Helpers reutilizables en `notebooks/_common/`.
+
+### Spec-driven development
+
+Las specs viven en [`docs/specs/synthetic-bms/`](docs/specs/synthetic-bms/) y
+[`docs/specs/digital-twin-bms-physics-validation/`](docs/specs/digital-twin-bms-physics-validation/).
 
 | Spec | Contenido |
 |------|-----------|
@@ -342,10 +420,10 @@ Spec-driven development en [`docs/specs/synthetic-bms/`](docs/specs/synthetic-bm
 | `10-validation-checklist.md` | Checklist final por categoría |
 | `STATUS.md` | Estado actual del proyecto |
 
-Documentos fuente del dominio en `docs/`:
-[`CAPTIA_Informe_CasosDeUso_DatosSinteticos.md`](docs/CAPTIA_Informe_CasosDeUso_DatosSinteticos.md),
-[`CENTINELA_Guia_Alumnos_v4.md`](docs/CENTINELA_Guia_Alumnos_v4.md) y
-[`MEDALLION_Arquitectura_Guia_Referencia.md`](docs/MEDALLION_Arquitectura_Guia_Referencia.md).
+Documentos fuente del dominio (archivados):
+[`CAPTIA_Informe_CasosDeUso_DatosSinteticos.md`](docs/archive/CAPTIA_Informe_CasosDeUso_DatosSinteticos.md),
+[`CENTINELA_Guia_Alumnos_v4.md`](docs/archive/CENTINELA_Guia_Alumnos_v4.md) y
+[`MEDALLION_Arquitectura_Guia_Referencia.md`](docs/archive/MEDALLION_Arquitectura_Guia_Referencia.md).
 
 ---
 

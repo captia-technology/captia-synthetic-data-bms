@@ -8,6 +8,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **45 didactic notebooks** under `notebooks/` covering the 11 use cases
+  (A-J + extra) of the IES Simarro AI & Big Data course. Each notebook
+  follows an 18-section template, uses `seed=42` and ships deterministic
+  mocks under `notebooks/_data/`. Helpers in `notebooks/_common/`
+  (schema constants, InfluxDB client with `.env`, mock generators,
+  plotting, template outline).
+- **Notebook builder** under `scripts/build_notebooks/` (one module per
+  case) and `scripts/build_notebook_data.py` for idempotent regeneration.
+- **Web documentation** restructured: 28 new markdowns across
+  `docs/use-cases/`, `docs/contracts/`, `docs/validation/`,
+  `docs/operations/`, `docs/notebooks/`, `docs/getting-started/` and
+  `docs/architecture/`. Updated `mkdocs.yml` navigation, builds with
+  zero warnings.
+- **Audit phase 11**: `docs/audit/USE_CASE_MATRIX.md`,
+  `docs/audit/NOTEBOOK_PLAN.md`, `docs/audit/DOCS_REPORT.md`. STATUS
+  updated.
+- **Notebook integrity test suite** in
+  `tests/integration/test_notebooks_integrity.py` (183 parametrised
+  checks): nbformat 4 validity, traceable headers (case + medallion +
+  spec), CAPTIA schema citation, no inline secrets, importability of
+  `notebooks._common` without matplotlib, deterministic mocks.
+- **Taskfile commands**: `task notebooks:data`, `task notebooks:build`,
+  `task notebooks:test`, `task notebooks:lab`, `task docs:build`,
+  `task docs:serve`.
 - Public-release polish: Apache-2.0 license, NOTICE, CODE_OF_CONDUCT,
   CONTRIBUTING, SECURITY, CHANGELOG, GitHub workflows, dependabot,
   issue/PR templates.
@@ -17,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All absolute paths removed from configs and docs in favour of relative
   references to the upstream repository.
 - Contact email updated to `jaime.sendra@captiatechnology.com`.
+- README root extended with _Notebooks didácticos_ section and updated
+  documentation map (web sections + specs + archive).
 
 ## [0.1.0] - 2026-05-09
 
