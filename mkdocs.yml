@@ -9,6 +9,8 @@ copyright: "Copyright &copy; 2026 CAPTIA Technology — Apache 2.0"
 theme:
   name: material
   language: es
+  logo: assets/images/logo-captia.png
+  favicon: assets/images/favicon.ico
   font:
     text: Inter
     code: JetBrains Mono
@@ -163,6 +165,7 @@ nav:
     - Healthchecks: operations/healthchecks.md
     - Dependabot: operations/dependabot.md
   - CAPTIA Corporate:
+    - Sobre CAPTIA: captia-corporate/about.md
     - Presentación: captia-corporate/index.md
     - Resumen ejecutivo (1 pág): captia-corporate/executive-summary.md
     - Business case (ROI detallado): captia-corporate/business-case.md

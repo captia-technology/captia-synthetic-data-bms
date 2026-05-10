@@ -16,15 +16,49 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Spec-Driven](https://img.shields.io/badge/spec--driven-yes-2ea44f)](docs/specs/synthetic-bms/)
 
-📖 **Documentación completa**: <https://captia-technology.github.io/captia-synthetic-data-bms/>
+<img src="docs/assets/images/logo-captia-blue.png" alt="CAPTIA Technology" width="180">
+
+📖 **Documentación**: <https://captia-technology.github.io/captia-synthetic-data-bms/>
+🌐 **Plataforma comercial**: <https://captiatechnology.com>
 
 </div>
 
-> **¿Qué es esto?** Un microservicio que genera telemetría sintética realista de aulas
-> educativas (CO₂, temperatura, humedad, ocupación, climatización, consumo eléctrico),
-> la publica con los topics MQTT y schema exactos de CAPTIA-CONNECT en producción y la
-> visualiza end-to-end (MQTT → Telegraf → InfluxDB → Grafana). Sirve para entrenar
-> modelos de ML, probar el pipeline IoT entero o como banco de pruebas docente.
+## Quiénes somos
+
+**CAPTIA Technology** es una empresa española especializada en plataformas
+**AI-first** de análisis de datos industriales y energéticos en tiempo real.
+Operamos desde la Comunidad Valenciana con foco en:
+
+- **Edificación inteligente** (BMS — Building Management Systems).
+- **Energía** (predicción consumo, detección anomalías HVAC, optimización).
+- **Industria 4.0** (SCADA, MES, alarmas ISA-18.2, mantenimiento predictivo).
+- **Educación técnica** (FP, universidades, banco de pruebas docente).
+
+Nuestra plataforma comercial **[Captia.ai](https://captiatechnology.com)**
+permite visualizar datos en tiempo real, consultar con IA contextual,
+generar informes automáticos en PDF, automatizar alertas/acciones, y
+gestionar alarmas industriales con ciclo ISA-18.2 completo — todo
+multi-tenant.
+
+---
+
+## Qué es este repo
+
+> **CAPTIA Synthetic Data BMS** es la primera apertura **open-source bajo
+> Apache 2.0** del ecosistema CAPTIA. Un microservicio que genera
+> telemetría sintética realista de aulas educativas (CO₂, temperatura,
+> humedad, ocupación, climatización, consumo eléctrico), la publica con
+> los topics MQTT y schema exactos de CAPTIA en producción y la visualiza
+> end-to-end (MQTT → Telegraf → InfluxDB → Grafana).
+
+**Sirve para**:
+- Entrenar modelos ML de forecasting, anomalías HVAC, IAQ.
+- Probar el pipeline IoT entero sin depender de telemetría real.
+- Banco de pruebas docente para FP IES Simarro y partners académicos.
+- Demostrar el rigor técnico de la suite CAPTIA (10 patches físicos con
+  tests, score realismo 0.94, schema canónico inviolable).
+
+100 % datos sintéticos · sin PII · `seed=42` reproducible bit-a-bit · 45 notebooks didácticos.
 
 ---
 

@@ -2,7 +2,7 @@
 
 > **Última verificación:** 2026-05-10
 > **Estado consolidado:** [STATUS](STATUS.md).
-> **Repo de referencia:** `C:\CAPTIA\CAPTIA-CONNECT\captia-connect`.
+> **Repo de referencia:** `captia-connect` (interno).
 
 ## Reportes producidos
 

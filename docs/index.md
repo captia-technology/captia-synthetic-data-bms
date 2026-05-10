@@ -1,14 +1,27 @@
+<p align="center">
+  <img src="assets/images/logo-captia-blue.png" alt="CAPTIA Technology" width="200">
+</p>
+
 # CAPTIA Synthetic Data BMS
+
+> **Plataforma AI-first de análisis de datos industriales y energéticos.**
+> Multi-tenant · Tiempo real · Dashboards interactivos · Informes automáticos · Automatizaciones · IA contextual
+
+[Sobre CAPTIA Technology →](captia-corporate/about.md) · [Plataforma comercial captia.ai](https://captiatechnology.com) · [Repo público GitHub](https://github.com/captia-technology/captia-synthetic-data-bms)
+
+---
 
 > **Última verificación:** 2026-05-10
 > **Stack:** Python 3.12 · FastAPI · MQTT · InfluxDB 2.7 · Telegraf · Redis · Grafana 11 · Prometheus · Loki · Promtail
 > **Licencia:** Apache 2.0
 > **Contacto:** [jaime.sendra@captiatechnology.com](mailto:jaime.sendra@captiatechnology.com)
 
-Microservicio generador de datos sintéticos para BMS (*Building Management
-System*) en aulas educativas (IES Simarro, Comunidad Valenciana). Reproduce
-el pipeline canónico CAPTIA `MQTT → Telegraf → InfluxDB → Grafana` con un
-generador hexagonal vendoreado y políticas de extensión locales.
+Este repositorio es un **microservicio open-source generador de datos sintéticos
+para BMS** (*Building Management System*) en aulas educativas (IES Simarro,
+Comunidad Valenciana). Reproduce el pipeline canónico CAPTIA
+`MQTT → Telegraf → InfluxDB → Grafana` con un generador hexagonal vendoreado y
+políticas de extensión locales — el mismo schema canónico y patrones que
+CAPTIA usa en producción industrial.
 
 ## ¿Qué quieres hacer?
 
