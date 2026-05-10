@@ -500,18 +500,35 @@ def corporate_section(
     valor: str,
     roi_table_md: str,
     risks_md: str = "",
+    baseline_section: str | None = None,
 ) -> tuple[str, str]:
     """Sección 20 — *Visión corporativa CAPTIA*.
 
     Bloque tipo *board pitch*: propuesta de valor, ROI estimado y riesgos
     desde la perspectiva del cliente final (CAPTIA Technology + IES Simarro
     + futuros centros CENTINELA+).
+
+    Parameters
+    ----------
+    baseline_section:
+        Sección concreta de ``docs/captia/economic_baseline.md`` que
+        ancla las cifras (e.g. ``"§2.3"``). Si se pasa, se añade una
+        nota de trazabilidad ROI obligatoria — ataca anti-patrón
+        **NA-E** (ROI sin denominador).
     """
     body = (
         f"### Propuesta de valor\n\n{valor.strip()}\n\n### ROI estimado\n\n{roi_table_md.strip()}\n"
     )
     if risks_md.strip():
         body += "\n### Riesgos y mitigaciones\n\n" + risks_md.strip() + "\n"
+    if baseline_section:
+        body += (
+            f"\n> **Trazabilidad ROI:** las cifras de esta tabla son "
+            f"derivables de [`docs/captia/economic_baseline.md`]"
+            f"(../../docs/captia/economic_baseline.md) {baseline_section}. "
+            f"Si una cifra no aparece allí, NO se reporta aquí "
+            f"(política anti NA-E).\n"
+        )
     return section(20, "Visión corporativa CAPTIA", body)
 
 

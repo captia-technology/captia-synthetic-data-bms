@@ -94,6 +94,7 @@ con $s$ semilla, $D$ dataset (versionado lakeFS), $\theta$ hiperparámetros.
             "- Drift entre generador y producción: validado por suite 211/211 PASS "
             "y score realismo físico 0.94."
         ),
+        baseline_section="Sec 1 (cartera total)",
     ),
     bibliography_section(
         [
@@ -166,6 +167,7 @@ con percentil 99 medido in-vivo $< 500$ ms.
             "- Backpressure InfluxDB en picos > 1 000 msg/s: configurar buffer "
             "Telegraf de 60 s."
         ),
+        baseline_section="Sec 2.1 (onboarding savings)",
     ),
     bibliography_section(
         [
@@ -254,6 +256,7 @@ Objetivos Simarro: $\text{MAE} \leq 0.15$ kWh, $\text{sMAPE} \leq 12\%$.
             "primer mes de captura.\n"
             "- Drift estacional: re-entrenar trimestralmente."
         ),
+        baseline_section="Sec 2.2 (ahorro consumo HVAC)",
     ),
     bibliography_section(
         [
@@ -337,6 +340,7 @@ Objetivos: $\text{F1} \geq 0.85$, $\text{TPR}@1\%\text{FPR} \geq 0.7$.
             "- False positives → fatiga de alarmas. Tunear umbral con percentil 99.\n"
             "- Drift en HVAC envejecido: incluir age-feature."
         ),
+        baseline_section="Sec 2.4 (incident reduction HVAC)",
     ),
     bibliography_section(
         [
@@ -405,6 +409,7 @@ con pesos calibrados para reflejar normativa EN 16798.
             "| Reducción quejas calidad aire | +2 000 €/año |\n"
             "| **Total año 1** | **+5 150 €** |"
         ),
+        baseline_section="Sec 2.2 (alertas IAQ)",
     ),
     bibliography_section(
         [
@@ -477,6 +482,7 @@ Objetivo Simarro: $\text{nMAE} \leq 8\%$ a 24 h, $\text{Skill} \geq 0.3$.
             "| Coste integración ERA5+AEMET | -1 200 € one-time |\n"
             "| **Payback** | **~12 meses** |"
         ),
+        baseline_section="Sec 3 (PV system)",
     ),
     bibliography_section(
         [
@@ -546,6 +552,7 @@ Trazabilidad bidireccional dataset $\leftrightarrow$ run $\leftrightarrow$ deplo
             "| Cumplimiento EU AI Act (riesgo evitado) | +20 000 € (riesgo) |\n"
             "| **Bruto** | **+1 200 €/año** + risk hedging |"
         ),
+        baseline_section="Sec 4 (compliance EU AI Act)",
     ),
     bibliography_section(
         [
@@ -616,6 +623,7 @@ $$
             "| Auditoría continua sin intervención | +800 €/año productividad |\n"
             "| **Bruto** | **+2 300 €/año** |"
         ),
+        baseline_section="Sec 2.2 (incident reduction)",
     ),
     bibliography_section(
         [
@@ -689,6 +697,7 @@ Objetivos: $\text{Hit@5} \geq 0.85$, $\text{MRR} \geq 0.7$, Faithfulness ≥ 0.9
             "- Hallucinations del LLM: mitigar con tools de hechos verificables.\n"
             "- Coste API escala linealmente con uso: monitorizar."
         ),
+        baseline_section="Sec 2.2 (automation L1)",
     ),
     bibliography_section(
         [
@@ -757,6 +766,7 @@ debajo, pandas es más rápido.
             "| Setup Spark on K8s | -2 500 € one-time |\n"
             "| **Payback** | **~3 meses** |"
         ),
+        baseline_section="Sec 3 caso I (Spark TCO)",
     ),
     bibliography_section(
         [
@@ -830,6 +840,7 @@ Objetivos: mAP@0.5 ≥ 0.90 (car/truck), ≥ 0.75 (motorbike/bicycle).
             "| Compute GPU dedicada | -1 500 €/año |\n"
             "| **Neto** | **+15 500 €/año** |"
         ),
+        baseline_section="Sec 3 caso J (smart cities)",
     ),
     bibliography_section(
         [

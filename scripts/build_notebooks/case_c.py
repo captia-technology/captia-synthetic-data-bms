@@ -388,14 +388,20 @@ df.head()
             "Computamos features y discutimos cobertura.",
             """\
 def make_features(d):
+    # Features causales (anti NA-H): rolling+shift(1) para evitar leakage.
+    # Para cada timestamp t, la feature valve_duty_60 en t depende solo de
+    # valores en la ventana [t-60min, t-1min] (ventana causal estricta).
+    # El valor de `valve` en `t` NO entra en su propia feature de duty cycle.
+    # Sin shift(1) habria leakage del instante a predecir.
     f = pd.DataFrame(index=d.index)
     f["dt_supply_return"] = d["RA_TEMP"] - d["SA_TEMP"]
     f["dt_supply_outdoor"] = d["OA_TEMP"] - d["SA_TEMP"]
     f["valve"] = d["CCV"]
     f["fan"] = d["FAN_STATE"]
     f["fan_valve_diff"] = f["valve"] - f["fan"]
-    f["valve_duty_60"] = f["valve"].rolling("60min").mean()
-    f["fan_duty_60"] = f["fan"].rolling("60min").mean()
+    # Anti-leakage: rolling().shift(1) garantiza ventana causal.
+    f["valve_duty_60"] = f["valve"].rolling("60min").mean().shift(1)
+    f["fan_duty_60"] = f["fan"].rolling("60min").mean().shift(1)
     f["dt_lag_15"] = f["dt_supply_return"].shift(15)
     f["dt_change_15"] = f["dt_supply_return"] - f["dt_lag_15"]
     f["is_fault"] = d["is_fault"]
@@ -642,10 +648,23 @@ for name, s in scores.items():
 report = pd.DataFrame(rows).set_index("model")
 print(report)
 
-# Aserciones rigurosas: el mejor modelo debe batir el rule-based en AUC
-assert report["AUC"].max() > report.loc["rule_dT", "AUC"], "Ningún modelo bate la regla física"
-assert report["F1*"].max() > 0.5, "F1 óptimo demasiado bajo en el mejor modelo"
-print("Validaciones OK")
+# Aserciones rigurosas (anti NA-F): comparar contra baseline real, no umbral trivial.
+# rule_dT es la regla física (baseline). El mejor ML debe batirla en AUC.
+rule_auc = float(report.loc["rule_dT", "AUC"])
+best_auc = float(report["AUC"].max())
+best_f1 = float(report["F1*"].max())
+assert best_auc > rule_auc, (
+    f"Ningún modelo bate la regla física rule_dT (AUC_rule={rule_auc:.3f} vs best_ML={best_auc:.3f})"
+)
+assert best_f1 > 0.7, (
+    f"F1 óptimo {best_f1:.3f} < 0.7 — el modelo no es defendible para producción "
+    f"(threshold operativo HVAC: F1 >= 0.7 con FN(refrigerant_low) coste 1 800 EUR)"
+)
+assert best_auc > 0.85, (
+    f"AUC máximo {best_auc:.3f} < 0.85 — anomaly detection HVAC debería ser >= 0.85 "
+    f"con dataset etiquetado y firmas físicas distinguibles"
+)
+print(f"Validaciones OK: rule_AUC={rule_auc:.3f} best_AUC={best_auc:.3f} best_F1={best_f1:.3f}")
 """,
         ),
         section(
@@ -782,9 +801,34 @@ report
         section(
             14,
             "Validaciones",
-            "Recall por tipo no debe ser cero (sería detector ciego).",
+            "**Asserts cuantitativos por tipo de fallo** (anti NA-F):\n\n"
+            "- `recall_per_fault >= 0.3` en mock (diferenciable del azar para 4 clases ~0.25).\n"
+            "- `F1 macro > 0.45` en mock (vs 0.25 random).\n"
+            "- En **producción Simarro real** los thresholds operativos son\n"
+            "  `recall(refrigerant_low) >= 0.6` (FN coste 1 800 EUR, baseline Sec 2.4).\n"
+            "- Se reporta el valor pero no se bloquea con el threshold producción\n"
+            "  porque el mock LBNL FDD tiene firmas atenuadas vs RTU real.\n",
             """\
-assert (report["recall"] > 0.05).all()
+assert (report["recall"] >= 0.3).all(), (
+    f"Recall por tipo demasiado bajo en mock (anti NA-F): {report['recall'].to_dict()}"
+)
+f1_macro = float(report["f1"].mean())
+assert f1_macro > 0.45, (
+    f"F1 macro mock {f1_macro:.3f} <= 0.45 — modelo apenas mejor que aleatorio (4 clases)"
+)
+# Reportar threshold producción (no bloquea)
+PROD_F1_THRESHOLD = 0.6
+PROD_RECALL_RL_THRESHOLD = 0.6
+prod_status = "PASS" if f1_macro > PROD_F1_THRESHOLD else "WARN-mock"
+if "refrigerant_low" in report.index:
+    rl = float(report.loc["refrigerant_low", "recall"])
+    rl_status = "PASS" if rl >= PROD_RECALL_RL_THRESHOLD else "WARN-mock"
+    print(
+        f"Mock validado: F1_macro={f1_macro:.3f} (prod_threshold>{PROD_F1_THRESHOLD} {prod_status}) "
+        f"recall(refrigerant_low)={rl:.3f} (prod>{PROD_RECALL_RL_THRESHOLD} {rl_status})"
+    )
+else:
+    print(f"Mock validado: F1_macro={f1_macro:.3f}")
 """,
         ),
         section(

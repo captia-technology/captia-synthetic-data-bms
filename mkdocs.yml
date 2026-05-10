@@ -157,6 +157,16 @@ nav:
     - Validación E2E: audit/E2E_VALIDATION_REPORT.md
     - Realismo físico: audit/PHYSICAL_REALISM_REPORT.md
     - Plan de acción: audit/ACTION_PLAN.md
+    - Auditoría notebooks (Sprint 5):
+      - Estado: audit/notebooks/STATUS.md
+      - Final report: audit/notebooks/FINAL_NOTEBOOK_AUDIT_REPORT.md
+      - Inventario 45 nb: audit/notebooks/00_NOTEBOOK_INVENTORY.md
+      - Guidelines CAPTIA: audit/notebooks/CAPTIA_NOTEBOOK_GUIDELINES.md
+      - Template canónico: audit/notebooks/CAPTIA_NOTEBOOK_TEMPLATE.md
+      - Quality matrix: audit/notebooks/NOTEBOOK_QUALITY_MATRIX.md
+      - Plan refactor: audit/notebooks/NOTEBOOK_REFACTOR_PLAN.md
+      - Revisión temática: audit/notebooks/THEMATIC_REVIEW.md
+      - Reporte ejecución: audit/notebooks/REFACTOR_EXECUTION_REPORT.md
   - Operaciones:
     - Troubleshooting: operations/troubleshooting.md
     - Variables de entorno: operations/environment.md

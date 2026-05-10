@@ -750,9 +750,16 @@ plt.tight_layout()
         section(
             14,
             "Validaciones",
-            "Accuracy global > 0.6.",
+            "**Asserts cuantitativos no triviales** (anti NA-F):\n\n"
+            "- `acc > 0.7` (vs baseline aleatorio 1/N_classes ≈ 0.25 para 4 clases).\n"
+            "- `acc > 2 * baseline_random` para garantizar señal.\n"
+            "- Si falla → routing por keywords insuficiente, escalar a LLM.",
             """\
-assert acc > 0.55
+N_CLASSES = 4
+baseline_random = 1.0 / N_CLASSES
+assert acc > 0.7, f"Routing accuracy {acc:.3f} < 0.7 — golden set insuficiente o keywords frágiles"
+assert acc > 2 * baseline_random, f"Routing apenas mejora baseline aleatorio ({baseline_random:.2f})"
+print(f"acc={acc:.3f} (baseline_random={baseline_random:.3f}, ratio={acc/baseline_random:.1f}x)")
 """,
         ),
         section(

@@ -135,7 +135,7 @@ wait-init:  ## Block until influx-init AND metadata-bootstrap exit successfully 
 	done
 
 .PHONY: verify-metadata
-verify-metadata:  ## Verify captia_metadata is populated (210 captia_point_meta + 1 captia_domain_meta)
+verify-metadata:  ## Verify captia_metadata is populated (33 vars × N aulas + 1 domain_meta)
 	@bash -c '\
 	    TOKEN=$$(grep INFLUXDB_TOKEN .env | cut -d= -f2); \
 	    P=$$(curl -s -X POST "http://localhost:$${INFLUXDB_PORT_HOST:-8087}/api/v2/query?org=$${INFLUXDB_ORG:-captia}" \
@@ -146,9 +146,9 @@ verify-metadata:  ## Verify captia_metadata is populated (210 captia_point_meta 
 	        -H "Authorization: Token $$TOKEN" -H "Accept: application/csv" -H "Content-type: application/vnd.flux" \
 	        -d "from(bucket:\"captia_metadata\") |> range(start:0) |> filter(fn:(r) => r._measurement == \"captia_domain_meta\") |> filter(fn:(r) => r._field == \"domain_name\") |> count() |> group() |> sum()" \
 	        | tail -2 | head -1 | grep -oE "[0-9]+$$"); \
-	    EXPECTED_P=$$(( $${BMS_N_AULAS:-10} * 21 )); \
+	    EXPECTED_P=$$(( $${BMS_N_AULAS:-10} * 33 )); \
 	    if [ "$${P:-0}" -ge "$$EXPECTED_P" ] && [ "$${D:-0}" -ge "1" ]; then \
-	        echo "==> verify-metadata OK: $$P captia_point_meta (>= $$EXPECTED_P), $$D captia_domain_meta (>= 1)"; \
+	        echo "==> verify-metadata OK: $$P captia_point_meta (>= $$EXPECTED_P = N×(21 vendor + 12 derived)), $$D captia_domain_meta (>= 1)"; \
 	    else \
 	        echo "ERROR: captia_metadata under-populated. point_meta=$${P:-0}/$$EXPECTED_P, domain_meta=$${D:-0}/1"; \
 	        echo "Run: make metadata-bootstrap"; exit 1; \

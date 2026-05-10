@@ -119,7 +119,9 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
 
-    notebooks = sorted(NOTEBOOK_DIR.rglob("*.ipynb"))
+    # Excluye `notebooks/_templates/` — el template canónico tiene
+    # placeholders {{...}} y NO está pensado para ejecutarse.
+    notebooks = sorted(nb for nb in NOTEBOOK_DIR.rglob("*.ipynb") if "_templates" not in nb.parts)
     if args.filter:
         notebooks = [nb for nb in notebooks if args.filter in nb.as_posix()]
     if not notebooks:
@@ -159,7 +161,11 @@ def main() -> int:
         "results": sorted(results, key=lambda r: r["notebook"]),
     }
     report_path.write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"\nReporte: {report_path.relative_to(ROOT)}")
+    try:
+        rel_report = report_path.resolve().relative_to(ROOT)
+        print(f"\nReporte: {rel_report.as_posix()}")
+    except ValueError:
+        print(f"\nReporte: {report_path}")
     print(f"OK: {summary['ok']}  FAIL: {summary['failed']}")
 
     if summary["failed"]:

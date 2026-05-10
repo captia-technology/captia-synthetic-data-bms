@@ -26,7 +26,9 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-NOTEBOOKS = sorted((ROOT / "notebooks").rglob("*.ipynb"))
+# Excluye `notebooks/_templates/` — contiene el template canónico con
+# placeholders {{...}} que NO deben ser auditados como notebooks didácticos.
+NOTEBOOKS = sorted(p for p in (ROOT / "notebooks").rglob("*.ipynb") if "_templates" not in p.parts)
 
 # Hacer accesible el paquete `notebooks._common` cuando pytest no parte de la raíz.
 if str(ROOT) not in sys.path:
