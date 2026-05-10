@@ -13,31 +13,41 @@ theme:
     text: Inter
     code: JetBrains Mono
   palette:
+    # Light mode — paleta corporativa CAPTIA (azul #2451FF + verde IA #0CE879)
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: indigo
-      accent: indigo
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-7
         name: Cambiar a modo oscuro
+    # Dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: indigo
-      accent: indigo
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-4
         name: Cambiar a modo claro
   features:
     - navigation.instant
+    - navigation.tracking
     - navigation.tabs
     - navigation.tabs.sticky
     - navigation.sections
+    - navigation.expand
     - navigation.top
+    - navigation.footer
+    - navigation.indexes
     - search.suggest
     - search.highlight
+    - search.share
     - content.code.copy
     - content.code.annotate
+    - content.tabs.link
     - toc.follow
+  icon:
+    repo: fontawesome/brands/github
 
 extra_css:
   - assets/stylesheets/extra.css
@@ -167,7 +177,13 @@ nav:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/captiatechnology/CAPTIA-SYNTHETIC-DATA-BMS
+      link: https://github.com/captia-technology/CAPTIA-SYNTHETIC-DATA-BMS
+    - icon: fontawesome/solid/globe
+      link: https://captiatechnology.com
+      name: CAPTIA Technology
+    - icon: fontawesome/solid/envelope
+      link: mailto:jaime.sendra@captiatechnology.com
+      name: Contacto
   generator: false
 
 # strict deshabilitado por ahora: hay enlaces relativos a code paths

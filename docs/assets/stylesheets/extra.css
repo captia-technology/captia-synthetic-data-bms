@@ -1,65 +1,212 @@
-/* CAPTIA Synthetic Data BMS — Material theme overrides */
+/*
+ * CAPTIA Synthetic Data BMS — Paleta corporativa para MkDocs Material
+ *
+ * Aplicada desde captia.ai (sitio corporativo CAPTIA Technology):
+ *   Primary: #2451FF (azul corporativo)
+ *   Accent:  #0CE879 (verde IA)
+ *   Fuente:  Inter (text), JetBrains Mono (code)
+ *
+ * Source: C:\CAPTIA\CAPTIA.AI\captia.ai\docs\assets\stylesheets\extra.css
+ */
 
-:root {
-  --captia-primary: #4338ca;
-  --captia-accent:  #6366f1;
-  --captia-surface: #f8fafc;
-  --captia-border:  #e2e8f0;
-}
-
+/* ============================================
+   LIGHT MODE
+   ============================================ */
 [data-md-color-scheme="default"] {
-  --md-primary-fg-color: var(--captia-primary);
-  --md-accent-fg-color:  var(--captia-accent);
+  /* Primary */
+  --md-primary-fg-color: #2451FF;
+  --md-primary-fg-color--light: #5A7AFF;
+  --md-primary-fg-color--dark: #1B2FCC;
+
+  /* Accent */
+  --md-accent-fg-color: #0CE879;
+  --md-accent-fg-color--transparent: rgba(12, 232, 121, 0.12);
+
+  /* Typeset */
+  --md-typeset-color: #1A1C1F;
+  --md-typeset-a-color: #2451FF;
+
+  /* Code */
+  --md-code-bg-color: #F7F8FA;
+  --md-code-fg-color: #1A1C1F;
+
+  /* Footer */
+  --md-footer-bg-color: #1B2FCC;
+  --md-footer-bg-color--dark: #141F99;
+  --md-footer-fg-color: rgba(255, 255, 255, 0.85);
+  --md-footer-fg-color--light: rgba(255, 255, 255, 0.65);
+  --md-footer-fg-color--lighter: rgba(255, 255, 255, 0.45);
 }
 
+/* ============================================
+   DARK MODE
+   ============================================ */
 [data-md-color-scheme="slate"] {
-  --md-primary-fg-color: var(--captia-accent);
-  --md-accent-fg-color:  var(--captia-primary);
+  /* Primary */
+  --md-primary-fg-color: #5A7AFF;
+  --md-primary-fg-color--light: #7B96FF;
+  --md-primary-fg-color--dark: #2451FF;
+
+  /* Accent */
+  --md-accent-fg-color: #0CE879;
+  --md-accent-fg-color--transparent: rgba(12, 232, 121, 0.15);
+
+  /* Typeset */
+  --md-typeset-a-color: #5A7AFF;
+
+  /* Code */
+  --md-code-bg-color: #1e1e2e;
+
+  /* Default background */
+  --md-default-bg-color: #1a1a2e;
 }
 
-/* Tablas más densas y legibles */
+/* ============================================
+   HEADER
+   ============================================ */
+.md-header {
+  background-color: var(--md-primary-fg-color);
+}
+
+.md-tabs {
+  background-color: var(--md-primary-fg-color--dark);
+}
+
+/* ============================================
+   NAVIGATION
+   ============================================ */
+
+/* Active nav item uses accent color */
+.md-nav__link--active {
+  color: var(--md-accent-fg-color) !important;
+  font-weight: 600;
+}
+
+/* Current section indicator */
+.md-nav__item--active > .md-nav__link {
+  color: var(--md-primary-fg-color);
+  font-weight: 600;
+}
+
+/* Sidebar nav: nested items más visibles */
+.md-nav__item--nested > .md-nav__link {
+  font-weight: 600;
+}
+
+/* ============================================
+   TABLES
+   ============================================ */
+.md-typeset table:not([class]) th {
+  background-color: var(--md-primary-fg-color);
+  color: #FFFFFF;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) th {
+  background-color: var(--md-primary-fg-color--dark);
+}
+
+.md-typeset table:not([class]) td {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.md-typeset table:not([class]) tr:hover td {
+  background-color: rgba(36, 81, 255, 0.04);
+}
+
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) tr:hover td {
+  background-color: rgba(90, 122, 255, 0.08);
+}
+
+/* Tablas más compactas para datos densos */
 .md-typeset table:not([class]) {
   font-size: 0.85rem;
 }
 
-.md-typeset table:not([class]) th {
-  background-color: var(--captia-primary);
-  color: #ffffff;
-  font-weight: 600;
-}
-
-.md-typeset table:not([class]) tr:nth-child(even) td {
-  background-color: var(--captia-surface);
-}
-
-[data-md-color-scheme="slate"] .md-typeset table:not([class]) tr:nth-child(even) td {
-  background-color: rgba(255, 255, 255, 0.03);
-}
-
-/* Code blocks */
+/* ============================================
+   CODE BLOCKS
+   ============================================ */
 .md-typeset code {
-  font-size: 0.85em;
-}
-
-/* Mermaid containers */
-.md-typeset .mermaid {
-  background-color: var(--captia-surface);
   border-radius: 4px;
-  padding: 1rem;
-  margin: 1rem 0;
+  font-size: 0.82em;
 }
 
-[data-md-color-scheme="slate"] .md-typeset .mermaid {
-  background-color: rgba(255, 255, 255, 0.03);
+.md-typeset pre > code {
+  border-radius: 8px;
 }
 
-/* Admonitions: highlight notes from auditoría */
+/* ============================================
+   ADMONITIONS
+   ============================================ */
+
+/* Tip uses accent green */
+.md-typeset .admonition.tip,
+.md-typeset details.tip {
+  border-color: #0CE879;
+}
+
+.md-typeset .tip > .admonition-title,
+.md-typeset .tip > summary {
+  background-color: rgba(12, 232, 121, 0.12);
+}
+
+/* Audit notes con accent corporativo */
 .md-typeset .admonition.audit,
 .md-typeset details.audit {
-  border-color: var(--captia-accent);
+  border-color: var(--md-accent-fg-color);
 }
 
-/* Sidebar nav: indentar más visiblemente */
-.md-nav__item--nested > .md-nav__link {
-  font-weight: 600;
+/* ============================================
+   MERMAID
+   ============================================ */
+.mermaid {
+  text-align: center;
+  margin: 1.5em 0;
+  background-color: rgba(36, 81, 255, 0.02);
+  border-radius: 6px;
+  padding: 1rem;
+}
+
+[data-md-color-scheme="slate"] .mermaid {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+/* ============================================
+   SEARCH
+   ============================================ */
+.md-search__input {
+  border-radius: 8px;
+}
+
+/* ============================================
+   CONTENT
+   ============================================ */
+
+/* Horizontal rule styling */
+.md-typeset hr {
+  border-color: rgba(36, 81, 255, 0.12);
+}
+
+/* Blockquote accent */
+.md-typeset blockquote {
+  border-left-color: var(--md-primary-fg-color--light);
+}
+
+/* Links hover */
+.md-typeset a:hover {
+  color: var(--md-primary-fg-color--dark);
+}
+
+/* ============================================
+   FOOTER
+   ============================================ */
+.md-footer {
+  background-color: var(--md-footer-bg-color);
 }
