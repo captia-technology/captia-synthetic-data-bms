@@ -1,66 +1,220 @@
 {
-  "title": "BMS Fallos HVAC — Caso C",
+  "title": "BMS · Fault Detection & Reliability (Caso C)",
   "uid": "bms-faults-c",
-  "tags": ["captia", "bms", "faults", "caseC"],
+  "tags": ["captia", "bms", "faults", "reliability", "caseC"],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "editable": true,
-  "refresh": "30s",
+  "refresh": "1m",
   "time": {"from": "now-7d", "to": "now"},
   "panels": [
     {
       "id": 1,
       "type": "stat",
-      "title": "Fallos inyectados (24h)",
+      "title": "Faults activos AHORA",
+      "description": "Eventos fault.* con value>0 en último sample. Cuenta de averías en curso.",
       "gridPos": {"x": 0, "y": 0, "w": 6, "h": 5},
       "targets": [
         {
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "sum(increase(captia_bms_faults_injected_total[24h]))",
+          "datasource": {"type": "influxdb", "uid": "influxdb"},
+          "query": "from(bucket: \"state_events\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"captia_point_state\")\n  |> filter(fn: (r) => r.variable =~ /^fault\\./)\n  |> last()\n  |> filter(fn: (r) => r._value > 0.0)\n  |> group()\n  |> count()",
           "refId": "A"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 1},
+              {"color": "red", "value": 5}
+            ]
+          },
+          "noValue": "0"
+        }
+      },
+      "options": {"colorMode": "background", "graphMode": "none"}
     },
     {
       "id": 2,
-      "type": "piechart",
-      "title": "Distribución por tipo (24h)",
-      "gridPos": {"x": 6, "y": 0, "w": 9, "h": 9},
+      "type": "stat",
+      "title": "Faults inyectados (24h)",
+      "description": "Total eventos fault.* iniciados en últimas 24h.",
+      "gridPos": {"x": 6, "y": 0, "w": 6, "h": 5},
       "targets": [
         {
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "sum by (fault_type) (increase(captia_bms_faults_injected_total[24h]))",
-          "legendFormat": "{{fault_type}}",
+          "datasource": {"type": "influxdb", "uid": "influxdb"},
+          "query": "from(bucket: \"state_events\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"captia_point_state\")\n  |> filter(fn: (r) => r.variable =~ /^fault\\./)\n  |> filter(fn: (r) => r._value > 0.0)\n  |> group()\n  |> count()",
           "refId": "A"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "none", "noValue": "0"}
+      }
     },
     {
       "id": 3,
-      "type": "timeseries",
-      "title": "Eventos de fallo (state_events)",
-      "gridPos": {"x": 15, "y": 0, "w": 9, "h": 9},
+      "type": "stat",
+      "title": "MTBF (h, último 7d, todas aulas)",
+      "description": "Mean Time Between Failures: ventana_horas / num_faults. Mayor = sistema más fiable.",
+      "gridPos": {"x": 12, "y": 0, "w": 6, "h": 5},
       "targets": [
         {
           "datasource": {"type": "influxdb", "uid": "influxdb"},
-          "query": "from(bucket: \"state_events\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"captia_fault_labels\" and r._field == \"active\")\n  |> aggregateWindow(every: 1h, fn: count, createEmpty: false)",
+          "query": "from(bucket: \"state_events\")\n  |> range(start: -7d)\n  |> filter(fn: (r) => r._measurement == \"captia_point_state\")\n  |> filter(fn: (r) => r.variable =~ /^fault\\./)\n  |> filter(fn: (r) => r._value > 0.0)\n  |> group()\n  |> count()\n  |> map(fn: (r) => ({ r with _value: 168.0 / float(v: r._value) }))",
           "refId": "A"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "h",
+          "decimals": 1,
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 24},
+              {"color": "green", "value": 168}
+            ]
+          },
+          "noValue": "—"
+        }
+      },
+      "options": {"colorMode": "value"}
     },
     {
       "id": 4,
-      "type": "table",
-      "title": "Fallos activos por aula",
-      "gridPos": {"x": 0, "y": 9, "w": 24, "h": 10},
+      "type": "stat",
+      "title": "Aulas afectadas (7d)",
+      "description": "Aulas distintas con al menos 1 fault en la ventana. % aulas problemáticas.",
+      "gridPos": {"x": 18, "y": 0, "w": 6, "h": 5},
       "targets": [
         {
           "datasource": {"type": "influxdb", "uid": "influxdb"},
-          "query": "from(bucket: \"state_events\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"captia_fault_labels\" and r._field == \"active\" and r._value == 1.0)\n  |> last()\n  |> group(columns: [\"asset_id\", \"fault_type\"])",
+          "query": "from(bucket: \"state_events\")\n  |> range(start: -7d)\n  |> filter(fn: (r) => r._measurement == \"captia_point_state\")\n  |> filter(fn: (r) => r.variable =~ /^fault\\./)\n  |> filter(fn: (r) => r._value > 0.0)\n  |> group(columns: [\"asset_id\"])\n  |> count()\n  |> group()\n  |> count()",
           "refId": "A"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "none", "noValue": "0"}
+      }
+    },
+    {
+      "id": 5,
+      "type": "piechart",
+      "title": "Distribución por tipo (7d)",
+      "description": "Proporción de cada tipo: sensor_drift / valve_stuck / fan_failure / refrigerant_low.",
+      "gridPos": {"x": 0, "y": 5, "w": 12, "h": 9},
+      "targets": [
+        {
+          "datasource": {"type": "influxdb", "uid": "influxdb"},
+          "query": "from(bucket: \"state_events\")\n  |> range(start: -7d)\n  |> filter(fn: (r) => r._measurement == \"captia_point_state\")\n  |> filter(fn: (r) => r.variable =~ /^fault\\./)\n  |> filter(fn: (r) => r._value > 0.0)\n  |> group(columns: [\"variable\"])\n  |> count()\n  |> group()\n  |> sort(columns: [\"_value\"], desc: true)",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {"displayMode": "table", "values": ["value", "percent"]}
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Faults timeline (severidad por evento)",
+      "description": "Cada punto = evento fault. Y-axis = severity (0.3-1.0). Color = tipo.",
+      "gridPos": {"x": 12, "y": 5, "w": 12, "h": 9},
+      "targets": [
+        {
+          "datasource": {"type": "influxdb", "uid": "influxdb"},
+          "query": "from(bucket: \"state_events\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"captia_point_state\")\n  |> filter(fn: (r) => r.variable =~ /^fault\\./)\n  |> filter(fn: (r) => r._value > 0.0)\n  |> keep(columns: [\"_time\", \"_value\", \"variable\", \"asset_id\"])",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "max": 1,
+          "custom": {"drawStyle": "points", "pointSize": 8, "lineWidth": 0}
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Top aulas por # faults (7d)",
+      "description": "Aulas más problemáticas con desglose por tipo. Click para drill-down.",
+      "gridPos": {"x": 0, "y": 14, "w": 12, "h": 9},
+      "targets": [
+        {
+          "datasource": {"type": "influxdb", "uid": "influxdb"},
+          "query": "from(bucket: \"state_events\")\n  |> range(start: -7d)\n  |> filter(fn: (r) => r._measurement == \"captia_point_state\")\n  |> filter(fn: (r) => r.variable =~ /^fault\\./)\n  |> filter(fn: (r) => r._value > 0.0)\n  |> group(columns: [\"asset_id\", \"variable\"])\n  |> count()\n  |> group()\n  |> pivot(rowKey: [\"asset_id\"], columnKey: [\"variable\"], valueColumn: \"_value\")",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"align": "center", "displayMode": "color-background"},
+          "color": {"mode": "continuous-YlRd"}
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "Severity media (faults activos)",
+      "description": "Severity media de los faults en curso. >0.7 = críticos, atender primero.",
+      "gridPos": {"x": 12, "y": 14, "w": 12, "h": 4},
+      "targets": [
+        {
+          "datasource": {"type": "influxdb", "uid": "influxdb"},
+          "query": "from(bucket: \"state_events\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"captia_point_state\")\n  |> filter(fn: (r) => r.variable =~ /^fault\\./)\n  |> last()\n  |> filter(fn: (r) => r._value > 0.0)\n  |> group()\n  |> mean()",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 2,
+          "min": 0,
+          "max": 1,
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 0.5},
+              {"color": "red", "value": 0.7}
+            ]
+          },
+          "noValue": "—"
+        }
+      },
+      "options": {"colorMode": "background"}
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Fault rate (eventos/día rolling)",
+      "description": "Tendencia de inestabilidad: subida sostenida = degradación HVAC.",
+      "gridPos": {"x": 12, "y": 18, "w": 12, "h": 5},
+      "targets": [
+        {
+          "datasource": {"type": "influxdb", "uid": "influxdb"},
+          "query": "from(bucket: \"state_events\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"captia_point_state\")\n  |> filter(fn: (r) => r.variable =~ /^fault\\./)\n  |> filter(fn: (r) => r._value > 0.0)\n  |> aggregateWindow(every: 6h, fn: count, createEmpty: true)\n  |> group()\n  |> aggregateWindow(every: 6h, fn: sum, createEmpty: true)\n  |> map(fn: (r) => ({ r with _value: float(v: r._value) * 4.0 }))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {"drawStyle": "bars", "fillOpacity": 70}
+        }
+      }
     }
   ]
 }

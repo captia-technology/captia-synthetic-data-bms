@@ -315,7 +315,19 @@ def make_traffic_camera_mock(
     days: int = 7,
     seed: int = DEFAULT_SEED,
 ) -> tuple[pd.DataFrame, MockMeta]:
-    """Mock conteo vehicular sintético + meteorología fusionada."""
+    """Mock conteo vehicular sintético + meteorología fusionada.
+
+    DGP **explícito** (evita leakage encubierto):
+
+    - ``vehicle_count(t) = base(hour, dow) · slowdown(rain) + ruido + offset(camera)``
+    - ``congestion_level(t)`` con regla MIXTA:
+        1. nivel base por hora/dow,
+        2. lluvia (efecto ±1 nivel cuando ``precip > 1 mm``),
+        3. ruido categórico aleatorio.
+
+    No es función directa de ``vehicle_count``; el modelo del notebook debe
+    aprender la interacción ``cuenta + meteo + horario``.
+    """
     rng = _rng(seed)
     rows = []
     idx = pd.date_range("2024-09-01", periods=days * 24 * 4, freq="15min", tz="UTC")
@@ -328,11 +340,19 @@ def make_traffic_camera_mock(
         offset = int.from_bytes(hashlib.sha1(cam.encode()).digest()[:4], "big") % 30
         weekday = idx.weekday
         rush = ((idx.hour.isin([7, 8, 9, 17, 18, 19])) & (weekday < 5)).astype(float)
+        # Base: tráfico esperado según hora del día y día de la semana
         base = 30 + 50 * rush + 8 * np.sin(2 * np.pi * (idx.hour) / 24)
         rain = np.clip(rng.exponential(0.05, size=n) - 0.04, 0, 5)
-        slowdown = np.where(rain > 0.5, 0.8, 1.0)
+        rain_event = (rain > 1.0).astype(float)
+        slowdown = 1.0 - 0.18 * rain_event  # -18 % cuando llueve
         count = base * slowdown + rng.normal(0, 4, size=n) + offset
-        congestion = np.clip(np.digitize(count, [20, 60, 100]), 0, 3)
+
+        # congestion_level: regla MIXTA — no es binning de count
+        base_level = np.where(rush > 0, 2, np.where(idx.hour.isin([10, 11, 14, 15, 16]), 1, 0))
+        rain_bump = (rain_event * rng.choice([0, 1], size=n, p=[0.4, 0.6])).astype(int)
+        cat_noise = rng.choice([-1, 0, 0, 0, 1], size=n)
+        congestion = np.clip(base_level + rain_bump + cat_noise, 0, 3)
+
         rows.append(
             pd.DataFrame(
                 {

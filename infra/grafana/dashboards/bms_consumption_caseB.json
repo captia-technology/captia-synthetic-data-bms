@@ -1,65 +1,194 @@
 {
-  "title": "BMS Consumo eléctrico — Caso B",
+  "title": "BMS · Energy Analytics (Caso B)",
   "uid": "bms-consumption-b",
   "tags": ["captia", "bms", "consumption", "caseB"],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 3,
   "editable": true,
   "refresh": "1m",
   "time": {"from": "now-24h", "to": "now"},
   "panels": [
     {
       "id": 1,
-      "type": "timeseries",
-      "title": "Consumo eléctrico por aula (W)",
-      "gridPos": {"x": 0, "y": 0, "w": 24, "h": 9},
+      "type": "stat",
+      "title": "kWh hoy",
+      "description": "∫ power dt ≈ Σ(power_W × 5min) / 60 / 1000. Suma sobre todas las aulas.",
+      "gridPos": {"x": 0, "y": 0, "w": 6, "h": 5},
       "targets": [
         {
           "datasource": {"type": "influxdb", "uid": "influxdb"},
-          "query": "from(bucket: \"telemetry_1m\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"captia_point\" and r.variable == \"power_01\")\n  |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)",
+          "query": "from(bucket: \"telemetry\")\n  |> range(start: today())\n  |> filter(fn: (r) => r._measurement == \"captia_point\" and r.variable == \"power_01\")\n  |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({ r with _value: r._value * (5.0 / 60.0) / 1000.0 }))\n  |> group()\n  |> sum()",
           "refId": "A"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "kwatth", "decimals": 1, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}
+      },
+      "options": {"colorMode": "value", "graphMode": "none"}
     },
     {
       "id": 2,
-      "type": "timeseries",
-      "title": "Temperatura exterior (°C)",
-      "gridPos": {"x": 0, "y": 9, "w": 12, "h": 8},
+      "type": "stat",
+      "title": "Coste hoy (€, tarifa 0.18€/kWh)",
+      "gridPos": {"x": 6, "y": 0, "w": 6, "h": 5},
       "targets": [
         {
           "datasource": {"type": "influxdb", "uid": "influxdb"},
-          "query": "from(bucket: \"telemetry_1m\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"captia_point\" and r.variable == \"temperature-outdoor\")\n  |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)",
+          "query": "from(bucket: \"telemetry\")\n  |> range(start: today())\n  |> filter(fn: (r) => r._measurement == \"captia_point\" and r.variable == \"power_01\")\n  |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({ r with _value: r._value * (5.0 / 60.0) / 1000.0 * 0.18 }))\n  |> group()\n  |> sum()",
           "refId": "A"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "currencyEUR", "decimals": 2}
+      }
     },
     {
       "id": 3,
-      "type": "timeseries",
-      "title": "Daylight lux (proxy de irradiancia, vendor no genera solar_irradiance)",
-      "gridPos": {"x": 12, "y": 9, "w": 12, "h": 8},
+      "type": "stat",
+      "title": "Power ahora (kW total)",
+      "gridPos": {"x": 12, "y": 0, "w": 6, "h": 5},
       "targets": [
         {
           "datasource": {"type": "influxdb", "uid": "influxdb"},
-          "query": "from(bucket: \"telemetry_1m\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"captia_point\" and r.variable == \"daylight-lux\")\n  |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)",
+          "query": "from(bucket: \"telemetry\")\n  |> range(start: -2m)\n  |> filter(fn: (r) => r._measurement == \"captia_point\" and r.variable == \"power_01\")\n  |> last()\n  |> group()\n  |> sum()\n  |> map(fn: (r) => ({ r with _value: r._value / 1000.0 }))",
           "refId": "A"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "kwatt", "decimals": 2,
+          "color": {"mode": "thresholds"},
+          "thresholds": {"mode": "absolute", "steps": [
+            {"color": "green", "value": null},
+            {"color": "yellow", "value": 5},
+            {"color": "red", "value": 10}
+          ]}
+        }
+      },
+      "options": {"colorMode": "background"}
     },
     {
       "id": 4,
       "type": "stat",
-      "title": "Energía total 24h (kWh)",
-      "gridPos": {"x": 0, "y": 17, "w": 24, "h": 5},
+      "title": "Top consumidor 24h",
+      "gridPos": {"x": 18, "y": 0, "w": 6, "h": 5},
       "targets": [
         {
           "datasource": {"type": "influxdb", "uid": "influxdb"},
-          "query": "from(bucket: \"telemetry_1h\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"captia_point\" and r.variable == \"power_01\")\n  |> mean()\n  |> map(fn: (r) => ({ r with _value: r._value * 24.0 / 1000.0 }))\n  |> sum()",
+          "query": "from(bucket: \"telemetry\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"captia_point\" and r.variable == \"power_01\")\n  |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({ r with _value: r._value * (5.0 / 60.0) / 1000.0 }))\n  |> group(columns: [\"asset_id\"])\n  |> sum()\n  |> group()\n  |> top(n: 1, columns: [\"_value\"])\n  |> keep(columns: [\"asset_id\", \"_value\"])",
           "refId": "A"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "kwatth", "decimals": 1}
+      },
+      "options": {"textMode": "value_and_name"}
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Power por aula 24h (top-10) — kW",
+      "description": "Top 10 aulas por consumo total 24h. Series visible hasta 10 (no 70). Bucket: telemetry (raw).",
+      "gridPos": {"x": 0, "y": 5, "w": 24, "h": 9},
+      "targets": [
+        {
+          "datasource": {"type": "influxdb", "uid": "influxdb"},
+          "query": "topAulas = from(bucket: \"telemetry\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"captia_point\" and r.variable == \"power_01\")\n  |> group(columns: [\"asset_id\"])\n  |> mean()\n  |> group()\n  |> sort(columns: [\"_value\"], desc: true)\n  |> limit(n: 10)\n  |> keep(columns: [\"asset_id\"])\n  |> findColumn(fn: (key) => true, column: \"asset_id\")\n\nfrom(bucket: \"telemetry\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"captia_point\" and r.variable == \"power_01\")\n  |> filter(fn: (r) => contains(value: r.asset_id, set: topAulas))\n  |> aggregateWindow(every: 15m, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({ r with _value: r._value / 1000.0 }))\n  |> keep(columns: [\"_time\", \"_value\", \"asset_id\"])",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "kwatt",
+          "custom": {"lineWidth": 2, "fillOpacity": 5, "drawStyle": "line"}
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "T_exterior vs Power total — correlación clima/consumo",
+      "description": "Power total stack (eje izq) vs temperatura exterior (eje der). Correlación visual.",
+      "gridPos": {"x": 0, "y": 14, "w": 24, "h": 8},
+      "targets": [
+        {
+          "datasource": {"type": "influxdb", "uid": "influxdb"},
+          "query": "from(bucket: \"telemetry\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"captia_point\" and r.variable == \"power_01\")\n  |> aggregateWindow(every: 15m, fn: mean, createEmpty: false)\n  |> group(columns: [\"_time\"])\n  |> sum()\n  |> group()\n  |> map(fn: (r) => ({ r with _value: r._value / 1000.0, _field: \"power_total_kW\" }))\n  |> keep(columns: [\"_time\", \"_value\", \"_field\"])",
+          "refId": "A"
+        },
+        {
+          "datasource": {"type": "influxdb", "uid": "influxdb"},
+          "query": "from(bucket: \"telemetry\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"captia_point\" and r.variable == \"temperature-outdoor\")\n  |> aggregateWindow(every: 15m, fn: mean, createEmpty: false)\n  |> group()\n  |> aggregateWindow(every: 15m, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({ r with _field: \"T_outdoor_C\" }))\n  |> keep(columns: [\"_time\", \"_value\", \"_field\"])",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"drawStyle": "line", "lineWidth": 2, "fillOpacity": 10}
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "T_outdoor_C"},
+            "properties": [
+              {"id": "unit", "value": "celsius"},
+              {"id": "custom.axisPlacement", "value": "right"},
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}},
+              {"id": "custom.lineWidth", "value": 3},
+              {"id": "custom.fillOpacity", "value": 0}
+            ]
+          },
+          {
+            "matcher": {"id": "byName", "options": "power_total_kW"},
+            "properties": [
+              {"id": "unit", "value": "kwatt"},
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 7,
+      "type": "bargauge",
+      "title": "Top-10 aulas por kWh (24h)",
+      "description": "Ranking energético. Identifica candidatas a auditoría. Color rojo = mayor consumo.",
+      "gridPos": {"x": 0, "y": 22, "w": 12, "h": 9},
+      "targets": [
+        {
+          "datasource": {"type": "influxdb", "uid": "influxdb"},
+          "query": "from(bucket: \"telemetry\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"captia_point\" and r.variable == \"power_01\")\n  |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({ r with _value: r._value * (5.0 / 60.0) / 1000.0 }))\n  |> group(columns: [\"asset_id\"])\n  |> sum()\n  |> group()\n  |> sort(columns: [\"_value\"], desc: true)\n  |> limit(n: 10)\n  |> keep(columns: [\"asset_id\", \"_value\"])",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "kwatth", "decimals": 1,
+          "color": {"mode": "continuous-GrYlRd"}
+        }
+      },
+      "options": {"orientation": "horizontal", "displayMode": "gradient"}
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Load profile diario — kW total por hora",
+      "description": "Patrón 24h promedio del power total. Detecta picos y valles del día.",
+      "gridPos": {"x": 12, "y": 22, "w": 12, "h": 9},
+      "targets": [
+        {
+          "datasource": {"type": "influxdb", "uid": "influxdb"},
+          "query": "from(bucket: \"telemetry\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"captia_point\" and r.variable == \"power_01\")\n  |> aggregateWindow(every: 1h, fn: mean, createEmpty: false)\n  |> group(columns: [\"_time\"])\n  |> sum()\n  |> group()\n  |> map(fn: (r) => ({ r with _value: r._value / 1000.0 }))\n  |> keep(columns: [\"_time\", \"_value\"])",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "kwatt",
+          "custom": {"drawStyle": "bars", "fillOpacity": 70, "lineWidth": 0},
+          "color": {"mode": "continuous-BlPu"}
+        }
+      }
     }
   ]
 }

@@ -1,24 +1,192 @@
 {
-  "title": "BMS Overview",
+  "title": "BMS · System Health Cockpit",
   "uid": "bms-overview",
-  "tags": ["captia", "bms", "overview"],
+  "tags": ["captia", "bms", "ops"],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "editable": true,
   "refresh": "10s",
-  "time": {"from": "now-30m", "to": "now"},
+  "time": {"from": "now-1h", "to": "now"},
   "panels": [
     {
       "id": 1,
       "type": "stat",
-      "title": "Generator status",
-      "gridPos": {"x": 0, "y": 0, "w": 6, "h": 4},
+      "title": "Data freshness (s desde último point)",
+      "description": "Segundos desde el último DataPoint emitido. >60s = pipeline degradado.",
+      "gridPos": {"x": 0, "y": 0, "w": 6, "h": 5},
+      "targets": [
+        {
+          "datasource": {"type": "influxdb", "uid": "influxdb"},
+          "query": "from(bucket: \"telemetry\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"captia_point\")\n  |> keep(columns: [\"_time\"])\n  |> group()\n  |> max(column: \"_time\")\n  |> map(fn: (r) => ({ _value: float(v: int(v: now()) - int(v: r._time)) / 1000000000.0 }))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 0,
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 30},
+              {"color": "red", "value": 60}
+            ]
+          }
+        }
+      },
+      "options": {"colorMode": "background", "graphMode": "none"}
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Ingest rate (points/sec, last 5m)",
+      "description": "Throughput total de puntos llegando a InfluxDB. Esperado ≥ N_aulas × 14 vars / 5s.",
+      "gridPos": {"x": 6, "y": 0, "w": 6, "h": 5},
+      "targets": [
+        {
+          "datasource": {"type": "influxdb", "uid": "influxdb"},
+          "query": "from(bucket: \"telemetry\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"captia_point\")\n  |> count()\n  |> group()\n  |> sum()\n  |> map(fn: (r) => ({ r with _value: float(v: r._value) / 300.0 }))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1,
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 1},
+              {"color": "green", "value": 5}
+            ]
+          }
+        }
+      },
+      "options": {"colorMode": "background"}
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Active aulas (last 5m)",
+      "description": "Número de assets distintos emitiendo en últimos 5 min.",
+      "gridPos": {"x": 12, "y": 0, "w": 6, "h": 5},
+      "targets": [
+        {
+          "datasource": {"type": "influxdb", "uid": "influxdb"},
+          "query": "from(bucket: \"telemetry\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"captia_point\")\n  |> filter(fn: (r) => exists r._value)\n  |> group(columns: [\"asset_id\"])\n  |> count()\n  |> filter(fn: (r) => r._value > 0)\n  |> group()\n  |> count()",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Variables únicas (catálogo)",
+      "description": "Variables distintas activas. 21 esperadas según variables.yaml.",
+      "gridPos": {"x": 18, "y": 0, "w": 6, "h": 5},
+      "targets": [
+        {
+          "datasource": {"type": "influxdb", "uid": "influxdb"},
+          "query": "from(bucket: \"telemetry\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"captia_point\")\n  |> filter(fn: (r) => exists r._value)\n  |> group(columns: [\"variable\"])\n  |> count()\n  |> filter(fn: (r) => r._value > 0)\n  |> group()\n  |> count()",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 11},
+              {"color": "green", "value": 14}
+            ]
+          }
+        }
+      },
+      "options": {"colorMode": "background"}
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Ingest rate por bucket (points/min)",
+      "description": "Rate de inserción por bucket. Caída brusca → pipeline issue.",
+      "gridPos": {"x": 0, "y": 5, "w": 12, "h": 8},
+      "targets": [
+        {
+          "datasource": {"type": "influxdb", "uid": "influxdb"},
+          "query": "from(bucket: \"telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"captia_point\")\n  |> aggregateWindow(every: 1m, fn: count, createEmpty: true)\n  |> group()\n  |> aggregateWindow(every: 1m, fn: sum, createEmpty: true)\n  |> map(fn: (r) => ({ r with _field: \"telemetry\" }))",
+          "refId": "A"
+        },
+        {
+          "datasource": {"type": "influxdb", "uid": "influxdb"},
+          "query": "from(bucket: \"state_events\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"captia_point_state\")\n  |> aggregateWindow(every: 1m, fn: count, createEmpty: true)\n  |> group()\n  |> aggregateWindow(every: 1m, fn: sum, createEmpty: true)\n  |> map(fn: (r) => ({ r with _field: \"state_events\" }))",
+          "refId": "B"
+        },
+        {
+          "datasource": {"type": "influxdb", "uid": "influxdb"},
+          "query": "from(bucket: \"telemetry_1m\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"captia_point\")\n  |> aggregateWindow(every: 1m, fn: count, createEmpty: true)\n  |> group()\n  |> aggregateWindow(every: 1m, fn: sum, createEmpty: true)\n  |> map(fn: (r) => ({ r with _field: \"telemetry_1m_rollup\" }))",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "short", "custom": {"drawStyle": "line", "lineWidth": 2, "fillOpacity": 10}}
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Errores publish (Telegraf, /sec)",
+      "description": "Tasa de errores por motivo (retention, format, timeout). >0.1/s = investigar.",
+      "gridPos": {"x": 12, "y": 5, "w": 12, "h": 8},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "up{job=\"bms-data-generator\"}",
-          "legendFormat": "up",
+          "expr": "sum by (reason) (rate(captia_bms_publish_errors_total[5m]))",
+          "legendFormat": "{{reason}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "red", "value": 0.1}
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {"mode": "line+area"}
+          }
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Health por servicio (Prometheus up{})",
+      "description": "Estado de cada componente del stack.",
+      "gridPos": {"x": 0, "y": 13, "w": 12, "h": 7},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "up",
+          "instant": true,
+          "format": "table",
           "refId": "A"
         }
       ],
@@ -32,59 +200,34 @@
       }
     },
     {
-      "id": 2,
+      "id": 8,
       "type": "stat",
-      "title": "Active jobs",
-      "gridPos": {"x": 6, "y": 0, "w": 6, "h": 4},
+      "title": "Cardinality bucket telemetry (series únicas, 24h)",
+      "description": "N_aulas × N_variables. Crecimiento → cardinality leak.",
+      "gridPos": {"x": 12, "y": 13, "w": 12, "h": 7},
       "targets": [
         {
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "captia_bms_active_jobs",
+          "datasource": {"type": "influxdb", "uid": "influxdb"},
+          "query": "from(bucket: \"telemetry\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"captia_point\")\n  |> group(columns: [\"asset_id\", \"variable\"])\n  |> distinct(column: \"_value\")\n  |> count()\n  |> group()\n  |> count()",
           "refId": "A"
         }
-      ]
-    },
-    {
-      "id": 3,
-      "type": "timeseries",
-      "title": "Messages published / sec",
-      "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
-      "targets": [
-        {
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "sum by (topic) (rate(captia_bms_messages_published_total[1m]))",
-          "legendFormat": "{{topic}}",
-          "refId": "A"
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 1500},
+              {"color": "red", "value": 5000}
+            ]
+          }
         }
-      ]
-    },
-    {
-      "id": 4,
-      "type": "timeseries",
-      "title": "Publish errors / sec",
-      "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
-      "targets": [
-        {
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "sum by (reason) (rate(captia_bms_publish_errors_total[1m]))",
-          "legendFormat": "{{reason}}",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 5,
-      "type": "timeseries",
-      "title": "Points generated by asset (rate/min)",
-      "gridPos": {"x": 0, "y": 12, "w": 24, "h": 8},
-      "targets": [
-        {
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "sum by (asset) (rate(captia_bms_points_generated_total[1m]))",
-          "legendFormat": "{{asset}}",
-          "refId": "A"
-        }
-      ]
+      },
+      "options": {"colorMode": "background"}
     }
   ]
 }
